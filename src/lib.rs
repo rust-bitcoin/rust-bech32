@@ -40,19 +40,12 @@
 //!     hrp: "bech32".to_string(), 
 //!     data: vec![0x00, 0x01, 0x02] 
 //! };
-//! let encode = b.to_string().unwrap();
-//! assert_eq!(encode, "bech321qpz4nc4pe".to_string());
+//! let encoded = b.to_string().unwrap();
+//! assert_eq!(encoded, "bech321qpz4nc4pe".to_string());
+//! 
+//! let c = Bech32::from_string(encoded);
+//! assert_eq!(b, c.unwrap());
 //! ```
-// 
-// ```rust
-// use bech32;
-// 
-// let s: &str = "abcdef1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw";
-// 
-// let dec_result = Bech32.from_string("tb");
-// assert_eq!(enc_result.unwrap(), 
-//     "tb1qqqqqp399et2xygdj5xreqhjjvcmzhxw4aywxecjdzew6hylgvsesrxh6hy".to_string());
-// ```
 
 use std::{error, fmt};
 
