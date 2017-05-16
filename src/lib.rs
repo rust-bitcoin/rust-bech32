@@ -18,8 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-#![warn(missing_docs)]
-
 //! Encoding and decoding Bech32 Bitcoin Segwit Addresses
 //! 
 //! Encoding and decoding for Bech32 strings and Bitcoin Segregated Witness 
@@ -36,28 +34,230 @@
 //! # Examples
 //! 
 //! ```rust
-//! use bech32::wit_prog::WitnessProgram;
-//! 
-//! let witness_program = WitnessProgram {
-//!     version: 0,
-//!     program: vec![
-//!                 0x00, 0x00, 0x00, 0xc4, 0xa5, 0xca, 0xd4, 0x62, 
-//!                 0x21, 0xb2, 0xa1, 0x87, 0x90, 0x5e, 0x52, 0x66, 
-//!                 0x36, 0x2b, 0x99, 0xd5, 0xe9, 0x1c, 0x6c, 0xe2, 
-//!                 0x4d, 0x16, 0x5d, 0xab, 0x93, 0xe8, 0x64, 0x33]
+//! use bech32::Bech32;
+//!
+//! let b = Bech32 {
+//!     hrp: "bech32".to_string(), 
+//!     data: vec![0x00, 0x01, 0x02] 
 //! };
-//! 
-//! let enc_result = witness_program.to_address("tb".to_string());
-//! assert_eq!(enc_result.unwrap(), 
-//!     "tb1qqqqqp399et2xygdj5xreqhjjvcmzhxw4aywxecjdzew6hylgvsesrxh6hy".to_string());
+//! let encode = b.to_string().unwrap();
+//! assert_eq!(encode, "bech321qpz4nc4pe".to_string());
 //! ```
+// 
+// ```rust
+// use bech32;
+// 
+// let s: &str = "abcdef1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw";
+// 
+// let dec_result = Bech32.from_string("tb");
+// assert_eq!(enc_result.unwrap(), 
+//     "tb1qqqqqp399et2xygdj5xreqhjjvcmzhxw4aywxecjdzew6hylgvsesrxh6hy".to_string());
+// ```
 
-pub mod bech32;
-pub mod wit_prog;
+use std::{error, fmt};
+
+#[deny(missing_docs)]
+#[deny(non_upper_case_globals)]
+#[deny(non_camel_case_types)]
+#[deny(non_snake_case)]
+#[deny(unused_mut)]
+
+/// Grouping structure for the human-readable part and the data part
+/// of decoded Bech32 string.
+#[derive(PartialEq, Debug, Clone)]
+pub struct Bech32 {
+    /// Human-readable part
+    pub hrp: String,
+    /// Data payload
+    pub data: Vec<u8>
+}
+
+type EncodeResult = Result<String, Error>;
+type DecodeResult = Result<Bech32, Error>;
+
+impl Bech32 {
+    /// Encode as a string
+    pub fn to_string(&self) -> EncodeResult {
+        if self.hrp.len() < 1 {
+            return Err(Error::InvalidLength)
+        }
+        let hrp_bytes: Vec<u8> = self.hrp.clone().into_bytes();
+        let mut combined: Vec<u8> = self.data.clone();
+        combined.extend_from_slice(&create_checksum(&hrp_bytes, &self.data));
+        let mut encoded: String = format!("{}{}", self.hrp, SEP);
+        for p in combined {
+            if p >= 32 {
+                return Err(Error::InvalidData(p))
+            }
+            encoded.push(CHARSET[p as usize]);
+        }
+        Ok(encoded)
+    }
+
+    /// Decode from a string
+    pub fn from_string(s: String) -> DecodeResult {
+        // Ensure overall length is within bounds
+        let len: usize = s.len();
+        if len < 8 || len > 90 {
+            return Err(Error::InvalidLength)
+        }
+
+        // Check for missing separator
+        if s.find(SEP).is_none() {
+            return Err(Error::MissingSeparator)
+        }
+
+        // Split at separator and check for two pieces
+        let parts: Vec<&str> = s.rsplitn(2, SEP).collect();
+        let raw_hrp = parts[1];
+        let raw_data = parts[0];
+        if raw_hrp.len() < 1 || raw_data.len() < 6 {
+            return Err(Error::InvalidLength)
+        }
+
+        let mut has_lower: bool = false;
+        let mut has_upper: bool = false;
+        let mut hrp_bytes: Vec<u8> = Vec::new();
+        for b in raw_hrp.bytes() {
+            // Valid subset of ASCII
+            if b < 33 || b > 126 {
+                return Err(Error::InvalidChar(b))
+            }
+            let mut c = b;
+            // Lowercase
+            if b >= b'a' && b <= b'z' {
+                has_lower = true;
+            }
+            // Uppercase
+            if b >= b'A' && b <= b'Z' {
+                has_upper = true;
+                // Convert to lowercase
+                c = b + (b'a'-b'A');
+            }
+            hrp_bytes.push(c);
+        }
+
+        // Check data payload
+        let mut data_bytes: Vec<u8> = Vec::new();
+        for b in raw_data.bytes() {
+            // Aphanumeric only
+            if !((b >= b'0' && b <= b'9') || (b >= b'A' && b <= b'Z') || (b >= b'a' && b <= b'z')) {
+                return Err(Error::InvalidChar(b))
+            }
+            // Excludes these characters: [1,b,i,o]
+            if b == b'1' || b == b'b' || b == b'i' || b == b'o' {
+                return Err(Error::InvalidChar(b))
+            }
+            // Lowercase
+            if b >= b'a' && b <= b'z' {
+                has_lower = true;
+            }
+            let mut c = b;
+            // Uppercase
+            if b >= b'A' && b <= b'Z' {
+                has_upper = true;
+                // Convert to lowercase
+                c = b + (b'a'-b'A');
+            }
+            data_bytes.push(CHARSET_REV[c as usize] as u8);
+        }
+
+        // Ensure no mixed case
+        if has_lower && has_upper {
+            return Err(Error::MixedCase)
+        }
+
+        // Ensure checksum
+        if !verify_checksum(&hrp_bytes, &data_bytes) {
+            return Err(Error::InvalidChecksum)
+        }
+
+        // Remove checksum from data payload
+        let dbl: usize = data_bytes.len();
+        data_bytes.truncate(dbl - 6);
+
+        Ok(Bech32 {
+            hrp: String::from_utf8(hrp_bytes).unwrap(),
+            data: data_bytes
+        })
+    }
+}
+
+fn create_checksum(hrp: &Vec<u8>, data: &Vec<u8>) -> Vec<u8> {
+    let mut values: Vec<u8> = hrp_expand(hrp);
+    values.extend_from_slice(data);
+    // Pad with 6 zeros
+    values.extend_from_slice(&[0u8; 6]);
+    let plm: u32 = polymod(values) ^ 1;
+    let mut checksum: Vec<u8> = Vec::new();
+    for p in 0..6 {
+        checksum.push(((plm >> 5 * (5 - p)) & 0x1f) as u8);
+    }
+    checksum
+}
+
+fn verify_checksum(hrp: &Vec<u8>, data: &Vec<u8>) -> bool {
+    let mut exp = hrp_expand(hrp);
+    exp.extend_from_slice(data);
+    polymod(exp) == 1u32
+}
+
+fn hrp_expand(hrp: &Vec<u8>) -> Vec<u8> {
+    let mut v: Vec<u8> = Vec::new();
+    for b in hrp {
+        v.push(*b >> 5);
+    }
+    v.push(0);
+    for b in hrp {
+        v.push(*b & 0x1f);
+    }
+    v
+}
+
+fn polymod(values: Vec<u8>) -> u32 {
+    let mut chk: u32 = 1;
+    let mut b: u8;
+    for v in values {
+        b = (chk >> 25) as u8;
+        chk = (chk & 0x1ffffff) << 5 ^ (v as u32);
+        for i in 0..5 {
+            if (b >> i) & 1 == 1 {
+                chk ^= GEN[i]
+            }
+        }
+    }
+    chk
+}
+
+/// Human-readable part and data part separator
+const SEP: char = '1';
+
+/// Encoding character set. Maps data value -> char
+const CHARSET: [char; 32] = [
+    'q','p','z','r','y','9','x','8',
+    'g','f','2','t','v','d','w','0',
+    's','3','j','n','5','4','k','h',
+    'c','e','6','m','u','a','7','l'
+];
+
+// Reverse character set. Maps ASCII byte -> CHARSET index on [0,31]
+const CHARSET_REV: [i8; 128] = [
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    15, -1, 10, 17, 21, 20, 26, 30,  7,  5, -1, -1, -1, -1, -1, -1,
+    -1, 29, -1, 24, 13, 25,  9,  8, 23, -1, 18, 22, 31, 27, 19, -1,
+     1,  0,  3, 16, 11, 28, 12, 14,  6,  4,  2, -1, -1, -1, -1, -1,
+    -1, 29, -1, 24, 13, 25,  9,  8, 23, -1, 18, 22, 31, 27, 19, -1,
+     1,  0,  3, 16, 11, 28, 12, 14,  6,  4,  2, -1, -1, -1, -1, -1
+];
+
+/// Generator coefficients
+const GEN: [u32; 5] = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
 
 /// Error types for Bech32 encoding / decoding
 #[derive(PartialEq, Debug)]
-pub enum CodingError {
+pub enum Error {
     /// String does not contain the separator character
     MissingSeparator,
     /// The checksum does not match the rest of the data
@@ -65,67 +265,42 @@ pub enum CodingError {
     /// The data or human-readable part is too long or too short
     InvalidLength,
     /// Some part of the string contains an invalid character
-    InvalidChar,
+    InvalidChar(u8),
     /// Some part of the data has an invalid value
-    InvalidData,
+    InvalidData(u8),
     /// The whole string must be of one case
     MixedCase,
 }
 
-/// Error types for validating scriptpubkeys
-#[derive(PartialEq, Debug)]
-pub enum ScriptPubKeyError {
-    /// scriptpubkeys does not have enough data
-    TooShort,
-    /// The provided length byte does not match the data
-    InvalidLengthByte,
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Error::MissingSeparator => write!(f, "missing human-readable separator, \"{}\"", SEP),
+            Error::InvalidChecksum => write!(f, "invalid checksum"),
+            Error::InvalidLength => write!(f, "invalid length"),
+            Error::InvalidChar(n) => write!(f, "invalid character (code={})", n),
+            Error::InvalidData(n) => write!(f, "invalid data point ({})", n),
+            Error::MixedCase => write!(f, "mixed-case strings not allowed"),
+        }
+    }
 }
 
-/// Error types for witness programs
-///
-/// BIP141 specifies Segregated Witness and defines valid program lengths
-/// for Version 0 scripts. Script version is also limited to values 0-16.
-#[derive(PartialEq, Debug)]
-pub enum WitnessProgramError {
-    /// Denotes that the WitnessProgram is too long or too short
-    ///
-    /// Programs must be between 2 and 40 bytes
-    InvalidLength,
-    /// Given the program version, the length is invalid
-    ///
-    /// Version 0 scripts must be either 20 or 32 bytes
-    InvalidVersionLength,
-    /// Script version must be 0 to 16 inclusive
-    InvalidScriptVersion,
-}
-
-/// Error types during bit conversion
-#[derive(PartialEq, Debug)]
-pub enum BitConversionError {
-    /// Input value exceeds "from bits" size
-    InvalidInputValue(u8),
-    /// Invalid padding values in data
-    InvalidPadding,
-}
-
-/// Error types while encoding and decoding SegWit addresses
-#[derive(PartialEq, Debug)]
-pub enum AddressError {
-    /// Some Bech32 conversion error
-    Bech32(CodingError),
-    /// Some witness program error
-    WitnessProgram(WitnessProgramError),
-    /// Some 5-bit <-> 8-bit conversion error
-    Conversion(BitConversionError),
-    /// The provided human-readable portion does not match
-    HumanReadableMismatch,
-    /// The human-readable part is invalid (must be "bc" or "tb")
-    InvalidHumanReadablePart,
+impl error::Error for Error {
+    fn description(&self) -> &str {
+        match *self {
+            Error::MissingSeparator => "missing human-readable separator",
+            Error::InvalidChecksum => "invalid checksum",
+            Error::InvalidLength => "invalid length",
+            Error::InvalidChar(_) => "invalid character",
+            Error::InvalidData(_) => "invalid data point",
+            Error::MixedCase => "mixed-case strings not allowed",
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use Bech32;
 
     #[test]
     fn valid_checksum() {
@@ -137,7 +312,7 @@ mod tests {
             "split1checkupstagehandshakeupstreamerranterredcaperred2y9e3w",
         );
         for s in strings {
-            let decode_result = bech32::Bech32::from_string(s.to_string());
+            let decode_result = Bech32::from_string(s.to_string());
             if !decode_result.is_ok() {
                 panic!("Did not decode: {:?} Reason: {:?}", s, decode_result.unwrap_err());
             }
@@ -145,124 +320,6 @@ mod tests {
             let encode_result = decode_result.unwrap().to_string();
             assert!(encode_result.is_ok());
             assert_eq!(s.to_lowercase(), encode_result.unwrap().to_lowercase());
-        }
-    }
-
-    #[test]
-    fn valid_address() {
-        let pairs: Vec<(&str, Vec<u8>)> = vec![
-            (
-                "BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4",
-                vec![
-                    0x00, 0x14, 0x75, 0x1e, 0x76, 0xe8, 0x19, 0x91, 0x96, 0xd4, 0x54,
-                    0x94, 0x1c, 0x45, 0xd1, 0xb3, 0xa3, 0x23, 0xf1, 0x43, 0x3b, 0xd6
-                ]
-            ),
-            (
-                "tb1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3q0sl5k7",
-                vec![
-                    0x00, 0x20, 0x18, 0x63, 0x14, 0x3c, 0x14, 0xc5, 0x16, 0x68, 0x04,
-                    0xbd, 0x19, 0x20, 0x33, 0x56, 0xda, 0x13, 0x6c, 0x98, 0x56, 0x78,
-                    0xcd, 0x4d, 0x27, 0xa1, 0xb8, 0xc6, 0x32, 0x96, 0x04, 0x90, 0x32,
-                    0x62
-                ]
-            ),
-            (
-                "bc1pw508d6qejxtdg4y5r3zarvary0c5xw7kw508d6qejxtdg4y5r3zarvary0c5xw7k7grplx",
-                vec![
-                    0x81, 0x28, 0x75, 0x1e, 0x76, 0xe8, 0x19, 0x91, 0x96, 0xd4, 0x54,
-                    0x94, 0x1c, 0x45, 0xd1, 0xb3, 0xa3, 0x23, 0xf1, 0x43, 0x3b, 0xd6,
-                    0x75, 0x1e, 0x76, 0xe8, 0x19, 0x91, 0x96, 0xd4, 0x54, 0x94, 0x1c,
-                    0x45, 0xd1, 0xb3, 0xa3, 0x23, 0xf1, 0x43, 0x3b, 0xd6
-                ]
-            ),
-            (
-                "BC1SW50QA3JX3S",
-                vec![
-                   0x90, 0x02, 0x75, 0x1e
-                ]
-            ),
-            (
-                "bc1zw508d6qejxtdg4y5r3zarvaryvg6kdaj",
-                vec![
-                    0x82, 0x10, 0x75, 0x1e, 0x76, 0xe8, 0x19, 0x91, 0x96, 0xd4, 0x54,
-                    0x94, 0x1c, 0x45, 0xd1, 0xb3, 0xa3, 0x23
-                ]
-            ),
-            (
-                "tb1qqqqqp399et2xygdj5xreqhjjvcmzhxw4aywxecjdzew6hylgvsesrxh6hy",
-                vec![
-                    0x00, 0x20, 0x00, 0x00, 0x00, 0xc4, 0xa5, 0xca, 0xd4, 0x62, 0x21,
-                    0xb2, 0xa1, 0x87, 0x90, 0x5e, 0x52, 0x66, 0x36, 0x2b, 0x99, 0xd5,
-                    0xe9, 0x1c, 0x6c, 0xe2, 0x4d, 0x16, 0x5d, 0xab, 0x93, 0xe8, 0x64,
-                    0x33
-                ]
-            ),
-        ];
-        for p in pairs {
-            let (address, scriptpubkey) = p;
-            let mut hrp = "bc".to_string();
-            let mut dec_result = wit_prog::WitnessProgram::from_address(hrp.clone(),
-                address.to_string());
-            if !dec_result.is_ok() {
-                hrp = "tb".to_string();
-                dec_result = wit_prog::WitnessProgram::from_address(hrp.clone(),
-                    address.to_string());
-                if !dec_result.is_ok() {
-                    println!("Should be valid: {:?}", address);
-                }
-            }
-            assert!(dec_result.is_ok());
-
-            let prog = dec_result.unwrap();
-            let pubkey = prog.clone().to_scriptpubkey();
-            assert_eq!(pubkey, scriptpubkey);
-
-            let spk_result = wit_prog::WitnessProgram::from_scriptpubkey(&scriptpubkey);
-            assert!(spk_result.is_ok());
-            assert_eq!(prog, spk_result.unwrap());
-
-            let enc_result = prog.to_address(hrp);
-            assert!(enc_result.is_ok());
-
-            let enc_address = enc_result.unwrap();
-            assert_eq!(address.to_lowercase(), enc_address.to_lowercase());
-        }
-    }
-
-    #[test]
-    fn invalid_address() {
-        let pairs: Vec<(&str, AddressError)> = vec!(
-            ("tc1qw508d6qejxtdg4y5r3zarvary0c5xw7kg3g4ty",
-                AddressError::InvalidHumanReadablePart),
-            ("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t5",
-                AddressError::Bech32(CodingError::InvalidChecksum)),
-            ("BC13W508D6QEJXTDG4Y5R3ZARVARY0C5XW7KN40WF2",
-                AddressError::WitnessProgram(WitnessProgramError::InvalidScriptVersion)),
-            ("bc1rw5uspcuh",
-                AddressError::WitnessProgram(WitnessProgramError::InvalidLength)),
-            ("bc10w508d6qejxtdg4y5r3zarvary0c5xw7kw508d6qejxtdg4y5r3zarvary0c5xw7kw5rljs90",
-                AddressError::Bech32(CodingError::InvalidLength)),
-            ("BC1QR508D6QEJXTDG4Y5R3ZARVARYV98GJ9P",
-                AddressError::WitnessProgram(WitnessProgramError::InvalidVersionLength)),
-            ("tb1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3q0sL5k7",
-                AddressError::Bech32(CodingError::MixedCase)),
-            ("tb1pw508d6qejxtdg4y5r3zarqfsj6c3",
-                AddressError::Conversion(BitConversionError::InvalidPadding)),
-            ("tb1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3pjxtptv",
-                AddressError::Conversion(BitConversionError::InvalidPadding)),
-        );
-        for p in pairs {
-            let (address, desired_error) = p;
-            let hrp = address[0..2].to_string();
-            let dec_result = wit_prog::WitnessProgram::from_address(
-                hrp.to_lowercase(), address.to_string());
-            println!("{:?}", address.to_string());
-            if dec_result.is_ok() {
-                println!("{:?}", dec_result.unwrap());
-                panic!("Should be invalid: {:?}", address);
-            }
-            assert_eq!(dec_result.unwrap_err(), desired_error);
         }
     }
 }
