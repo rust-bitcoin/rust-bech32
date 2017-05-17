@@ -47,13 +47,13 @@
 //! assert_eq!(b, c.unwrap());
 //! ```
 
-use std::{error, fmt};
+#![deny(missing_docs)]
+#![deny(non_upper_case_globals)]
+#![deny(non_camel_case_types)]
+#![deny(non_snake_case)]
+#![deny(unused_mut)]
 
-#[deny(missing_docs)]
-#[deny(non_upper_case_globals)]
-#[deny(non_camel_case_types)]
-#[deny(non_snake_case)]
-#[deny(unused_mut)]
+use std::{error, fmt};
 
 /// Grouping structure for the human-readable part and the data part
 /// of decoded Bech32 string.
