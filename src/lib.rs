@@ -290,6 +290,7 @@ impl error::Error for Error {
 #[cfg(test)]
 mod tests {
     use Bech32;
+    use Error;
 
     #[test]
     fn valid_checksum() {
@@ -309,6 +310,38 @@ mod tests {
             let encode_result = decode_result.unwrap().to_string();
             assert!(encode_result.is_ok());
             assert_eq!(s.to_lowercase(), encode_result.unwrap().to_lowercase());
+        }
+    }
+
+    #[test]
+    fn invalid() {
+        let pairs: Vec<(&str, Error)> = vec!(
+            (" 1nwldj5",
+                Error::InvalidChar(b' ')),
+            ("\x7f1axkwrx",
+                Error::InvalidChar(0x7f)),
+            ("an84characterslonghumanreadablepartthatcontainsthenumber1andtheexcludedcharactersbio1569pvx",
+                Error::InvalidLength),
+            ("pzry9x0s0muk",
+                Error::MissingSeparator),
+            ("1pzry9x0s0muk",
+                Error::InvalidLength),
+            ("x1b4n0q5v",
+                Error::InvalidChar(b'b')),
+            ("li1dgmt3",
+                Error::InvalidLength),
+            ("de1lg7wt\u{ff}",
+                Error::InvalidChar(0xc3)), // ASCII 0xff -> \uC3BF in UTF-8
+        );
+        for p in pairs {
+            let (s, expected_error) = p;
+            let dec_result = Bech32::from_string(s.to_string());
+            println!("{:?}", s.to_string());
+            if dec_result.is_ok() {
+                println!("{:?}", dec_result.unwrap());
+                panic!("Should be invalid: {:?}", s);
+            }
+            assert_eq!(dec_result.unwrap_err(), expected_error);
         }
     }
 }
