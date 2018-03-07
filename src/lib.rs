@@ -33,7 +33,7 @@
 //! use bech32::Bech32;
 //!
 //! let b = Bech32::new("bech32".into(), vec![0x00, 0x01, 0x02]).unwrap();
-//! let encoded = b.to_string().unwrap();
+//! let encoded = b.to_string();
 //! assert_eq!(encoded, "bech321qpz4nc4pe".to_string());
 //!
 //! let c = encoded.parse::<Bech32>();
@@ -93,14 +93,16 @@ impl Bech32 {
 
     /// Encode as a string
     pub fn to_string(&self) -> String {
-        let hrp_bytes: Vec<u8> = self.hrp.clone().into_bytes();
-        let mut combined: Vec<u8> = self.data.clone();
-        combined.extend_from_slice(&create_checksum(&hrp_bytes, &self.data));
-        let mut encoded: String = format!("{}{}", self.hrp, SEP);
-        for p in combined {
-            encoded.push(CHARSET[p as usize]);
-        }
-        encoded
+        let hrp_bytes: &[u8] = self.hrp.as_bytes();
+        let checksum = create_checksum(&hrp_bytes, &self.data);
+        let data_part = self.data.iter().chain(checksum.iter());
+
+        format!(
+            "{}{}{}",
+            self.hrp,
+            SEP,
+            data_part.map(|p| CHARSET[*p as usize]).collect::<String>()
+        )
     }
 }
 
@@ -196,7 +198,7 @@ impl FromStr for Bech32 {
     }
 }
 
-fn create_checksum(hrp: &Vec<u8>, data: &Vec<u8>) -> Vec<u8> {
+fn create_checksum(hrp: &[u8], data: &[u8]) -> Vec<u8> {
     let mut values: Vec<u8> = hrp_expand(hrp);
     values.extend_from_slice(data);
     // Pad with 6 zeros
@@ -215,7 +217,7 @@ fn verify_checksum(hrp: &Vec<u8>, data: &Vec<u8>) -> bool {
     polymod(exp) == 1u32
 }
 
-fn hrp_expand(hrp: &Vec<u8>) -> Vec<u8> {
+fn hrp_expand(hrp: &[u8]) -> Vec<u8> {
     let mut v: Vec<u8> = Vec::new();
     for b in hrp {
         v.push(*b >> 5);
@@ -383,8 +385,7 @@ mod tests {
             }
             assert!(decode_result.is_ok());
             let encode_result = decode_result.unwrap().to_string();
-            assert!(encode_result.is_ok());
-            assert_eq!(s.to_lowercase(), encode_result.unwrap().to_lowercase());
+            assert_eq!(s.to_lowercase(), encode_result.to_lowercase());
         }
     }
 
