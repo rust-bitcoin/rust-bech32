@@ -92,21 +92,15 @@ impl Bech32 {
     }
 
     /// Encode as a string
-    pub fn to_string(&self) -> EncodeResult {
-        if self.hrp.len() < 1 {
-            return Err(Error::InvalidLength)
-        }
+    pub fn to_string(&self) -> String {
         let hrp_bytes: Vec<u8> = self.hrp.clone().into_bytes();
         let mut combined: Vec<u8> = self.data.clone();
         combined.extend_from_slice(&create_checksum(&hrp_bytes, &self.data));
         let mut encoded: String = format!("{}{}", self.hrp, SEP);
         for p in combined {
-            if p >= 32 {
-                return Err(Error::InvalidData(p))
-            }
             encoded.push(CHARSET[p as usize]);
         }
-        Ok(encoded)
+        encoded
     }
 }
 
