@@ -439,7 +439,6 @@ mod tests {
         for p in pairs {
             let (s, expected_error) = p;
             let dec_result = s.parse::<Bech32>();
-            println!("{:?}", s.to_string());
             if dec_result.is_ok() {
                 println!("{:?}", dec_result.unwrap());
                 panic!("Should be invalid: {:?}", s);
