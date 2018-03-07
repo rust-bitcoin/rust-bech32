@@ -39,7 +39,7 @@
 //! let encoded = b.to_string().unwrap();
 //! assert_eq!(encoded, "bech321qpz4nc4pe".to_string());
 //! 
-//! let c = Bech32::from_string(encoded);
+//! let c = encoded.parse::<Bech32>();
 //! assert_eq!(b, c.unwrap());
 //! ```
 
@@ -50,6 +50,7 @@
 #![deny(unused_mut)]
 
 use std::{error, fmt};
+use std::str::FromStr;
 
 /// Grouping structure for the human-readable part and the data part
 /// of decoded Bech32 string.
@@ -82,9 +83,13 @@ impl Bech32 {
         }
         Ok(encoded)
     }
+}
+
+impl FromStr for Bech32 {
+    type Err = Error;
 
     /// Decode from a string
-    pub fn from_string(s: String) -> DecodeResult {
+    fn from_str(s: &str) -> DecodeResult {
         // Ensure overall length is within bounds
         let len: usize = s.len();
         if len < 8 || len > 90 {
@@ -302,7 +307,7 @@ mod tests {
             "split1checkupstagehandshakeupstreamerranterredcaperred2y9e3w",
         );
         for s in strings {
-            let decode_result = Bech32::from_string(s.to_string());
+            let decode_result = s.parse::<Bech32>();
             if !decode_result.is_ok() {
                 panic!("Did not decode: {:?} Reason: {:?}", s, decode_result.unwrap_err());
             }
@@ -335,7 +340,7 @@ mod tests {
         );
         for p in pairs {
             let (s, expected_error) = p;
-            let dec_result = Bech32::from_string(s.to_string());
+            let dec_result = s.parse::<Bech32>();
             println!("{:?}", s.to_string());
             if dec_result.is_ok() {
                 println!("{:?}", dec_result.unwrap());
