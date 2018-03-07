@@ -373,6 +373,28 @@ mod tests {
     use convert_bits;
 
     #[test]
+    fn new_checks() {
+        assert!(Bech32::new("test".into(), vec![1, 2, 3, 4]).is_ok());
+        assert_eq!(Bech32::new("".into(), vec![1, 2, 3, 4]), Err(Error::InvalidLength));
+        assert_eq!(Bech32::new("test".into(), vec![30, 31, 35, 20]), Err(Error::InvalidData(35)));
+
+        let both = Bech32::new("".into(), vec![30, 31, 35, 20]);
+        assert!(both == Err(Error::InvalidLength) || both == Err(Error::InvalidData(35)));
+    }
+
+    #[test]
+    fn getters() {
+        let bech: Bech32 = "BC1SW50QA3JX3S".parse().unwrap();
+        let data: Vec<u8> = vec![16, 14, 20, 15, 0];
+        assert_eq!(bech.hrp(), "bc");
+        assert_eq!(
+            bech.data(),
+            data.as_slice()
+        );
+        assert_eq!(bech.into_parts(), ("bc".to_owned(), data));
+    }
+
+    #[test]
     fn valid_checksum() {
         let strings: Vec<&str> = vec!(
             "A12UEL5L",
