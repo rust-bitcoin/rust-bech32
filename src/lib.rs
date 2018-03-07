@@ -32,10 +32,7 @@
 //! ```rust
 //! use bech32::Bech32;
 //!
-//! let b = Bech32 {
-//!     hrp: "bech32".to_string(),
-//!     data: vec![0x00, 0x01, 0x02]
-//! };
+//! let b = Bech32::new("bech32".into(), vec![0x00, 0x01, 0x02]).unwrap();
 //! let encoded = b.to_string().unwrap();
 //! assert_eq!(encoded, "bech321qpz4nc4pe".to_string());
 //!
@@ -57,15 +54,43 @@ use std::str::FromStr;
 #[derive(PartialEq, Debug, Clone)]
 pub struct Bech32 {
     /// Human-readable part
-    pub hrp: String,
+    hrp: String,
     /// Data payload
-    pub data: Vec<u8>
+    data: Vec<u8>
 }
 
 type EncodeResult = Result<String, Error>;
 type DecodeResult = Result<Bech32, Error>;
 
 impl Bech32 {
+
+    /// Constructs a `Bech32` struct if the result can be encoded as a bech32 string.
+    pub fn new(hrp: String, data: Vec<u8>) -> Result<Bech32, Error> {
+        if hrp.is_empty() {
+            return Err(Error::InvalidLength)
+        }
+        if let Some(bad_byte) = data.iter().find(|&&x| x >= 32) {
+            return Err(Error::InvalidData(bad_byte.clone()));
+        }
+
+        Ok(Bech32 {hrp, data})
+    }
+
+    /// Returns the human readable part
+    pub fn hrp(&self) -> &str {
+        &self.hrp
+    }
+
+    /// Returns the data part as `[u8]` but only using 5 bits per byte
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+
+    /// Destructures the `Bech32` struct into it's parts
+    pub fn into_parts(self) -> (String, Vec<u8>) {
+        (self.hrp, self.data)
+    }
+
     /// Encode as a string
     pub fn to_string(&self) -> EncodeResult {
         if self.hrp.len() < 1 {
