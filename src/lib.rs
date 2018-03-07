@@ -48,6 +48,7 @@
 
 use std::{error, fmt};
 use std::str::FromStr;
+use std::fmt::{Display, Formatter};
 
 /// Grouping structure for the human-readable part and the data part
 /// of decoded Bech32 string.
@@ -90,14 +91,16 @@ impl Bech32 {
     pub fn into_parts(self) -> (String, Vec<u8>) {
         (self.hrp, self.data)
     }
+}
 
-    /// Encode as a string
-    pub fn to_string(&self) -> String {
+impl Display for Bech32 {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let hrp_bytes: &[u8] = self.hrp.as_bytes();
         let checksum = create_checksum(&hrp_bytes, &self.data);
         let data_part = self.data.iter().chain(checksum.iter());
 
-        format!(
+        write!(
+            f,
             "{}{}{}",
             self.hrp,
             SEP,
