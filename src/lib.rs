@@ -70,7 +70,7 @@ impl Bech32 {
             return Err(Error::InvalidLength)
         }
         if let Some(bad_byte) = data.iter().find(|&&x| x >= 32) {
-            return Err(Error::InvalidData(bad_byte.clone()));
+            return Err(Error::InvalidData(*bad_byte));
         }
 
         Ok(Bech32 {hrp, data})
@@ -205,7 +205,7 @@ fn create_checksum(hrp: &[u8], data: &[u8]) -> Vec<u8> {
     values.extend_from_slice(data);
     // Pad with 6 zeros
     values.extend_from_slice(&[0u8; 6]);
-    let plm: u32 = polymod(values) ^ 1;
+    let plm: u32 = polymod(&values) ^ 1;
     let mut checksum: Vec<u8> = Vec::new();
     for p in 0..6 {
         checksum.push(((plm >> 5 * (5 - p)) & 0x1f) as u8);
@@ -213,10 +213,10 @@ fn create_checksum(hrp: &[u8], data: &[u8]) -> Vec<u8> {
     checksum
 }
 
-fn verify_checksum(hrp: &Vec<u8>, data: &Vec<u8>) -> bool {
+fn verify_checksum(hrp: &[u8], data: &[u8]) -> bool {
     let mut exp = hrp_expand(hrp);
     exp.extend_from_slice(data);
-    polymod(exp) == 1u32
+    polymod(&exp) == 1u32
 }
 
 fn hrp_expand(hrp: &[u8]) -> Vec<u8> {
@@ -231,12 +231,12 @@ fn hrp_expand(hrp: &[u8]) -> Vec<u8> {
     v
 }
 
-fn polymod(values: Vec<u8>) -> u32 {
+fn polymod(values: &[u8]) -> u32 {
     let mut chk: u32 = 1;
     let mut b: u8;
     for v in values {
         b = (chk >> 25) as u8;
-        chk = (chk & 0x1ffffff) << 5 ^ (v as u32);
+        chk = (chk & 0x1ffffff) << 5 ^ (*v as u32);
         for i in 0..5 {
             if (b >> i) & 1 == 1 {
                 chk ^= GEN[i]
