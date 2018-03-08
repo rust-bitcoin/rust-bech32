@@ -95,7 +95,7 @@ impl Bech32 {
 impl Display for Bech32 {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let hrp_bytes: &[u8] = self.hrp.as_bytes();
-        let checksum = create_checksum(&hrp_bytes, &self.data);
+        let checksum = create_checksum(hrp_bytes, &self.data);
         let data_part = self.data.iter().chain(checksum.iter());
 
         write!(
@@ -169,13 +169,16 @@ impl FromStr for Bech32 {
             if b >= b'a' && b <= b'z' {
                 has_lower = true;
             }
-            let mut c = b;
+
             // Uppercase
-            if b >= b'A' && b <= b'Z' {
+            let c = if b >= b'A' && b <= b'Z' {
                 has_upper = true;
                 // Convert to lowercase
-                c = b + (b'a'-b'A');
-            }
+                b + (b'a'-b'A')
+            } else {
+                b
+            };
+
             data_bytes.push(CHARSET_REV[c as usize] as u8);
         }
 
@@ -208,7 +211,7 @@ fn create_checksum(hrp: &[u8], data: &[u8]) -> Vec<u8> {
     let plm: u32 = polymod(&values) ^ 1;
     let mut checksum: Vec<u8> = Vec::new();
     for p in 0..6 {
-        checksum.push(((plm >> 5 * (5 - p)) & 0x1f) as u8);
+        checksum.push(((plm >> (5 * (5 - p))) & 0x1f) as u8);
     }
     checksum
 }
@@ -236,7 +239,7 @@ fn polymod(values: &[u8]) -> u32 {
     let mut b: u8;
     for v in values {
         b = (chk >> 25) as u8;
-        chk = (chk & 0x1ffffff) << 5 ^ (*v as u32);
+        chk = (chk & 0x1ffffff) << 5 ^ (u32::from(*v));
         for i in 0..5 {
             if (b >> i) & 1 == 1 {
                 chk ^= GEN[i]
