@@ -328,7 +328,7 @@ type ConvertResult = Result<Vec<u8>, Error>;
 ///
 /// # Panics
 /// Function will panic if attempting to convert `from` or `to` a bit size that
-/// is larger than 8 bits.
+/// is larger than 8 bits or 0 bits.
 ///
 /// # Examples
 ///
@@ -338,8 +338,8 @@ type ConvertResult = Result<Vec<u8>, Error>;
 /// assert_eq!(base5.unwrap(), vec![0x1f, 0x1c]);
 /// ```
 pub fn convert_bits(data: &[u8], from: u32, to: u32, pad: bool) -> ConvertResult {
-    if from > 8 || to > 8 {
-        panic!("convert_bits `from` and `to` parameters greater than 8");
+    if from > 8 || to > 8 || from == 0 || to == 0 {
+        panic!("convert_bits `from` and `to` parameters greater than 8 or 0");
     }
     let mut acc: u32 = 0;
     let mut bits: u32 = 0;
@@ -481,6 +481,22 @@ mod tests {
             let result = convert_bits(&data, from_bits, to_bits, pad);
             assert!(result.is_err());
             assert_eq!(result.unwrap_err(), expected_error);
+        }
+    }
+
+    #[test]
+    fn convert_bits_invalid_bit_size() {
+        use std::panic::{catch_unwind, set_hook, take_hook};
+
+        let invalid = &[(0, 8), (5, 0), (9, 5), (8, 10), (0, 16)];
+
+        for &(from, to) in invalid {
+            set_hook(Box::new(|_| {}));
+            let result = catch_unwind(|| {
+                let _ = convert_bits(&[0], from, to, true);
+            });
+            take_hook();
+            assert!(result.is_err());
         }
     }
 }
