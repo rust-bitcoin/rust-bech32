@@ -86,7 +86,7 @@ impl Bech32 {
         &self.data
     }
 
-    /// Destructures the `Bech32` struct into it's parts
+    /// Destructures the `Bech32` struct into its parts
     pub fn into_parts(self) -> (String, Vec<u8>) {
         (self.hrp, self.data)
     }
