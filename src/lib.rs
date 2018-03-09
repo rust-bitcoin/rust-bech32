@@ -19,26 +19,26 @@
 // THE SOFTWARE.
 
 //! Encoding and decoding Bech32 format
-//! 
-//! Bech32 is a 5-bit (base-32) encoding scheme that produces strings that comprise 
-//! a human-readable part, a separator, a data part, and a checksum. The encoding 
-//! implements a BCH code that guarantees error detection of up to four characters 
+//!
+//! Bech32 is a 5-bit (base-32) encoding scheme that produces strings that comprise
+//! a human-readable part, a separator, a data part, and a checksum. The encoding
+//! implements a BCH code that guarantees error detection of up to four characters
 //! with less than 1 in 1 billion chance of failing to detect more errors.
-//! 
+//!
 //! The Bech32 encoding was originally formulated in [BIP-0173](https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki)
-//! 
+//!
 //! # Examples
-//! 
+//!
 //! ```rust
 //! use bech32::Bech32;
 //!
 //! let b = Bech32 {
-//!     hrp: "bech32".to_string(), 
-//!     data: vec![0x00, 0x01, 0x02] 
+//!     hrp: "bech32".to_string(),
+//!     data: vec![0x00, 0x01, 0x02]
 //! };
 //! let encoded = b.to_string().unwrap();
 //! assert_eq!(encoded, "bech321qpz4nc4pe".to_string());
-//! 
+//!
 //! let c = encoded.parse::<Bech32>();
 //! assert_eq!(b, c.unwrap());
 //! ```
@@ -262,6 +262,8 @@ pub enum Error {
     InvalidChar(u8),
     /// Some part of the data has an invalid value
     InvalidData(u8),
+    /// The bit conversion failed due to a padding issue
+    InvalidPadding,
     /// The whole string must be of one case
     MixedCase,
 }
@@ -274,6 +276,7 @@ impl fmt::Display for Error {
             Error::InvalidLength => write!(f, "invalid length"),
             Error::InvalidChar(n) => write!(f, "invalid character (code={})", n),
             Error::InvalidData(n) => write!(f, "invalid data point ({})", n),
+            Error::InvalidPadding => write!(f, "invalid padding"),
             Error::MixedCase => write!(f, "mixed-case strings not allowed"),
         }
     }
@@ -287,15 +290,63 @@ impl error::Error for Error {
             Error::InvalidLength => "invalid length",
             Error::InvalidChar(_) => "invalid character",
             Error::InvalidData(_) => "invalid data point",
+            Error::InvalidPadding => "invalid padding",
             Error::MixedCase => "mixed-case strings not allowed",
         }
     }
+}
+
+type ConvertResult = Result<Vec<u8>, Error>;
+
+/// Convert between bit sizes
+///
+/// # Panics
+/// Function will panic if attempting to convert `from` or `to` a bit size that
+/// is larger than 8 bits.
+///
+/// # Examples
+///
+/// ```rust
+/// use bech32::convert_bits;
+/// let base5 = convert_bits(vec![0xff], 8, 5, true);
+/// assert_eq!(base5.unwrap(), vec![0x1f, 0x1c]);
+/// ```
+pub fn convert_bits(data: Vec<u8>, from: u32, to: u32, pad: bool) -> ConvertResult {
+    if from > 8 || to > 8 {
+        panic!("convert_bits `from` and `to` parameters greater than 8");
+    }
+    let mut acc: u32 = 0;
+    let mut bits: u32 = 0;
+    let mut ret: Vec<u8> = Vec::new();
+    let maxv: u32 = (1<<to) - 1;
+    for value in data {
+        let v: u32 = value as u32;
+        if (v >> from) != 0 {
+            // Input value exceeds `from` bit size
+            return Err(Error::InvalidData(v as u8))
+        }
+        acc = (acc << from) | v;
+        bits += from;
+        while bits >= to {
+            bits -= to;
+            ret.push(((acc >> bits) & maxv) as u8);
+        }
+    }
+    if pad {
+        if bits > 0 {
+            ret.push(((acc << (to - bits)) & maxv) as u8);
+        }
+    } else if bits >= from || ((acc << (to - bits)) & maxv) != 0 {
+        return Err(Error::InvalidPadding)
+    }
+    Ok(ret)
 }
 
 #[cfg(test)]
 mod tests {
     use Bech32;
     use Error;
+    use convert_bits;
 
     #[test]
     fn valid_checksum() {
@@ -319,7 +370,7 @@ mod tests {
     }
 
     #[test]
-    fn invalid() {
+    fn invalid_strings() {
         let pairs: Vec<(&str, Error)> = vec!(
             (" 1nwldj5",
                 Error::InvalidChar(b' ')),
@@ -347,6 +398,42 @@ mod tests {
                 panic!("Should be invalid: {:?}", s);
             }
             assert_eq!(dec_result.unwrap_err(), expected_error);
+        }
+    }
+
+    #[test]
+    fn valid_conversion() {
+        // Set of [data, from_bits, to_bits, pad, result]
+        let tests: Vec<(Vec<u8>, u32, u32, bool, Vec<u8>)> = vec!(
+            (vec![0x01], 1, 1, true, vec![0x01]),
+            (vec![0x01, 0x01], 1, 1, true, vec![0x01, 0x01]),
+            (vec![0x01], 8, 8, true, vec![0x01]),
+            (vec![0x01], 8, 4, true, vec![0x00, 0x01]),
+            (vec![0x01], 8, 2, true, vec![0x00, 0x00, 0x00, 0x01]),
+            (vec![0x01], 8, 1, true, vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01]),
+            (vec![0xff], 8, 5, true, vec![0x1f, 0x1c]),
+            (vec![0x1f, 0x1c], 5, 8, false, vec![0xff]),
+        );
+        for t in tests {
+            let (data, from_bits, to_bits, pad, expected_result) = t;
+            let result = convert_bits(data, from_bits, to_bits, pad);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), expected_result);
+        }
+    }
+
+    #[test]
+    fn invalid_conversion() {
+        // Set of [data, from_bits, to_bits, pad, expected error]
+        let tests: Vec<(Vec<u8>, u32, u32, bool, Error)> = vec!(
+            (vec![0xff], 8, 5, false, Error::InvalidPadding),
+            (vec![0x02], 1, 1, true, Error::InvalidData(0x02)),
+        );
+        for t in tests {
+            let (data, from_bits, to_bits, pad, expected_error) = t;
+            let result = convert_bits(data, from_bits, to_bits, pad);
+            assert!(result.is_err());
+            assert_eq!(result.unwrap_err(), expected_error);
         }
     }
 }

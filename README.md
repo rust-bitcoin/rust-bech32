@@ -9,12 +9,12 @@ Bitcoin-specific address encoding is handled by the `bitcoin-bech32` crate.
 use bech32::Bech32;
 
 let b = Bech32 {
-    hrp: "bech32".to_string(), 
-    data: vec![0x00, 0x01, 0x02] 
+    hrp: "bech32".to_string(),
+    data: vec![0x00, 0x01, 0x02]
 };
 let encoded = b.to_string().unwrap();
 assert_eq!(encoded, "bech321qpz4nc4pe".to_string());
 
-let c = Bech32::from_string(encoded);
+let c = encoded.parse::<Bech32>();
 assert_eq!(b, c.unwrap());
 ```
