@@ -262,6 +262,8 @@ pub enum Error {
     InvalidChar(u8),
     /// Some part of the data has an invalid value
     InvalidData(u8),
+    /// The bit conversion failed due to a padding issue
+    InvalidPadding,
     /// The whole string must be of one case
     MixedCase,
 }
@@ -274,6 +276,7 @@ impl fmt::Display for Error {
             Error::InvalidLength => write!(f, "invalid length"),
             Error::InvalidChar(n) => write!(f, "invalid character (code={})", n),
             Error::InvalidData(n) => write!(f, "invalid data point ({})", n),
+            Error::InvalidPadding => write!(f, "invalid padding"),
             Error::MixedCase => write!(f, "mixed-case strings not allowed"),
         }
     }
@@ -287,12 +290,13 @@ impl error::Error for Error {
             Error::InvalidLength => "invalid length",
             Error::InvalidChar(_) => "invalid character",
             Error::InvalidData(_) => "invalid data point",
+            Error::InvalidPadding => "invalid padding",
             Error::MixedCase => "mixed-case strings not allowed",
         }
     }
 }
 
-type ConvertResult = Result<Vec<u8>, BitConversionError>;
+type ConvertResult = Result<Vec<u8>, Error>;
 
 /// Convert between bit sizes
 ///
@@ -319,7 +323,7 @@ pub fn convert_bits(data: Vec<u8>, from: u32, to: u32, pad: bool) -> ConvertResu
         let v: u32 = value as u32;
         if (v >> from) != 0 {
             // Input value exceeds `from` bit size
-            return Err(BitConversionError::InvalidInputValue(v as u8))
+            return Err(Error::InvalidData(v as u8))
         }
         acc = (acc << from) | v;
         bits += from;
@@ -333,36 +337,9 @@ pub fn convert_bits(data: Vec<u8>, from: u32, to: u32, pad: bool) -> ConvertResu
             ret.push(((acc << (to - bits)) & maxv) as u8);
         }
     } else if bits >= from || ((acc << (to - bits)) & maxv) != 0 {
-        return Err(BitConversionError::InvalidPadding)
+        return Err(Error::InvalidPadding)
     }
     Ok(ret)
-}
-
-/// Error types during bit conversion
-#[derive(PartialEq, Debug)]
-pub enum BitConversionError {
-    /// Input value exceeds "from bits" size
-    InvalidInputValue(u8),
-    /// Invalid padding values in data
-    InvalidPadding,
-}
-
-impl fmt::Display for BitConversionError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            BitConversionError::InvalidInputValue(b) => write!(f, "invalid input value ({})", b),
-            BitConversionError::InvalidPadding => write!(f, "invalid padding"),
-        }
-    }
-}
-
-impl error::Error for BitConversionError {
-    fn description(&self) -> &str {
-        match *self {
-            BitConversionError::InvalidInputValue(_) => "invalid input value",
-            BitConversionError::InvalidPadding => "invalid padding",
-        }
-    }
 }
 
 #[cfg(test)]
@@ -370,7 +347,6 @@ mod tests {
     use Bech32;
     use Error;
     use convert_bits;
-    use BitConversionError;
 
     #[test]
     fn valid_checksum() {
@@ -449,9 +425,9 @@ mod tests {
     #[test]
     fn invalid_conversion() {
         // Set of [data, from_bits, to_bits, pad, expected error]
-        let tests: Vec<(Vec<u8>, u32, u32, bool, BitConversionError)> = vec!(
-            (vec![0xff], 8, 5, false, BitConversionError::InvalidPadding),
-            (vec![0x02], 1, 1, true, BitConversionError::InvalidInputValue(0x02)),
+        let tests: Vec<(Vec<u8>, u32, u32, bool, Error)> = vec!(
+            (vec![0xff], 8, 5, false, Error::InvalidPadding),
+            (vec![0x02], 1, 1, true, Error::InvalidData(0x02)),
         );
         for t in tests {
             let (data, from_bits, to_bits, pad, expected_error) = t;
