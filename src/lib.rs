@@ -60,7 +60,6 @@ pub struct Bech32 {
     data: Vec<u8>
 }
 
-type EncodeResult = Result<String, Error>;
 type DecodeResult = Result<Bech32, Error>;
 
 impl Bech32 {
