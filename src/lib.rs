@@ -334,10 +334,10 @@ type ConvertResult = Result<Vec<u8>, Error>;
 ///
 /// ```rust
 /// use bech32::convert_bits;
-/// let base5 = convert_bits(vec![0xff], 8, 5, true);
+/// let base5 = convert_bits(&[0xff], 8, 5, true);
 /// assert_eq!(base5.unwrap(), vec![0x1f, 0x1c]);
 /// ```
-pub fn convert_bits(data: Vec<u8>, from: u32, to: u32, pad: bool) -> ConvertResult {
+pub fn convert_bits(data: &[u8], from: u32, to: u32, pad: bool) -> ConvertResult {
     if from > 8 || to > 8 {
         panic!("convert_bits `from` and `to` parameters greater than 8");
     }
@@ -346,7 +346,7 @@ pub fn convert_bits(data: Vec<u8>, from: u32, to: u32, pad: bool) -> ConvertResu
     let mut ret: Vec<u8> = Vec::new();
     let maxv: u32 = (1<<to) - 1;
     for value in data {
-        let v: u32 = value as u32;
+        let v: u32 = *value as u32;
         if (v >> from) != 0 {
             // Input value exceeds `from` bit size
             return Err(Error::InvalidData(v as u8))
@@ -463,7 +463,7 @@ mod tests {
         );
         for t in tests {
             let (data, from_bits, to_bits, pad, expected_result) = t;
-            let result = convert_bits(data, from_bits, to_bits, pad);
+            let result = convert_bits(&data, from_bits, to_bits, pad);
             assert!(result.is_ok());
             assert_eq!(result.unwrap(), expected_result);
         }
@@ -478,7 +478,7 @@ mod tests {
         );
         for t in tests {
             let (data, from_bits, to_bits, pad, expected_error) = t;
-            let result = convert_bits(data, from_bits, to_bits, pad);
+            let result = convert_bits(&data, from_bits, to_bits, pad);
             assert!(result.is_err());
             assert_eq!(result.unwrap_err(), expected_error);
         }
