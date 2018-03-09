@@ -32,11 +32,8 @@
 //! ```rust
 //! use bech32::Bech32;
 //!
-//! let b = Bech32 {
-//!     hrp: "bech32".to_string(),
-//!     data: vec![0x00, 0x01, 0x02]
-//! };
-//! let encoded = b.to_string().unwrap();
+//! let b = Bech32::new("bech32".into(), vec![0x00, 0x01, 0x02]).unwrap();
+//! let encoded = b.to_string();
 //! assert_eq!(encoded, "bech321qpz4nc4pe".to_string());
 //!
 //! let c = encoded.parse::<Bech32>();
@@ -51,37 +48,63 @@
 
 use std::{error, fmt};
 use std::str::FromStr;
+use std::fmt::{Display, Formatter};
 
 /// Grouping structure for the human-readable part and the data part
 /// of decoded Bech32 string.
 #[derive(PartialEq, Debug, Clone)]
 pub struct Bech32 {
     /// Human-readable part
-    pub hrp: String,
+    hrp: String,
     /// Data payload
-    pub data: Vec<u8>
+    data: Vec<u8>
 }
 
-type EncodeResult = Result<String, Error>;
 type DecodeResult = Result<Bech32, Error>;
 
 impl Bech32 {
-    /// Encode as a string
-    pub fn to_string(&self) -> EncodeResult {
-        if self.hrp.len() < 1 {
+
+    /// Constructs a `Bech32` struct if the result can be encoded as a bech32 string.
+    pub fn new(hrp: String, data: Vec<u8>) -> Result<Bech32, Error> {
+        if hrp.is_empty() {
             return Err(Error::InvalidLength)
         }
-        let hrp_bytes: Vec<u8> = self.hrp.clone().into_bytes();
-        let mut combined: Vec<u8> = self.data.clone();
-        combined.extend_from_slice(&create_checksum(&hrp_bytes, &self.data));
-        let mut encoded: String = format!("{}{}", self.hrp, SEP);
-        for p in combined {
-            if p >= 32 {
-                return Err(Error::InvalidData(p))
-            }
-            encoded.push(CHARSET[p as usize]);
+        if let Some(bad_byte) = data.iter().find(|&&x| x >= 32) {
+            return Err(Error::InvalidData(bad_byte.clone()));
         }
-        Ok(encoded)
+
+        Ok(Bech32 {hrp, data})
+    }
+
+    /// Returns the human readable part
+    pub fn hrp(&self) -> &str {
+        &self.hrp
+    }
+
+    /// Returns the data part as `[u8]` but only using 5 bits per byte
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+
+    /// Destructures the `Bech32` struct into its parts
+    pub fn into_parts(self) -> (String, Vec<u8>) {
+        (self.hrp, self.data)
+    }
+}
+
+impl Display for Bech32 {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let hrp_bytes: &[u8] = self.hrp.as_bytes();
+        let checksum = create_checksum(&hrp_bytes, &self.data);
+        let data_part = self.data.iter().chain(checksum.iter());
+
+        write!(
+            f,
+            "{}{}{}",
+            self.hrp,
+            SEP,
+            data_part.map(|p| CHARSET[*p as usize]).collect::<String>()
+        )
     }
 }
 
@@ -177,7 +200,7 @@ impl FromStr for Bech32 {
     }
 }
 
-fn create_checksum(hrp: &Vec<u8>, data: &Vec<u8>) -> Vec<u8> {
+fn create_checksum(hrp: &[u8], data: &[u8]) -> Vec<u8> {
     let mut values: Vec<u8> = hrp_expand(hrp);
     values.extend_from_slice(data);
     // Pad with 6 zeros
@@ -196,7 +219,7 @@ fn verify_checksum(hrp: &Vec<u8>, data: &Vec<u8>) -> bool {
     polymod(exp) == 1u32
 }
 
-fn hrp_expand(hrp: &Vec<u8>) -> Vec<u8> {
+fn hrp_expand(hrp: &[u8]) -> Vec<u8> {
     let mut v: Vec<u8> = Vec::new();
     for b in hrp {
         v.push(*b >> 5);
@@ -349,6 +372,28 @@ mod tests {
     use convert_bits;
 
     #[test]
+    fn new_checks() {
+        assert!(Bech32::new("test".into(), vec![1, 2, 3, 4]).is_ok());
+        assert_eq!(Bech32::new("".into(), vec![1, 2, 3, 4]), Err(Error::InvalidLength));
+        assert_eq!(Bech32::new("test".into(), vec![30, 31, 35, 20]), Err(Error::InvalidData(35)));
+
+        let both = Bech32::new("".into(), vec![30, 31, 35, 20]);
+        assert!(both == Err(Error::InvalidLength) || both == Err(Error::InvalidData(35)));
+    }
+
+    #[test]
+    fn getters() {
+        let bech: Bech32 = "BC1SW50QA3JX3S".parse().unwrap();
+        let data: Vec<u8> = vec![16, 14, 20, 15, 0];
+        assert_eq!(bech.hrp(), "bc");
+        assert_eq!(
+            bech.data(),
+            data.as_slice()
+        );
+        assert_eq!(bech.into_parts(), ("bc".to_owned(), data));
+    }
+
+    #[test]
     fn valid_checksum() {
         let strings: Vec<&str> = vec!(
             "A12UEL5L",
@@ -364,8 +409,7 @@ mod tests {
             }
             assert!(decode_result.is_ok());
             let encode_result = decode_result.unwrap().to_string();
-            assert!(encode_result.is_ok());
-            assert_eq!(s.to_lowercase(), encode_result.unwrap().to_lowercase());
+            assert_eq!(s.to_lowercase(), encode_result.to_lowercase());
         }
     }
 
