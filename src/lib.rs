@@ -328,7 +328,7 @@ type ConvertResult = Result<Vec<u8>, Error>;
 ///
 /// # Panics
 /// Function will panic if attempting to convert `from` or `to` a bit size that
-/// is larger than 8 bits or 0 bits.
+/// is 0 or larger than 8 bits.
 ///
 /// # Examples
 ///
@@ -339,7 +339,7 @@ type ConvertResult = Result<Vec<u8>, Error>;
 /// ```
 pub fn convert_bits(data: &[u8], from: u32, to: u32, pad: bool) -> ConvertResult {
     if from > 8 || to > 8 || from == 0 || to == 0 {
-        panic!("convert_bits `from` and `to` parameters greater than 8 or 0");
+        panic!("convert_bits `from` and `to` parameters 0 or greater than 8");
     }
     let mut acc: u32 = 0;
     let mut bits: u32 = 0;
