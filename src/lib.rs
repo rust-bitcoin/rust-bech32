@@ -70,7 +70,7 @@ impl Bech32 {
             return Err(Error::InvalidLength)
         }
         if let Some(bad_byte) = data.iter().find(|&&x| x >= 32) {
-            return Err(Error::InvalidData(bad_byte.clone()));
+            return Err(Error::InvalidData(*bad_byte));
         }
 
         Ok(Bech32 {hrp, data})
@@ -95,7 +95,7 @@ impl Bech32 {
 impl Display for Bech32 {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let hrp_bytes: &[u8] = self.hrp.as_bytes();
-        let checksum = create_checksum(&hrp_bytes, &self.data);
+        let checksum = create_checksum(hrp_bytes, &self.data);
         let data_part = self.data.iter().chain(checksum.iter());
 
         write!(
@@ -169,13 +169,16 @@ impl FromStr for Bech32 {
             if b >= b'a' && b <= b'z' {
                 has_lower = true;
             }
-            let mut c = b;
+
             // Uppercase
-            if b >= b'A' && b <= b'Z' {
+            let c = if b >= b'A' && b <= b'Z' {
                 has_upper = true;
                 // Convert to lowercase
-                c = b + (b'a'-b'A');
-            }
+                b + (b'a'-b'A')
+            } else {
+                b
+            };
+
             data_bytes.push(CHARSET_REV[c as usize] as u8);
         }
 
@@ -205,18 +208,18 @@ fn create_checksum(hrp: &[u8], data: &[u8]) -> Vec<u8> {
     values.extend_from_slice(data);
     // Pad with 6 zeros
     values.extend_from_slice(&[0u8; 6]);
-    let plm: u32 = polymod(values) ^ 1;
+    let plm: u32 = polymod(&values) ^ 1;
     let mut checksum: Vec<u8> = Vec::new();
     for p in 0..6 {
-        checksum.push(((plm >> 5 * (5 - p)) & 0x1f) as u8);
+        checksum.push(((plm >> (5 * (5 - p))) & 0x1f) as u8);
     }
     checksum
 }
 
-fn verify_checksum(hrp: &Vec<u8>, data: &Vec<u8>) -> bool {
+fn verify_checksum(hrp: &[u8], data: &[u8]) -> bool {
     let mut exp = hrp_expand(hrp);
     exp.extend_from_slice(data);
-    polymod(exp) == 1u32
+    polymod(&exp) == 1u32
 }
 
 fn hrp_expand(hrp: &[u8]) -> Vec<u8> {
@@ -231,12 +234,12 @@ fn hrp_expand(hrp: &[u8]) -> Vec<u8> {
     v
 }
 
-fn polymod(values: Vec<u8>) -> u32 {
+fn polymod(values: &[u8]) -> u32 {
     let mut chk: u32 = 1;
     let mut b: u8;
     for v in values {
         b = (chk >> 25) as u8;
-        chk = (chk & 0x1ffffff) << 5 ^ (v as u32);
+        chk = (chk & 0x1ffffff) << 5 ^ (u32::from(*v));
         for i in 0..5 {
             if (b >> i) & 1 == 1 {
                 chk ^= GEN[i]
@@ -331,10 +334,10 @@ type ConvertResult = Result<Vec<u8>, Error>;
 ///
 /// ```rust
 /// use bech32::convert_bits;
-/// let base5 = convert_bits(vec![0xff], 8, 5, true);
+/// let base5 = convert_bits(&[0xff], 8, 5, true);
 /// assert_eq!(base5.unwrap(), vec![0x1f, 0x1c]);
 /// ```
-pub fn convert_bits(data: Vec<u8>, from: u32, to: u32, pad: bool) -> ConvertResult {
+pub fn convert_bits(data: &[u8], from: u32, to: u32, pad: bool) -> ConvertResult {
     if from > 8 || to > 8 {
         panic!("convert_bits `from` and `to` parameters greater than 8");
     }
@@ -343,7 +346,7 @@ pub fn convert_bits(data: Vec<u8>, from: u32, to: u32, pad: bool) -> ConvertResu
     let mut ret: Vec<u8> = Vec::new();
     let maxv: u32 = (1<<to) - 1;
     for value in data {
-        let v: u32 = value as u32;
+        let v: u32 = *value as u32;
         if (v >> from) != 0 {
             // Input value exceeds `from` bit size
             return Err(Error::InvalidData(v as u8))
@@ -460,7 +463,7 @@ mod tests {
         );
         for t in tests {
             let (data, from_bits, to_bits, pad, expected_result) = t;
-            let result = convert_bits(data, from_bits, to_bits, pad);
+            let result = convert_bits(&data, from_bits, to_bits, pad);
             assert!(result.is_ok());
             assert_eq!(result.unwrap(), expected_result);
         }
@@ -475,7 +478,7 @@ mod tests {
         );
         for t in tests {
             let (data, from_bits, to_bits, pad, expected_error) = t;
-            let result = convert_bits(data, from_bits, to_bits, pad);
+            let result = convert_bits(&data, from_bits, to_bits, pad);
             assert!(result.is_err());
             assert_eq!(result.unwrap_err(), expected_error);
         }
