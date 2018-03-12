@@ -2,7 +2,7 @@
 name = "bech32"
 version = "0.3.1"
 authors = ["Clark Moody"]
-repository = "https://github.com/clarkmoody/rust-bech32"
+repository = "https://github.com/rust-bitcoin/rust-bech32"
 description = "Encodes and decodes the Bech32 format"
 readme = "README.md"
 keywords = ["base32", "encoding", "bech32"]
