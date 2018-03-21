@@ -60,10 +60,7 @@ pub struct Bech32 {
     data: Vec<u8>
 }
 
-type DecodeResult = Result<Bech32, Error>;
-
 impl Bech32 {
-
     /// Constructs a `Bech32` struct if the result can be encoded as a bech32 string.
     pub fn new(hrp: String, data: Vec<u8>) -> Result<Bech32, Error> {
         if hrp.is_empty() {
@@ -73,7 +70,7 @@ impl Bech32 {
             return Err(Error::InvalidData(*bad_byte));
         }
 
-        Ok(Bech32 {hrp, data})
+        Ok(Bech32 {hrp: hrp, data: data})
     }
 
     /// Returns the human readable part
@@ -112,7 +109,7 @@ impl FromStr for Bech32 {
     type Err = Error;
 
     /// Decode from a string
-    fn from_str(s: &str) -> DecodeResult {
+    fn from_str(s: &str) -> Result<Bech32, Error> {
         // Ensure overall length is within bounds
         let len: usize = s.len();
         if len < 8 || len > 90 {
@@ -322,8 +319,6 @@ impl error::Error for Error {
     }
 }
 
-type ConvertResult = Result<Vec<u8>, Error>;
-
 /// Convert between bit sizes
 ///
 /// # Panics
@@ -337,7 +332,7 @@ type ConvertResult = Result<Vec<u8>, Error>;
 /// let base5 = convert_bits(&[0xff], 8, 5, true);
 /// assert_eq!(base5.unwrap(), vec![0x1f, 0x1c]);
 /// ```
-pub fn convert_bits(data: &[u8], from: u32, to: u32, pad: bool) -> ConvertResult {
+pub fn convert_bits(data: &[u8], from: u32, to: u32, pad: bool) -> Result<Vec<u8>, Error> {
     if from > 8 || to > 8 || from == 0 || to == 0 {
         panic!("convert_bits `from` and `to` parameters 0 or greater than 8");
     }

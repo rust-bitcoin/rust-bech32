@@ -1,6 +1,6 @@
 [package]
 name = "bech32"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["Clark Moody"]
 repository = "https://github.com/rust-bitcoin/rust-bech32"
 description = "Encodes and decodes the Bech32 format"

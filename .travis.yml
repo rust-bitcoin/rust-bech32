@@ -1,4 +1,6 @@
 language: rust
 rust:
   - stable
+  - nightly
+  - 1.14.0  # shipping debian version 2018 03
 cache: cargo
