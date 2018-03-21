@@ -73,7 +73,7 @@ impl Bech32 {
             return Err(Error::InvalidData(*bad_byte));
         }
 
-        Ok(Bech32 {hrp, data})
+        Ok(Bech32 {hrp: hrp, data: data})
     }
 
     /// Returns the human readable part
