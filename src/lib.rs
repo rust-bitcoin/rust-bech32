@@ -87,32 +87,12 @@ impl Bech32 {
     pub fn into_parts(self) -> (String, Vec<u8>) {
         (self.hrp, self.data)
     }
-}
 
-impl Display for Bech32 {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let hrp_bytes: &[u8] = self.hrp.as_bytes();
-        let checksum = create_checksum(hrp_bytes, &self.data);
-        let data_part = self.data.iter().chain(checksum.iter());
-
-        write!(
-            f,
-            "{}{}{}",
-            self.hrp,
-            SEP,
-            data_part.map(|p| CHARSET[*p as usize]).collect::<String>()
-        )
-    }
-}
-
-impl FromStr for Bech32 {
-    type Err = Error;
-
-    /// Decode from a string
-    fn from_str(s: &str) -> Result<Bech32, Error> {
+    /// Parses a Bech32 string but without enforcing the 90 character limit (for lightning BOLT 11).
+    pub fn from_str_lenient(s: &str) -> Result<Bech32, Error> {
         // Ensure overall length is within bounds
         let len: usize = s.len();
-        if len < 8 || len > 90 {
+        if len < 8 {
             return Err(Error::InvalidLength)
         }
 
@@ -197,6 +177,34 @@ impl FromStr for Bech32 {
             hrp: String::from_utf8(hrp_bytes).unwrap(),
             data: data_bytes
         })
+    }
+}
+
+impl Display for Bech32 {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let hrp_bytes: &[u8] = self.hrp.as_bytes();
+        let checksum = create_checksum(hrp_bytes, &self.data);
+        let data_part = self.data.iter().chain(checksum.iter());
+
+        write!(
+            f,
+            "{}{}{}",
+            self.hrp,
+            SEP,
+            data_part.map(|p| CHARSET[*p as usize]).collect::<String>()
+        )
+    }
+}
+
+impl FromStr for Bech32 {
+    type Err = Error;
+
+    /// Decode from a string
+    fn from_str(s: &str) -> Result<Bech32, Error> {
+        if s.len() > 90 {
+            return Err(Error::InvalidLength)
+        }
+        Self::from_str_lenient(s)
     }
 }
 
@@ -492,5 +500,14 @@ mod tests {
             take_hook();
             assert!(result.is_err());
         }
+    }
+
+    #[test]
+    fn lenient_parsing() {
+        assert_ne!(
+            Bech32::from_str_lenient("an84characterslonghumanreadablepartthatcontainsthenumber1a\
+            ndtheexcludedcharactersbio1569pvx"),
+            Err(Error::InvalidLength)
+        );
     }
 }
