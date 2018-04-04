@@ -50,6 +50,27 @@ use std::{error, fmt};
 use std::str::FromStr;
 use std::fmt::{Display, Formatter};
 
+/// Integer in the range `0..32`
+#[derive(PartialEq, Debug, Copy, Clone)]
+#[allow(non_camel_case_types)]
+pub struct u5(u8);
+
+/// Parse/convert base32 slice to `Self`. It is the reciprocal of
+/// `ToBase32`.
+pub trait FromBase32: Sized {
+    /// The associated error which can be returned from parsing (e.g. because of bad padding).
+    type Err;
+
+    /// Convert a base32 slice to `Self`.
+    fn from_base32(b32: &[u5]) -> Result<Self, Self::Err>;
+}
+
+/// A trait for converting a value to a type `T`, that represents a `u5` slice.
+pub trait ToBase32<T: AsRef<[u5]>> {
+    /// Convert `Self` to base32 slice
+    fn to_base32(&self) -> T;
+}
+
 /// Grouping structure for the human-readable part and the data part
 /// of decoded Bech32 string.
 #[derive(PartialEq, Debug, Clone)]
