@@ -39,6 +39,22 @@
 //! let c = encoded.parse::<Bech32>();
 //! assert_eq!(b, c.unwrap());
 //! ```
+//!
+//! If the data is already range-checked the `Bech32::new` function can be used which will never
+//! return `Err(Error::InvalidData)`.
+//!
+//! ```rust
+//! use bech32::{Bech32, u5, ToBase32};
+//!
+//! // converts base256 data to base32 and adds padding if needed
+//! let checked_data: Vec<u5> = [0xb4, 0xff, 0xa5].to_base32();
+//!
+//! let b = Bech32::new("bech32".into(), checked_data).expect("hrp is not empty");
+//! let encoded = b.to_string();
+//!
+//! assert_eq!(encoded, "bech321knl623tk6v7".to_string());
+//! ```
+//!
 
 #![deny(missing_docs)]
 #![deny(non_upper_case_globals)]
@@ -51,7 +67,7 @@ use std::str::FromStr;
 use std::fmt::{Display, Formatter};
 
 /// Integer in the range `0..32`
-#[derive(PartialEq, Debug, Copy, Clone, Default)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone, Default, PartialOrd, Ord)]
 #[allow(non_camel_case_types)]
 pub struct u5(u8);
 
@@ -100,6 +116,11 @@ impl u5 {
             Ok(u5(value))
         }
     }
+
+    /// Returns a copy of the underlying `u8` value
+    pub fn to_u8(&self) -> u8 {
+        self.0
+    }
 }
 
 impl Into<u8> for u5 {
@@ -114,7 +135,6 @@ impl AsRef<u8> for u5 {
     }
 }
 
-// TODO: try to implement conversion by typecasting, see https://www.reddit.com/r/rust/comments/88xvgg/hey_rustaceans_got_an_easy_question_ask_here/dwvk0w9/
 impl<'f, T: AsRef<[u8]>> CheckBase32<Vec<u5>> for T {
     type Err = Error;
 
@@ -123,6 +143,26 @@ impl<'f, T: AsRef<[u8]>> CheckBase32<Vec<u5>> for T {
     }
 }
 
+impl FromBase32 for Vec<u8> {
+    type Err = Error;
+
+    /// Convert base32 to base256, removes null-padding if present, returns
+    /// `Err(Error::InvalidPadding)` if padding bits are unequal `0`
+    fn from_base32(b32: &[u5]) -> Result<Self, Self::Err> {
+        convert_bits(b32, 5, 8, false)
+    }
+}
+
+impl<T: AsRef<[u8]>> ToBase32<Vec<u5>> for T {
+    /// Convert base256 to base32, adds padding if necessary
+    fn to_base32(&self) -> Vec<u5> {
+        convert_bits(self.as_ref(), 8, 5, true).expect(
+            "both error conditions are impossible (InvalidPadding, InvalidData)"
+        ).check_base32().expect(
+            "after conversion all elements are in range"
+        )
+    }
+}
 
 impl Bech32 {
     /// Constructs a `Bech32` struct if the result can be encoded as a bech32 string.
@@ -401,6 +441,10 @@ impl error::Error for Error {
 
 /// Convert between bit sizes
 ///
+/// # Errors
+/// * `Error::InvalidData` if any element of `data` is out of range
+/// * `Error::InvalidPadding` if `pad == false` and the padding bits are not `0`
+///
 /// # Panics
 /// Function will panic if attempting to convert `from` or `to` a bit size that
 /// is 0 or larger than 8 bits.
@@ -412,7 +456,9 @@ impl error::Error for Error {
 /// let base5 = convert_bits(&[0xff], 8, 5, true);
 /// assert_eq!(base5.unwrap(), vec![0x1f, 0x1c]);
 /// ```
-pub fn convert_bits(data: &[u8], from: u32, to: u32, pad: bool) -> Result<Vec<u8>, Error> {
+pub fn convert_bits<T>(data: &[T], from: u32, to: u32, pad: bool) -> Result<Vec<u8>, Error>
+    where T: Into<u8> + Copy
+{
     if from > 8 || to > 8 || from == 0 || to == 0 {
         panic!("convert_bits `from` and `to` parameters 0 or greater than 8");
     }
@@ -421,7 +467,7 @@ pub fn convert_bits(data: &[u8], from: u32, to: u32, pad: bool) -> Result<Vec<u8
     let mut ret: Vec<u8> = Vec::new();
     let maxv: u32 = (1<<to) - 1;
     for value in data {
-        let v: u32 = *value as u32;
+        let v: u32 = Into::<u8>::into(*value) as u32;
         if (v >> from) != 0 {
             // Input value exceeds `from` bit size
             return Err(Error::InvalidData(v as u8))
@@ -585,5 +631,28 @@ mod tests {
             ndtheexcludedcharactersbio1569pvx"),
             Err(Error::InvalidLength)
         );
+    }
+
+    #[test]
+    fn check_base32() {
+        assert!([0u8, 1, 2, 30, 31].check_base32().is_ok());
+        assert!([0u8, 1, 2, 30, 31, 32].check_base32().is_err());
+        assert!([0u8, 1, 2, 30, 31, 255].check_base32().is_err());
+    }
+
+    #[test]
+    fn from_base32() {
+        use FromBase32;
+        assert_eq!(Vec::from_base32(&[0x1f, 0x1c].check_base32().unwrap()), Ok(vec![0xff]));
+        assert_eq!(
+            Vec::from_base32(&[0x1f, 0x1f].check_base32().unwrap()),
+            Err(Error::InvalidPadding)
+        );
+    }
+
+    #[test]
+    fn to_base32() {
+        use ToBase32;
+        assert_eq!([0xffu8].to_base32(), [0x1f, 0x1c].check_base32().unwrap());
     }
 }
