@@ -134,7 +134,7 @@ impl Bech32 {
         // Check data payload
         let mut data_bytes: Vec<u8> = Vec::new();
         for b in raw_data.bytes() {
-            // Aphanumeric only
+            // Alphanumeric only
             if !((b >= b'0' && b <= b'9') || (b >= b'A' && b <= b'Z') || (b >= b'a' && b <= b'z')) {
                 return Err(Error::InvalidChar(b))
             }
