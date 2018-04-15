@@ -356,7 +356,7 @@ fn polymod(values: &[u5]) -> u32 {
     let mut b: u8;
     for v in values {
         b = (chk >> 25) as u8;
-        chk = (chk & 0x1ffffff) << 5 ^ (*v.as_ref() as u32);
+        chk = (chk & 0x1ffffff) << 5 ^ (u32::from(*v.as_ref()));
         for i in 0..5 {
             if (b >> i) & 1 == 1 {
                 chk ^= GEN[i]
@@ -467,7 +467,7 @@ pub fn convert_bits<T>(data: &[T], from: u32, to: u32, pad: bool) -> Result<Vec<
     let mut ret: Vec<u8> = Vec::new();
     let maxv: u32 = (1<<to) - 1;
     for value in data {
-        let v: u32 = Into::<u8>::into(*value) as u32;
+        let v: u32 = u32::from(Into::<u8>::into(*value));
         if (v >> from) != 0 {
             // Input value exceeds `from` bit size
             return Err(Error::InvalidData(v as u8))
