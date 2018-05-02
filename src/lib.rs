@@ -32,13 +32,29 @@
 //! ```rust
 //! use bech32::Bech32;
 //!
-//! let b = Bech32::new("bech32".into(), vec![0x00, 0x01, 0x02]).unwrap();
+//! let b = Bech32::new_check_data("bech32".into(), vec![0x00, 0x01, 0x02]).unwrap();
 //! let encoded = b.to_string();
 //! assert_eq!(encoded, "bech321qpz4nc4pe".to_string());
 //!
 //! let c = encoded.parse::<Bech32>();
 //! assert_eq!(b, c.unwrap());
 //! ```
+//!
+//! If the data is already range-checked the `Bech32::new` function can be used which will never
+//! return `Err(Error::InvalidData)`.
+//!
+//! ```rust
+//! use bech32::{Bech32, u5, ToBase32};
+//!
+//! // converts base256 data to base32 and adds padding if needed
+//! let checked_data: Vec<u5> = [0xb4, 0xff, 0xa5].to_base32();
+//!
+//! let b = Bech32::new("bech32".into(), checked_data).expect("hrp is not empty");
+//! let encoded = b.to_string();
+//!
+//! assert_eq!(encoded, "bech321knl623tk6v7".to_string());
+//! ```
+//!
 
 #![deny(missing_docs)]
 #![deny(non_upper_case_globals)]
@@ -50,6 +66,37 @@ use std::{error, fmt};
 use std::str::FromStr;
 use std::fmt::{Display, Formatter};
 
+/// Integer in the range `0..32`
+#[derive(PartialEq, Eq, Debug, Copy, Clone, Default, PartialOrd, Ord)]
+#[allow(non_camel_case_types)]
+pub struct u5(u8);
+
+/// Parse/convert base32 slice to `Self`. It is the reciprocal of
+/// `ToBase32`.
+pub trait FromBase32: Sized {
+    /// The associated error which can be returned from parsing (e.g. because of bad padding).
+    type Err;
+
+    /// Convert a base32 slice to `Self`.
+    fn from_base32(b32: &[u5]) -> Result<Self, Self::Err>;
+}
+
+/// A trait for converting a value to a type `T` that represents a `u5` slice.
+pub trait ToBase32<T: AsRef<[u5]>> {
+    /// Convert `Self` to base32 slice
+    fn to_base32(&self) -> T;
+}
+
+/// A trait to convert between u8 arrays and u5 arrays without changing the content of the elements,
+/// but checking that they are in range.
+pub trait CheckBase32<T: AsRef<[u5]>> {
+    /// Error type if conversion fails
+    type Err;
+
+    /// Check if all values are in range and return array-like struct of `u5` values
+    fn check_base32(self) -> Result<T, Self::Err>;
+}
+
 /// Grouping structure for the human-readable part and the data part
 /// of decoded Bech32 string.
 #[derive(PartialEq, Debug, Clone)]
@@ -57,20 +104,83 @@ pub struct Bech32 {
     /// Human-readable part
     hrp: String,
     /// Data payload
-    data: Vec<u8>
+    data: Vec<u5>
+}
+
+impl u5 {
+    /// Convert a `u8` to `u5` if in range, return `Error` otherwise
+    pub fn try_from_u8(value: u8) -> Result<u5, Error> {
+        if value > 31 {
+            Err(Error::InvalidData(value))
+        } else {
+            Ok(u5(value))
+        }
+    }
+
+    /// Returns a copy of the underlying `u8` value
+    pub fn to_u8(&self) -> u8 {
+        self.0
+    }
+}
+
+impl Into<u8> for u5 {
+    fn into(self) -> u8 {
+        self.0
+    }
+}
+
+impl AsRef<u8> for u5 {
+    fn as_ref(&self) -> &u8 {
+        &self.0
+    }
+}
+
+impl<'f, T: AsRef<[u8]>> CheckBase32<Vec<u5>> for T {
+    type Err = Error;
+
+    fn check_base32(self) -> Result<Vec<u5>, Self::Err> {
+        self.as_ref().iter().map(|x| u5::try_from_u8(*x)).collect::<Result<Vec<u5>, Error>>()
+    }
+}
+
+impl FromBase32 for Vec<u8> {
+    type Err = Error;
+
+    /// Convert base32 to base256, removes null-padding if present, returns
+    /// `Err(Error::InvalidPadding)` if padding bits are unequal `0`
+    fn from_base32(b32: &[u5]) -> Result<Self, Self::Err> {
+        convert_bits(b32, 5, 8, false)
+    }
+}
+
+impl<T: AsRef<[u8]>> ToBase32<Vec<u5>> for T {
+    /// Convert base256 to base32, adds padding if necessary
+    fn to_base32(&self) -> Vec<u5> {
+        convert_bits(self.as_ref(), 8, 5, true).expect(
+            "both error conditions are impossible (InvalidPadding, InvalidData)"
+        ).check_base32().expect(
+            "after conversion all elements are in range"
+        )
+    }
 }
 
 impl Bech32 {
     /// Constructs a `Bech32` struct if the result can be encoded as a bech32 string.
-    pub fn new(hrp: String, data: Vec<u8>) -> Result<Bech32, Error> {
+    pub fn new(hrp: String, data: Vec<u5>) -> Result<Bech32, Error> {
         if hrp.is_empty() {
             return Err(Error::InvalidLength)
         }
-        if let Some(bad_byte) = data.iter().find(|&&x| x >= 32) {
-            return Err(Error::InvalidData(*bad_byte));
-        }
 
         Ok(Bech32 {hrp: hrp, data: data})
+    }
+
+    /// Constructs a `Bech32` struct if the result can be encoded as a bech32 string. It uses
+    /// `data` that is not range checked yet and as a result may return `Err(Error::InvalidData)`.
+    ///
+    /// This function currently allocates memory for the checked data part.
+    /// See [issue #19](https://github.com/rust-bitcoin/rust-bech32/issues/19).
+    pub fn new_check_data(hrp: String, data: Vec<u8>) -> Result<Bech32, Error> {
+        Self::new(hrp, data.check_base32()?)
     }
 
     /// Returns the human readable part
@@ -79,12 +189,12 @@ impl Bech32 {
     }
 
     /// Returns the data part as `[u8]` but only using 5 bits per byte
-    pub fn data(&self) -> &[u8] {
+    pub fn data(&self) -> &[u5] {
         &self.data
     }
 
     /// Destructures the `Bech32` struct into its parts
-    pub fn into_parts(self) -> (String, Vec<u8>) {
+    pub fn into_parts(self) -> (String, Vec<u5>) {
         (self.hrp, self.data)
     }
 
@@ -132,7 +242,7 @@ impl Bech32 {
         }
 
         // Check data payload
-        let mut data_bytes: Vec<u8> = Vec::new();
+        let mut data_bytes: Vec<u5> = Vec::new();
         for b in raw_data.bytes() {
             // Alphanumeric only
             if !((b >= b'0' && b <= b'9') || (b >= b'A' && b <= b'Z') || (b >= b'a' && b <= b'z')) {
@@ -156,7 +266,9 @@ impl Bech32 {
                 b
             };
 
-            data_bytes.push(CHARSET_REV[c as usize] as u8);
+            data_bytes.push(u5::try_from_u8(CHARSET_REV[c as usize] as u8).expect(
+                "range was already checked above"
+            ));
         }
 
         // Ensure no mixed case
@@ -191,7 +303,7 @@ impl Display for Bech32 {
             "{}{}{}",
             self.hrp,
             SEP,
-            data_part.map(|p| CHARSET[*p as usize]).collect::<String>()
+            data_part.map(|p| CHARSET[*p.as_ref() as usize]).collect::<String>()
         )
     }
 }
@@ -208,43 +320,43 @@ impl FromStr for Bech32 {
     }
 }
 
-fn create_checksum(hrp: &[u8], data: &[u8]) -> Vec<u8> {
-    let mut values: Vec<u8> = hrp_expand(hrp);
+fn create_checksum(hrp: &[u8], data: &[u5]) -> Vec<u5> {
+    let mut values: Vec<u5> = hrp_expand(hrp);
     values.extend_from_slice(data);
     // Pad with 6 zeros
-    values.extend_from_slice(&[0u8; 6]);
+    values.extend_from_slice(&[u5::try_from_u8(0).unwrap(); 6]);
     let plm: u32 = polymod(&values) ^ 1;
-    let mut checksum: Vec<u8> = Vec::new();
+    let mut checksum: Vec<u5> = Vec::new();
     for p in 0..6 {
-        checksum.push(((plm >> (5 * (5 - p))) & 0x1f) as u8);
+        checksum.push(u5::try_from_u8(((plm >> (5 * (5 - p))) & 0x1f) as u8).unwrap());
     }
     checksum
 }
 
-fn verify_checksum(hrp: &[u8], data: &[u8]) -> bool {
+fn verify_checksum(hrp: &[u8], data: &[u5]) -> bool {
     let mut exp = hrp_expand(hrp);
     exp.extend_from_slice(data);
     polymod(&exp) == 1u32
 }
 
-fn hrp_expand(hrp: &[u8]) -> Vec<u8> {
-    let mut v: Vec<u8> = Vec::new();
+fn hrp_expand(hrp: &[u8]) -> Vec<u5> {
+    let mut v: Vec<u5> = Vec::new();
     for b in hrp {
-        v.push(*b >> 5);
+        v.push(u5::try_from_u8(*b >> 5).expect("can't be out of range, max. 7"));
     }
-    v.push(0);
+    v.push(u5::try_from_u8(0).unwrap());
     for b in hrp {
-        v.push(*b & 0x1f);
+        v.push(u5::try_from_u8(*b & 0x1f).expect("can't be out of range, max. 31"));
     }
     v
 }
 
-fn polymod(values: &[u8]) -> u32 {
+fn polymod(values: &[u5]) -> u32 {
     let mut chk: u32 = 1;
     let mut b: u8;
     for v in values {
         b = (chk >> 25) as u8;
-        chk = (chk & 0x1ffffff) << 5 ^ (u32::from(*v));
+        chk = (chk & 0x1ffffff) << 5 ^ (u32::from(*v.as_ref()));
         for i in 0..5 {
             if (b >> i) & 1 == 1 {
                 chk ^= GEN[i]
@@ -329,6 +441,10 @@ impl error::Error for Error {
 
 /// Convert between bit sizes
 ///
+/// # Errors
+/// * `Error::InvalidData` if any element of `data` is out of range
+/// * `Error::InvalidPadding` if `pad == false` and the padding bits are not `0`
+///
 /// # Panics
 /// Function will panic if attempting to convert `from` or `to` a bit size that
 /// is 0 or larger than 8 bits.
@@ -340,7 +456,9 @@ impl error::Error for Error {
 /// let base5 = convert_bits(&[0xff], 8, 5, true);
 /// assert_eq!(base5.unwrap(), vec![0x1f, 0x1c]);
 /// ```
-pub fn convert_bits(data: &[u8], from: u32, to: u32, pad: bool) -> Result<Vec<u8>, Error> {
+pub fn convert_bits<T>(data: &[T], from: u32, to: u32, pad: bool) -> Result<Vec<u8>, Error>
+    where T: Into<u8> + Copy
+{
     if from > 8 || to > 8 || from == 0 || to == 0 {
         panic!("convert_bits `from` and `to` parameters 0 or greater than 8");
     }
@@ -349,7 +467,7 @@ pub fn convert_bits(data: &[u8], from: u32, to: u32, pad: bool) -> Result<Vec<u8
     let mut ret: Vec<u8> = Vec::new();
     let maxv: u32 = (1<<to) - 1;
     for value in data {
-        let v: u32 = *value as u32;
+        let v: u32 = u32::from(Into::<u8>::into(*value));
         if (v >> from) != 0 {
             // Input value exceeds `from` bit size
             return Err(Error::InvalidData(v as u8))
@@ -376,21 +494,25 @@ mod tests {
     use Bech32;
     use Error;
     use convert_bits;
+    use CheckBase32;
 
     #[test]
     fn new_checks() {
-        assert!(Bech32::new("test".into(), vec![1, 2, 3, 4]).is_ok());
-        assert_eq!(Bech32::new("".into(), vec![1, 2, 3, 4]), Err(Error::InvalidLength));
-        assert_eq!(Bech32::new("test".into(), vec![30, 31, 35, 20]), Err(Error::InvalidData(35)));
+        assert!(Bech32::new_check_data("test".into(), vec![1, 2, 3, 4]).is_ok());
+        assert_eq!(Bech32::new_check_data("".into(), vec![1, 2, 3, 4]), Err(Error::InvalidLength));
+        assert_eq!(Bech32::new_check_data("test".into(), vec![30, 31, 35, 20]), Err(Error::InvalidData(35)));
 
-        let both = Bech32::new("".into(), vec![30, 31, 35, 20]);
+        let both = Bech32::new_check_data("".into(), vec![30, 31, 35, 20]);
         assert!(both == Err(Error::InvalidLength) || both == Err(Error::InvalidData(35)));
+
+        assert!(Bech32::new("test".into(), [1u8, 2, 3, 4].check_base32().unwrap()).is_ok());
+        assert_eq!(Bech32::new("".into(), [1u8, 2, 3, 4].check_base32().unwrap()), Err(Error::InvalidLength));
     }
 
     #[test]
     fn getters() {
         let bech: Bech32 = "BC1SW50QA3JX3S".parse().unwrap();
-        let data: Vec<u8> = vec![16, 14, 20, 15, 0];
+        let data = [16, 14, 20, 15, 0].check_base32().unwrap();
         assert_eq!(bech.hrp(), "bc");
         assert_eq!(
             bech.data(),
@@ -509,5 +631,28 @@ mod tests {
             ndtheexcludedcharactersbio1569pvx"),
             Err(Error::InvalidLength)
         );
+    }
+
+    #[test]
+    fn check_base32() {
+        assert!([0u8, 1, 2, 30, 31].check_base32().is_ok());
+        assert!([0u8, 1, 2, 30, 31, 32].check_base32().is_err());
+        assert!([0u8, 1, 2, 30, 31, 255].check_base32().is_err());
+    }
+
+    #[test]
+    fn from_base32() {
+        use FromBase32;
+        assert_eq!(Vec::from_base32(&[0x1f, 0x1c].check_base32().unwrap()), Ok(vec![0xff]));
+        assert_eq!(
+            Vec::from_base32(&[0x1f, 0x1f].check_base32().unwrap()),
+            Err(Error::InvalidPadding)
+        );
+    }
+
+    #[test]
+    fn to_base32() {
+        use ToBase32;
+        assert_eq!([0xffu8].to_base32(), [0x1f, 0x1c].check_base32().unwrap());
     }
 }
