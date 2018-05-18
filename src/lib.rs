@@ -67,7 +67,7 @@ use std::str::FromStr;
 use std::fmt::{Display, Formatter};
 
 /// Integer in the range `0..32`
-#[derive(PartialEq, Eq, Debug, Copy, Clone, Default, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone, Default, PartialOrd, Ord, Hash)]
 #[allow(non_camel_case_types)]
 pub struct u5(u8);
 
@@ -99,7 +99,7 @@ pub trait CheckBase32<T: AsRef<[u5]>> {
 
 /// Grouping structure for the human-readable part and the data part
 /// of decoded Bech32 string.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, PartialOrd, Ord, Hash)]
 pub struct Bech32 {
     /// Human-readable part
     hrp: String,
