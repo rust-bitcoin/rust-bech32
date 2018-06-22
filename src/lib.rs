@@ -63,8 +63,9 @@
 #![deny(unused_mut)]
 
 use std::{error, fmt};
-use std::str::FromStr;
+use std::ascii::AsciiExt;
 use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 
 /// Integer in the range `0..32`
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Default, PartialOrd, Ord, Hash)]
@@ -249,9 +250,9 @@ impl Bech32 {
                 return Err(Error::InvalidChar(c))
             }
 
-            if c.is_ascii_lowercase() {
+            if c.is_lowercase() {
                 has_lower = true;
-            } else if c.is_ascii_uppercase() {
+            } else if c.is_uppercase() {
                 has_upper = true;
             }
 
@@ -540,8 +541,8 @@ mod tests {
         let pairs: Vec<(&str, Error)> = vec!(
             (" 1nwldj5",
                 Error::InvalidChar(' ')),
-            ("\x7f1axkwrx",
-                Error::InvalidChar(0x7f as char)),
+            ("abc1\u{2192}axkwrx",
+                Error::InvalidChar('\u{2192}')),
             ("an84characterslonghumanreadablepartthatcontainsthenumber1andtheexcludedcharactersbio1569pvx",
                 Error::InvalidLength),
             ("pzry9x0s0muk",
@@ -553,7 +554,7 @@ mod tests {
             ("li1dgmt3",
                 Error::InvalidLength),
             ("de1lg7wt\u{ff}",
-                Error::InvalidChar(0xc3 as char)), // ASCII 0xff -> \uC3BF in UTF-8
+                Error::InvalidChar('\u{ff}')),
         );
         for p in pairs {
             let (s, expected_error) = p;
@@ -562,7 +563,7 @@ mod tests {
                 println!("{:?}", dec_result.unwrap());
                 panic!("Should be invalid: {:?}", s);
             }
-            assert_eq!(dec_result.unwrap_err(), expected_error);
+            assert_eq!(dec_result.unwrap_err(), expected_error, "testing input '{}'", s);
         }
     }
 
