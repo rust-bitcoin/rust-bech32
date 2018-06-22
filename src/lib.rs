@@ -225,7 +225,7 @@ impl Bech32 {
         for b in raw_hrp.bytes() {
             // Valid subset of ASCII
             if b < 33 || b > 126 {
-                return Err(Error::InvalidChar(b))
+                return Err(Error::InvalidChar(b as char))
             }
             let mut c = b;
             // Lowercase
@@ -242,34 +242,28 @@ impl Bech32 {
         }
 
         // Check data payload
-        let mut data_bytes: Vec<u5> = Vec::new();
-        for b in raw_data.bytes() {
-            // Alphanumeric only
-            if !((b >= b'0' && b <= b'9') || (b >= b'A' && b <= b'Z') || (b >= b'a' && b <= b'z')) {
-                return Err(Error::InvalidChar(b))
+        let mut data_bytes = raw_data.chars().map(|c| {
+            // Only check if c is in the ASCII range, all invalid ASCII characters have the value -1
+            // in CHARSET_REV (which covers the whole ASCII range) and will be filtered out later.
+            if !c.is_ascii() {
+                return Err(Error::InvalidChar(c))
             }
-            // Excludes these characters: [1,b,i,o]
-            if b == b'1' || b == b'b' || b == b'i' || b == b'o' {
-                return Err(Error::InvalidChar(b))
-            }
-            // Lowercase
-            if b >= b'a' && b <= b'z' {
+
+            if c.is_ascii_lowercase() {
                 has_lower = true;
+            } else if c.is_ascii_uppercase() {
+                has_upper = true;
             }
 
-            // Uppercase
-            let c = if b >= b'A' && b <= b'Z' {
-                has_upper = true;
-                // Convert to lowercase
-                b + (b'a'-b'A')
-            } else {
-                b
-            };
+            // c should be <128 since it is in the ASCII range, CHARSET_REV.len() == 128
+            let num_value = CHARSET_REV[c as usize];
 
-            data_bytes.push(u5::try_from_u8(CHARSET_REV[c as usize] as u8).expect(
-                "range was already checked above"
-            ));
-        }
+            if num_value > 31 || num_value < 0 {
+                return Err(Error::InvalidChar(c));
+            }
+
+            Ok(u5::try_from_u8(num_value as u8).expect("range checked above, num_value <= 31"))
+        }).collect::<Result<Vec<u5>, Error>>()?;
 
         // Ensure no mixed case
         if has_lower && has_upper {
@@ -402,7 +396,7 @@ pub enum Error {
     /// The data or human-readable part is too long or too short
     InvalidLength,
     /// Some part of the string contains an invalid character
-    InvalidChar(u8),
+    InvalidChar(char),
     /// Some part of the data has an invalid value
     InvalidData(u8),
     /// The bit conversion failed due to a padding issue
@@ -545,9 +539,9 @@ mod tests {
     fn invalid_strings() {
         let pairs: Vec<(&str, Error)> = vec!(
             (" 1nwldj5",
-                Error::InvalidChar(b' ')),
+                Error::InvalidChar(' ')),
             ("\x7f1axkwrx",
-                Error::InvalidChar(0x7f)),
+                Error::InvalidChar(0x7f as char)),
             ("an84characterslonghumanreadablepartthatcontainsthenumber1andtheexcludedcharactersbio1569pvx",
                 Error::InvalidLength),
             ("pzry9x0s0muk",
@@ -555,11 +549,11 @@ mod tests {
             ("1pzry9x0s0muk",
                 Error::InvalidLength),
             ("x1b4n0q5v",
-                Error::InvalidChar(b'b')),
+                Error::InvalidChar('b')),
             ("li1dgmt3",
                 Error::InvalidLength),
             ("de1lg7wt\u{ff}",
-                Error::InvalidChar(0xc3)), // ASCII 0xff -> \uC3BF in UTF-8
+                Error::InvalidChar(0xc3 as char)), // ASCII 0xff -> \uC3BF in UTF-8
         );
         for p in pairs {
             let (s, expected_error) = p;
