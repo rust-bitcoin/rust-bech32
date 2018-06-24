@@ -650,4 +650,24 @@ mod tests {
         use ToBase32;
         assert_eq!([0xffu8].to_base32(), [0x1f, 0x1c].check_base32().unwrap());
     }
+
+    #[test]
+    fn reverse_charset() {
+        use std::ascii::AsciiExt;
+        use ::CHARSET_REV;
+
+        fn get_char_value(c: char) -> i8 {
+            let charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+            match charset.find(c.to_ascii_lowercase()) {
+                Some(x) => x as i8,
+                None => -1,
+            }
+        }
+
+        let expected_rev_charset = (0u8..128).map(|i| {
+            get_char_value(i as char)
+        }).collect::<Vec<_>>();
+
+        assert_eq!(&(CHARSET_REV[..]), expected_rev_charset.as_slice());
+    }
 }
