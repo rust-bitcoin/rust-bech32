@@ -551,6 +551,8 @@ mod tests {
                 Error::InvalidLength),
             ("x1b4n0q5v",
                 Error::InvalidChar('b')),
+            ("ABC1DEFGOH",
+                Error::InvalidChar('O')),
             ("li1dgmt3",
                 Error::InvalidLength),
             ("de1lg7wt\u{ff}",
