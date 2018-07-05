@@ -4,3 +4,7 @@ rust:
   - nightly
   - 1.14.0  # shipping debian version 2018 03
 cache: cargo
+
+script:
+  - cargo build --verbose --features strict
+  - cargo test --verbose --features strict
