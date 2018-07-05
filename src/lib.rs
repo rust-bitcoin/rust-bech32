@@ -62,6 +62,8 @@
 #![deny(non_snake_case)]
 #![deny(unused_mut)]
 
+#![cfg_attr(feature = "strict", deny(warnings))]
+
 use std::{error, fmt};
 
 // AsciiExt is needed for Rust 1.14 but not for newer versions
@@ -658,6 +660,8 @@ mod tests {
 
     #[test]
     fn reverse_charset() {
+        // AsciiExt is needed for Rust 1.14 but not for newer versions
+        #[allow(unused_imports, deprecated)]
         use std::ascii::AsciiExt;
         use ::CHARSET_REV;
 
