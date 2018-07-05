@@ -63,7 +63,6 @@
 #![deny(unused_mut)]
 
 use std::{error, fmt};
-use std::ascii::AsciiExt;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
@@ -655,7 +654,6 @@ mod tests {
 
     #[test]
     fn reverse_charset() {
-        use std::ascii::AsciiExt;
         use ::CHARSET_REV;
 
         fn get_char_value(c: char) -> i8 {
