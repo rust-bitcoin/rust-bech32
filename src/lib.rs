@@ -63,6 +63,9 @@
 #![deny(unused_mut)]
 
 use std::{error, fmt};
+
+// AsciiExt is needed for Rust 1.14 but not for newer versions
+#[allow(unused_imports, deprecated)]
 use std::ascii::AsciiExt;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
