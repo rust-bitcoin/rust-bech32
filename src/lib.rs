@@ -88,9 +88,16 @@ pub trait FromBase32: Sized {
 }
 
 /// A trait for converting a value to a type `T` that represents a `u5` slice.
-pub trait ToBase32<T: AsRef<[u5]>> {
+pub trait ToBase32 {
     /// Convert `Self` to base32 slice
-    fn to_base32(&self) -> T;
+    fn to_base32(&self) -> Vec<u5> {
+        let mut buff = Vec::new();
+        self.write_base32(&mut buff);
+        buff
+    }
+
+    /// Convert `Self` to bech32 and append the result to a supplied, mutable buffer
+    fn write_base32(&self, buffer: &mut Vec<u5>);
 }
 
 /// A trait to convert between u8 arrays and u5 arrays without changing the content of the elements,
@@ -159,14 +166,13 @@ impl FromBase32 for Vec<u8> {
     }
 }
 
-impl<T: AsRef<[u8]>> ToBase32<Vec<u5>> for T {
-    /// Convert base256 to base32, adds padding if necessary
-    fn to_base32(&self) -> Vec<u5> {
-        convert_bits(self.as_ref(), 8, 5, true).expect(
+impl<T: AsRef<[u8]>> ToBase32 for T {
+    fn write_base32(&self, buffer: &mut Vec<u5>) {
+        buffer.extend_from_slice(&convert_bits(self.as_ref(), 8, 5, true).expect(
             "both error conditions are impossible (InvalidPadding, InvalidData)"
         ).check_base32().expect(
             "after conversion all elements are in range"
-        )
+        ))
     }
 }
 
@@ -456,6 +462,8 @@ impl error::Error for Error {
 /// let base5 = convert_bits(&[0xff], 8, 5, true);
 /// assert_eq!(base5.unwrap(), vec![0x1f, 0x1c]);
 /// ```
+///
+// TODO: use mut buffer
 pub fn convert_bits<T>(data: &[T], from: u32, to: u32, pad: bool) -> Result<Vec<u8>, Error>
     where T: Into<u8> + Copy
 {
