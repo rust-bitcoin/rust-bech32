@@ -98,6 +98,12 @@ pub trait ToBase32 {
 
     /// Convert `Self` to bech32 and append the result to a supplied, mutable buffer
     fn write_base32(&self, buffer: &mut Vec<u5>);
+
+    /// Calculates the length of the serialized data
+    ///
+    /// This can be used in combination with `write_base32` to avoid allocations and is useful
+    /// for serializing dynamically sized data structures.
+    fn serialized_length(&self) -> usize;
 }
 
 /// A trait to convert between u8 arrays and u5 arrays without changing the content of the elements,
@@ -173,6 +179,15 @@ impl<T: AsRef<[u8]>> ToBase32 for T {
         ).check_base32().expect(
             "after conversion all elements are in range"
         ))
+    }
+
+    fn serialized_length(&self) -> usize {
+        let bits = self.as_ref().len() * 8;
+        if bits % 5 == 0 {
+            bits / 5
+        } else {
+            bits / 5 + 1
+        }
     }
 }
 
@@ -686,5 +701,15 @@ mod tests {
         }).collect::<Vec<_>>();
 
         assert_eq!(&(CHARSET_REV[..]), expected_rev_charset.as_slice());
+    }
+
+    #[test]
+    fn test_to_base32_len() {
+        use ::ToBase32;
+
+        for len in 0..128 {
+            let data = vec![0xff; len];
+            assert_eq!(data.to_base32().len(), data.serialized_length())
+        }
     }
 }
