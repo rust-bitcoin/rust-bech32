@@ -91,7 +91,7 @@ pub trait FromBase32: Sized {
 pub trait ToBase32 {
     /// Convert `Self` to base32 slice
     fn to_base32(&self) -> Vec<u5> {
-        let mut buff = Vec::new();
+        let mut buff = Vec::with_capacity(self.serialized_length());
         self.write_base32(&mut buff);
         buff
     }
