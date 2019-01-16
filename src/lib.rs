@@ -105,6 +105,10 @@ pub trait CheckBase32<T: AsRef<[u5]>> {
 
 /// Grouping structure for the human-readable part and the data part
 /// of decoded Bech32 string.
+///
+/// Please note that in contrast to the standard this library does not
+/// enforce a maximum length for bech32 encoded data. Please make sure to stay inside the parameters
+/// to ensure error detection.
 #[derive(PartialEq, Eq, Debug, Clone, PartialOrd, Ord, Hash)]
 pub struct Bech32 {
     /// Human-readable part
@@ -172,9 +176,26 @@ impl<T: AsRef<[u8]>> ToBase32<Vec<u5>> for T {
 
 impl Bech32 {
     /// Constructs a `Bech32` struct if the result can be encoded as a bech32 string.
+    ///
+    /// # Errors
+    /// * **MixedCase**: if the HRP contains upper case letters. Encoders must use lower case.
+    /// * **InvalidChar**: if the HRP contains any non-ASCII characters (outside 33..=126)
+    /// * **InvalidLength**: if the HRP is outside 1..83 characters long
+    ///
+    /// # Deviations from standard
+    /// * No length limits are enforced for the data part
+    ///
     pub fn new(hrp: String, data: Vec<u5>) -> Result<Bech32, Error> {
-        if hrp.is_empty() {
+        if hrp.is_empty() || hrp.len() > 83 {
             return Err(Error::InvalidLength)
+        }
+
+        if let Some(c) = hrp.chars().find(|&c| (c as u32) < 33 || (c as u32) > 126) {
+            return Err(Error::InvalidChar(c));
+        }
+
+        if hrp.chars().any(|c| c.is_uppercase()) {
+            return Err(Error::MixedCase);
         }
 
         Ok(Bech32 {hrp: hrp, data: data})
@@ -203,9 +224,29 @@ impl Bech32 {
     pub fn into_parts(self) -> (String, Vec<u5>) {
         (self.hrp, self.data)
     }
+}
 
-    /// Parses a Bech32 string but without enforcing the 90 character limit (for lightning BOLT 11).
-    pub fn from_str_lenient(s: &str) -> Result<Bech32, Error> {
+impl Display for Bech32 {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let hrp_bytes: &[u8] = self.hrp.as_bytes();
+        let checksum = create_checksum(hrp_bytes, &self.data);
+        let data_part = self.data.iter().chain(checksum.iter());
+
+        write!(
+            f,
+            "{}{}{}",
+            self.hrp,
+            SEP,
+            data_part.map(|p| CHARSET[*p.as_ref() as usize]).collect::<String>()
+        )
+    }
+}
+
+impl FromStr for Bech32 {
+    type Err = Error;
+
+    /// Decode from a string
+    fn from_str(s: &str) -> Result<Bech32, Error> {
         // Ensure overall length is within bounds
         let len: usize = s.len();
         if len < 8 {
@@ -221,7 +262,7 @@ impl Bech32 {
         let parts: Vec<&str> = s.rsplitn(2, SEP).collect();
         let raw_hrp = parts[1];
         let raw_data = parts[0];
-        if raw_hrp.len() < 1 || raw_data.len() < 6 {
+        if raw_hrp.len() < 1 || raw_data.len() < 6 || raw_hrp.len() > 83 {
             return Err(Error::InvalidLength)
         }
 
@@ -289,34 +330,6 @@ impl Bech32 {
             hrp: String::from_utf8(hrp_bytes).unwrap(),
             data: data_bytes
         })
-    }
-}
-
-impl Display for Bech32 {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let hrp_bytes: &[u8] = self.hrp.as_bytes();
-        let checksum = create_checksum(hrp_bytes, &self.data);
-        let data_part = self.data.iter().chain(checksum.iter());
-
-        write!(
-            f,
-            "{}{}{}",
-            self.hrp,
-            SEP,
-            data_part.map(|p| CHARSET[*p.as_ref() as usize]).collect::<String>()
-        )
-    }
-}
-
-impl FromStr for Bech32 {
-    type Err = Error;
-
-    /// Decode from a string
-    fn from_str(s: &str) -> Result<Bech32, Error> {
-        if s.len() > 90 {
-            return Err(Error::InvalidLength)
-        }
-        Self::from_str_lenient(s)
     }
 }
 
@@ -624,15 +637,6 @@ mod tests {
             take_hook();
             assert!(result.is_err());
         }
-    }
-
-    #[test]
-    fn lenient_parsing() {
-        assert_ne!(
-            Bech32::from_str_lenient("an84characterslonghumanreadablepartthatcontainsthenumber1a\
-            ndtheexcludedcharactersbio1569pvx"),
-            Err(Error::InvalidLength)
-        );
     }
 
     #[test]
