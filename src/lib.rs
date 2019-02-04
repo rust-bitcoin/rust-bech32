@@ -87,6 +87,12 @@ pub trait FromBase32: Sized {
     fn from_base32(b32: &[u5]) -> Result<Self, Self::Err>;
 }
 
+/// Like `Write`, but for `u5`s instead of `u8`s.
+pub trait WriteBase32 {
+    /// Append a slice to the underlying buffer
+    fn write_all(&mut self, u5s: &[u5]);
+}
+
 /// A trait for converting a value to a type `T` that represents a `u5` slice.
 pub trait ToBase32 {
     /// Convert `Self` to base32 slice
@@ -97,7 +103,7 @@ pub trait ToBase32 {
     }
 
     /// Convert `Self` to bech32 and append the result to a supplied, mutable buffer
-    fn write_base32(&self, buffer: &mut Vec<u5>);
+    fn write_base32<T: WriteBase32>(&self, buffer: &mut T);
 
     /// Calculates the length of the serialized data
     ///
@@ -176,9 +182,15 @@ impl FromBase32 for Vec<u8> {
     }
 }
 
+impl WriteBase32 for Vec<u5> {
+    fn write_all(&mut self, u5s: &[u5]) {
+        self.extend_from_slice(u5s);
+    }
+}
+
 impl<T: AsRef<[u8]>> ToBase32 for T {
-    fn write_base32(&self, buffer: &mut Vec<u5>) {
-        buffer.extend_from_slice(&convert_bits(self.as_ref(), 8, 5, true).expect(
+    fn write_base32<W: WriteBase32>(&self, buffer: &mut W) {
+        buffer.write_all(&convert_bits(self.as_ref(), 8, 5, true).expect(
             "both error conditions are impossible (InvalidPadding, InvalidData)"
         ).check_base32().expect(
             "after conversion all elements are in range"
