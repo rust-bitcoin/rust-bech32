@@ -226,19 +226,26 @@ impl Bech32 {
     }
 }
 
+/// Encode a bech32 payload to an [fmt::Formatter].
+pub fn encode_to_fmt<T: AsRef<[u5]>>(fmt: &mut fmt::Formatter, hrp: &str, data: T) -> fmt::Result {
+    let hrp_bytes: &[u8] = hrp.as_bytes();
+    let checksum = create_checksum(hrp_bytes, data.as_ref());
+    let data_part = data.as_ref().iter().chain(checksum.iter());
+
+    write!(
+        fmt,
+        "{}{}{}",
+        hrp,
+        SEP,
+        data_part
+            .map(|p| CHARSET[*p.as_ref() as usize])
+            .collect::<String>()
+    )
+}
+
 impl Display for Bech32 {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let hrp_bytes: &[u8] = self.hrp.as_bytes();
-        let checksum = create_checksum(hrp_bytes, &self.data);
-        let data_part = self.data.iter().chain(checksum.iter());
-
-        write!(
-            f,
-            "{}{}{}",
-            self.hrp,
-            SEP,
-            data_part.map(|p| CHARSET[*p.as_ref() as usize]).collect::<String>()
-        )
+        encode_to_fmt(f, &self.hrp, &self.data)
     }
 }
 
