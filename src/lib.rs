@@ -242,58 +242,59 @@ impl Display for Bech32 {
     }
 }
 
-impl FromStr for Bech32 {
-    type Err = Error;
+/// Decode a bech32 string into the raw HRP and the data bytes.
+/// The HRP is returned as it was found in the original string,
+/// so it can be either lower or upper case.
+pub fn decode(s: &str) -> Result<(&str, Vec<u5>), Error> {
+    // Ensure overall length is within bounds
+    let len: usize = s.len();
+    if len < 8 {
+        return Err(Error::InvalidLength);
+    }
 
-    /// Decode from a string
-    fn from_str(s: &str) -> Result<Bech32, Error> {
-        // Ensure overall length is within bounds
-        let len: usize = s.len();
-        if len < 8 {
-            return Err(Error::InvalidLength)
+    // Check for missing separator
+    if s.find(SEP).is_none() {
+        return Err(Error::MissingSeparator);
+    }
+
+    // Split at separator and check for two pieces
+    let parts: Vec<&str> = s.rsplitn(2, SEP).collect();
+    let raw_hrp = parts[1];
+    let raw_data = parts[0];
+    if raw_hrp.len() < 1 || raw_data.len() < 6 || raw_hrp.len() > 83 {
+        return Err(Error::InvalidLength);
+    }
+
+    let mut has_lower: bool = false;
+    let mut has_upper: bool = false;
+    let mut hrp_bytes: Vec<u8> = Vec::new();
+    for b in raw_hrp.bytes() {
+        // Valid subset of ASCII
+        if b < 33 || b > 126 {
+            return Err(Error::InvalidChar(b as char));
         }
-
-        // Check for missing separator
-        if s.find(SEP).is_none() {
-            return Err(Error::MissingSeparator)
+        let mut c = b;
+        // Lowercase
+        if b >= b'a' && b <= b'z' {
+            has_lower = true;
         }
-
-        // Split at separator and check for two pieces
-        let parts: Vec<&str> = s.rsplitn(2, SEP).collect();
-        let raw_hrp = parts[1];
-        let raw_data = parts[0];
-        if raw_hrp.len() < 1 || raw_data.len() < 6 || raw_hrp.len() > 83 {
-            return Err(Error::InvalidLength)
+        // Uppercase
+        if b >= b'A' && b <= b'Z' {
+            has_upper = true;
+            // Convert to lowercase
+            c = b + (b'a' - b'A');
         }
+        hrp_bytes.push(c);
+    }
 
-        let mut has_lower: bool = false;
-        let mut has_upper: bool = false;
-        let mut hrp_bytes: Vec<u8> = Vec::new();
-        for b in raw_hrp.bytes() {
-            // Valid subset of ASCII
-            if b < 33 || b > 126 {
-                return Err(Error::InvalidChar(b as char))
-            }
-            let mut c = b;
-            // Lowercase
-            if b >= b'a' && b <= b'z' {
-                has_lower = true;
-            }
-            // Uppercase
-            if b >= b'A' && b <= b'Z' {
-                has_upper = true;
-                // Convert to lowercase
-                c = b + (b'a'-b'A');
-            }
-            hrp_bytes.push(c);
-        }
-
-        // Check data payload
-        let mut data_bytes = raw_data.chars().map(|c| {
+    // Check data payload
+    let mut data = raw_data
+        .chars()
+        .map(|c| {
             // Only check if c is in the ASCII range, all invalid ASCII characters have the value -1
             // in CHARSET_REV (which covers the whole ASCII range) and will be filtered out later.
             if !c.is_ascii() {
-                return Err(Error::InvalidChar(c))
+                return Err(Error::InvalidChar(c));
             }
 
             if c.is_lowercase() {
@@ -310,25 +311,35 @@ impl FromStr for Bech32 {
             }
 
             Ok(u5::try_from_u8(num_value as u8).expect("range checked above, num_value <= 31"))
-        }).collect::<Result<Vec<u5>, Error>>()?;
+        })
+        .collect::<Result<Vec<u5>, Error>>()?;
 
-        // Ensure no mixed case
-        if has_lower && has_upper {
-            return Err(Error::MixedCase)
-        }
+    // Ensure no mixed case
+    if has_lower && has_upper {
+        return Err(Error::MixedCase);
+    }
 
-        // Ensure checksum
-        if !verify_checksum(&hrp_bytes, &data_bytes) {
-            return Err(Error::InvalidChecksum)
-        }
+    // Ensure checksum
+    if !verify_checksum(&hrp_bytes, &data) {
+        return Err(Error::InvalidChecksum);
+    }
 
-        // Remove checksum from data payload
-        let dbl: usize = data_bytes.len();
-        data_bytes.truncate(dbl - 6);
+    // Remove checksum from data payload
+    let dbl: usize = data.len();
+    data.truncate(dbl - 6);
 
+    Ok((&raw_hrp, data))
+}
+
+impl FromStr for Bech32 {
+    type Err = Error;
+
+    /// Decode from a string
+    fn from_str(s: &str) -> Result<Bech32, Error> {
+        let (hrp, data) = decode(s)?;
         Ok(Bech32 {
-            hrp: String::from_utf8(hrp_bytes).unwrap(),
-            data: data_bytes
+            hrp: hrp.to_lowercase(),
+            data: data,
         })
     }
 }
