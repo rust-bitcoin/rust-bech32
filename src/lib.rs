@@ -252,15 +252,14 @@ pub fn decode(s: &str) -> Result<(&str, Vec<u5>), Error> {
         return Err(Error::InvalidLength);
     }
 
-    // Check for missing separator
-    if s.find(SEP).is_none() {
-        return Err(Error::MissingSeparator);
-    }
-
     // Split at separator and check for two pieces
-    let parts: Vec<&str> = s.rsplitn(2, SEP).collect();
-    let raw_hrp = parts[1];
-    let raw_data = parts[0];
+    let (raw_hrp, raw_data) = match s.rfind("1") {
+        None => return Err(Error::MissingSeparator),
+        Some(sep) => {
+            let (hrp, data) = s.split_at(sep);
+            (hrp, &data[1..])
+        }
+    };
     if raw_hrp.len() < 1 || raw_data.len() < 6 || raw_hrp.len() > 83 {
         return Err(Error::InvalidLength);
     }
