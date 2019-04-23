@@ -309,7 +309,7 @@ impl FromStr for Bech32 {
                 return Err(Error::InvalidChar(c));
             }
 
-            Ok(u5::try_from_u8(num_value as u8).expect("range checked above, num_value <= 31"))
+            Ok(u5(num_value as u8))
         }).collect::<Result<Vec<u5>, Error>>()?;
 
         // Ensure no mixed case
