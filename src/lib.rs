@@ -30,29 +30,14 @@
 //! # Examples
 //!
 //! ```rust
-//! use bech32::Bech32;
+//! use bech32::{self, FromBase32, ToBase32};
 //!
-//! let b = Bech32::new_check_data("bech32".into(), vec![0x00, 0x01, 0x02]).unwrap();
-//! let encoded = b.to_string();
-//! assert_eq!(encoded, "bech321qpz4nc4pe".to_string());
+//! let encoded = bech32::encode("bech32", vec![0x00, 0x01, 0x02].to_base32()).unwrap();
+//! assert_eq!(encoded, "bech321qqqsyrhqy2a".to_string());
 //!
-//! let c = encoded.parse::<Bech32>();
-//! assert_eq!(b, c.unwrap());
-//! ```
-//!
-//! If the data is already range-checked the `Bech32::new` function can be used which will never
-//! return `Err(Error::InvalidData)`.
-//!
-//! ```rust
-//! use bech32::{Bech32, u5, ToBase32};
-//!
-//! // converts base256 data to base32 and adds padding if needed
-//! let checked_data: Vec<u5> = [0xb4, 0xff, 0xa5].to_base32();
-//!
-//! let b = Bech32::new("bech32".into(), checked_data).expect("hrp is not empty");
-//! let encoded = b.to_string();
-//!
-//! assert_eq!(encoded, "bech321knl623tk6v7".to_string());
+//! let (hrp, data) = bech32::decode(&encoded).unwrap();
+//! assert_eq!(hrp, "bech32");
+//! assert_eq!(Vec::<u8>::from_base32(&data).unwrap(), vec![0x00, 0x01, 0x02]);
 //! ```
 //!
 
@@ -61,7 +46,6 @@
 #![deny(non_camel_case_types)]
 #![deny(non_snake_case)]
 #![deny(unused_mut)]
-
 #![cfg_attr(feature = "strict", deny(warnings))]
 
 use std::{error, fmt};
@@ -69,53 +53,11 @@ use std::{error, fmt};
 // AsciiExt is needed for Rust 1.14 but not for newer versions
 #[allow(unused_imports, deprecated)]
 use std::ascii::AsciiExt;
-use std::fmt::{Display, Formatter};
-use std::str::FromStr;
 
 /// Integer in the range `0..32`
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Default, PartialOrd, Ord, Hash)]
 #[allow(non_camel_case_types)]
 pub struct u5(u8);
-
-/// Parse/convert base32 slice to `Self`. It is the reciprocal of
-/// `ToBase32`.
-pub trait FromBase32: Sized {
-    /// The associated error which can be returned from parsing (e.g. because of bad padding).
-    type Err;
-
-    /// Convert a base32 slice to `Self`.
-    fn from_base32(b32: &[u5]) -> Result<Self, Self::Err>;
-}
-
-/// A trait for converting a value to a type `T` that represents a `u5` slice.
-pub trait ToBase32<T: AsRef<[u5]>> {
-    /// Convert `Self` to base32 slice
-    fn to_base32(&self) -> T;
-}
-
-/// A trait to convert between u8 arrays and u5 arrays without changing the content of the elements,
-/// but checking that they are in range.
-pub trait CheckBase32<T: AsRef<[u5]>> {
-    /// Error type if conversion fails
-    type Err;
-
-    /// Check if all values are in range and return array-like struct of `u5` values
-    fn check_base32(self) -> Result<T, Self::Err>;
-}
-
-/// Grouping structure for the human-readable part and the data part
-/// of decoded Bech32 string.
-///
-/// Please note that in contrast to the standard this library does not
-/// enforce a maximum length for bech32 encoded data. Please make sure to stay inside the parameters
-/// to ensure error detection.
-#[derive(PartialEq, Eq, Debug, Clone, PartialOrd, Ord, Hash)]
-pub struct Bech32 {
-    /// Human-readable part
-    hrp: String,
-    /// Data payload
-    data: Vec<u5>
-}
 
 impl u5 {
     /// Convert a `u8` to `u5` if in range, return `Error` otherwise
@@ -145,12 +87,14 @@ impl AsRef<u8> for u5 {
     }
 }
 
-impl<'f, T: AsRef<[u8]>> CheckBase32<Vec<u5>> for T {
-    type Err = Error;
+/// Parse/convert base32 slice to `Self`. It is the reciprocal of
+/// `ToBase32`.
+pub trait FromBase32: Sized {
+    /// The associated error which can be returned from parsing (e.g. because of bad padding).
+    type Err;
 
-    fn check_base32(self) -> Result<Vec<u5>, Self::Err> {
-        self.as_ref().iter().map(|x| u5::try_from_u8(*x)).collect::<Result<Vec<u5>, Error>>()
-    }
+    /// Convert a base32 slice to `Self`.
+    fn from_base32(b32: &[u5]) -> Result<Self, Self::Err>;
 }
 
 impl FromBase32 for Vec<u8> {
@@ -163,143 +107,176 @@ impl FromBase32 for Vec<u8> {
     }
 }
 
+/// A trait for converting a value to a type `T` that represents a `u5` slice.
+pub trait ToBase32<T: AsRef<[u5]>> {
+    /// Convert `Self` to base32 slice
+    fn to_base32(&self) -> T;
+}
+
 impl<T: AsRef<[u8]>> ToBase32<Vec<u5>> for T {
     /// Convert base256 to base32, adds padding if necessary
     fn to_base32(&self) -> Vec<u5> {
-        convert_bits(self.as_ref(), 8, 5, true).expect(
-            "both error conditions are impossible (InvalidPadding, InvalidData)"
-        ).check_base32().expect(
-            "after conversion all elements are in range"
-        )
+        convert_bits(self.as_ref(), 8, 5, true)
+            .expect("both error conditions are impossible (InvalidPadding, InvalidData)")
+            .check_base32()
+            .expect("after conversion all elements are in range")
     }
 }
 
-impl Bech32 {
-    /// Constructs a `Bech32` struct if the result can be encoded as a bech32 string.
-    ///
-    /// # Errors
-    /// * **MixedCase**: if the HRP contains upper case letters. Encoders must use lower case.
-    /// * **InvalidChar**: if the HRP contains any non-ASCII characters (outside 33..=126)
-    /// * **InvalidLength**: if the HRP is outside 1..83 characters long
-    ///
-    /// # Deviations from standard
-    /// * No length limits are enforced for the data part
-    ///
-    pub fn new(hrp: String, data: Vec<u5>) -> Result<Bech32, Error> {
-        if hrp.is_empty() || hrp.len() > 83 {
-            return Err(Error::InvalidLength)
-        }
+/// A trait to convert between u8 arrays and u5 arrays without changing the content of the elements,
+/// but checking that they are in range.
+pub trait CheckBase32<T: AsRef<[u5]>> {
+    /// Error type if conversion fails
+    type Err;
 
-        if let Some(c) = hrp.chars().find(|&c| (c as u32) < 33 || (c as u32) > 126) {
-            return Err(Error::InvalidChar(c));
-        }
-
-        if hrp.chars().any(|c| c.is_uppercase()) {
-            return Err(Error::MixedCase);
-        }
-
-        Ok(Bech32 {hrp: hrp, data: data})
-    }
-
-    /// Constructs a `Bech32` struct if the result can be encoded as a bech32 string. It uses
-    /// `data` that is not range checked yet and as a result may return `Err(Error::InvalidData)`.
-    ///
-    /// This function currently allocates memory for the checked data part.
-    /// See [issue #19](https://github.com/rust-bitcoin/rust-bech32/issues/19).
-    pub fn new_check_data(hrp: String, data: Vec<u8>) -> Result<Bech32, Error> {
-        Self::new(hrp, data.check_base32()?)
-    }
-
-    /// Returns the human readable part
-    pub fn hrp(&self) -> &str {
-        &self.hrp
-    }
-
-    /// Returns the data part as `[u8]` but only using 5 bits per byte
-    pub fn data(&self) -> &[u5] {
-        &self.data
-    }
-
-    /// Destructures the `Bech32` struct into its parts
-    pub fn into_parts(self) -> (String, Vec<u5>) {
-        (self.hrp, self.data)
-    }
+    /// Check if all values are in range and return array-like struct of `u5` values
+    fn check_base32(self) -> Result<T, Self::Err>;
 }
 
-impl Display for Bech32 {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let hrp_bytes: &[u8] = self.hrp.as_bytes();
-        let checksum = create_checksum(hrp_bytes, &self.data);
-        let data_part = self.data.iter().chain(checksum.iter());
-
-        write!(
-            f,
-            "{}{}{}",
-            self.hrp,
-            SEP,
-            data_part.map(|p| CHARSET[*p.as_ref() as usize]).collect::<String>()
-        )
-    }
-}
-
-impl FromStr for Bech32 {
+impl<'f, T: AsRef<[u8]>> CheckBase32<Vec<u5>> for T {
     type Err = Error;
 
-    /// Decode from a string
-    fn from_str(s: &str) -> Result<Bech32, Error> {
-        // Ensure overall length is within bounds
-        let len: usize = s.len();
-        if len < 8 {
-            return Err(Error::InvalidLength)
+    fn check_base32(self) -> Result<Vec<u5>, Self::Err> {
+        self.as_ref().iter().map(|x| u5::try_from_u8(*x)).collect::<Result<Vec<u5>, Error>>()
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Case {
+    Upper,
+    Lower,
+    None,
+}
+
+/// Check if the HRP is valid. Returns the case of the HRP, if any.
+/// True for uppercase, false for lowercase, None for only digits.
+///
+/// # Errors
+/// * **MixedCase**: If the HRP contains both uppercase and lowercase characters.
+/// * **InvalidChar**: If the HRP contains any non-ASCII characters (outside 33..=126).
+/// * **InvalidLength**: If the HRP is outside 1..83 characters long.
+fn check_hrp(hrp: &str) -> Result<Case, Error> {
+    if hrp.is_empty() || hrp.len() > 83 {
+        return Err(Error::InvalidLength);
+    }
+
+    let mut has_lower: bool = false;
+    let mut has_upper: bool = false;
+    for b in hrp.bytes() {
+        // Valid subset of ASCII
+        if b < 33 || b > 126 {
+            return Err(Error::InvalidChar(b as char));
         }
 
-        // Check for missing separator
-        if s.find(SEP).is_none() {
-            return Err(Error::MissingSeparator)
-        }
+        if b >= b'a' && b <= b'z' {
+            has_lower = true;
+        } else if b >= b'A' && b <= b'Z' {
+            has_upper = true;
+        };
 
-        // Split at separator and check for two pieces
-        let parts: Vec<&str> = s.rsplitn(2, SEP).collect();
-        let raw_hrp = parts[1];
-        let raw_data = parts[0];
-        if raw_hrp.len() < 1 || raw_data.len() < 6 || raw_hrp.len() > 83 {
-            return Err(Error::InvalidLength)
+        if has_lower && has_upper {
+            return Err(Error::MixedCase);
         }
+    }
 
-        let mut has_lower: bool = false;
-        let mut has_upper: bool = false;
-        let mut hrp_bytes: Vec<u8> = Vec::new();
-        for b in raw_hrp.bytes() {
-            // Valid subset of ASCII
-            if b < 33 || b > 126 {
-                return Err(Error::InvalidChar(b as char))
-            }
-            let mut c = b;
-            // Lowercase
-            if b >= b'a' && b <= b'z' {
-                has_lower = true;
-            }
-            // Uppercase
-            if b >= b'A' && b <= b'Z' {
-                has_upper = true;
-                // Convert to lowercase
-                c = b + (b'a'-b'A');
-            }
-            hrp_bytes.push(c);
+    Ok(match (has_upper, has_lower) {
+        (true, false) => Case::Upper,
+        (false, true) => Case::Lower,
+        (false, false) => Case::None,
+        (true, true) => unreachable!(),
+    })
+}
+
+/// Encode a bech32 payload to an [fmt::Write].
+/// This method is intended for implementing traits from [std::fmt].
+///
+/// # Errors
+/// * If [check_hrp] returns an error for the given HRP.
+/// # Deviations from standard
+/// * No length limits are enforced for the data part
+pub fn encode_to_fmt<T: AsRef<[u5]>>(
+    fmt: &mut fmt::Write,
+    hrp: &str,
+    data: T,
+) -> Result<fmt::Result, Error> {
+    check_hrp(&hrp)?;
+    let checksum = create_checksum(hrp.as_bytes(), data.as_ref());
+    let data_part = data.as_ref().iter().chain(checksum.iter());
+
+    if let Err(e) = write!(fmt, "{}{}", hrp, SEP) {
+        return Ok(Err(e));
+    }
+    for p in data_part {
+        if let Err(e) = fmt.write_char(CHARSET[*p.as_ref() as usize]) {
+            return Ok(Err(e));
         }
+    }
+    Ok(Ok(()))
+}
 
-        // Check data payload
-        let mut data_bytes = raw_data.chars().map(|c| {
-            // Only check if c is in the ASCII range, all invalid ASCII characters have the value -1
-            // in CHARSET_REV (which covers the whole ASCII range) and will be filtered out later.
+/// Encode a bech32 payload to string.
+///
+/// # Errors
+/// * If [check_hrp] returns an error for the given HRP.
+/// # Deviations from standard
+/// * No length limits are enforced for the data part
+pub fn encode<T: AsRef<[u5]>>(hrp: &str, data: T) -> Result<String, Error> {
+    let mut buf = String::new();
+    encode_to_fmt(&mut buf, hrp, data)?.unwrap();
+    Ok(buf)
+}
+
+/// Decode a bech32 string into the raw HRP and the data bytes.
+///
+/// Returns the HRP in lowercase..
+pub fn decode(s: &str) -> Result<(String, Vec<u5>), Error> {
+    // Ensure overall length is within bounds
+    if s.len() < 8 {
+        return Err(Error::InvalidLength);
+    }
+
+    // Split at separator and check for two pieces
+    let (raw_hrp, raw_data) = match s.rfind(SEP) {
+        None => return Err(Error::MissingSeparator),
+        Some(sep) => {
+            let (hrp, data) = s.split_at(sep);
+            (hrp, &data[1..])
+        }
+    };
+    if raw_data.len() < 6 {
+        return Err(Error::InvalidLength);
+    }
+
+    let mut case = check_hrp(&raw_hrp)?;
+    let hrp_lower = match case {
+        Case::Upper => raw_hrp.to_lowercase(),
+        // already lowercase
+        Case::Lower | Case::None => String::from(raw_hrp),
+    };
+
+    // Check data payload
+    let mut data = raw_data
+        .chars()
+        .map(|c| {
+            // Only check if c is in the ASCII range, all invalid ASCII
+            // characters have the value -1 in CHARSET_REV (which covers
+            // the whole ASCII range) and will be filtered out later.
             if !c.is_ascii() {
-                return Err(Error::InvalidChar(c))
+                return Err(Error::InvalidChar(c));
             }
 
             if c.is_lowercase() {
-                has_lower = true;
+                match case {
+                    Case::Upper => return Err(Error::MixedCase),
+                    Case::None => case = Case::Lower,
+                    Case::Lower => {}
+                }
             } else if c.is_uppercase() {
-                has_upper = true;
+                match case {
+                    Case::Lower => return Err(Error::MixedCase),
+                    Case::None => case = Case::Upper,
+                    Case::Upper => {}
+                }
             }
 
             // c should be <128 since it is in the ASCII range, CHARSET_REV.len() == 128
@@ -310,27 +287,19 @@ impl FromStr for Bech32 {
             }
 
             Ok(u5::try_from_u8(num_value as u8).expect("range checked above, num_value <= 31"))
-        }).collect::<Result<Vec<u5>, Error>>()?;
-
-        // Ensure no mixed case
-        if has_lower && has_upper {
-            return Err(Error::MixedCase)
-        }
-
-        // Ensure checksum
-        if !verify_checksum(&hrp_bytes, &data_bytes) {
-            return Err(Error::InvalidChecksum)
-        }
-
-        // Remove checksum from data payload
-        let dbl: usize = data_bytes.len();
-        data_bytes.truncate(dbl - 6);
-
-        Ok(Bech32 {
-            hrp: String::from_utf8(hrp_bytes).unwrap(),
-            data: data_bytes
         })
+        .collect::<Result<Vec<u5>, Error>>()?;
+
+    // Ensure checksum
+    if !verify_checksum(&hrp_lower.as_bytes(), &data) {
+        return Err(Error::InvalidChecksum);
     }
+
+    // Remove checksum from data payload
+    let dbl: usize = data.len();
+    data.truncate(dbl - 6);
+
+    Ok((hrp_lower, data))
 }
 
 fn create_checksum(hrp: &[u8], data: &[u5]) -> Vec<u5> {
@@ -390,7 +359,7 @@ const CHARSET: [char; 32] = [
     'c','e','6','m','u','a','7','l'
 ];
 
-// Reverse character set. Maps ASCII byte -> CHARSET index on [0,31]
+/// Reverse character set. Maps ASCII byte -> CHARSET index on [0,31]
 const CHARSET_REV: [i8; 128] = [
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -399,7 +368,7 @@ const CHARSET_REV: [i8; 128] = [
     -1, 29, -1, 24, 13, 25,  9,  8, 23, -1, 18, 22, 31, 27, 19, -1,
      1,  0,  3, 16, 11, 28, 12, 14,  6,  4,  2, -1, -1, -1, -1, -1,
     -1, 29, -1, 24, 13, 25,  9,  8, 23, -1, 18, 22, 31, 27, 19, -1,
-     1,  0,  3, 16, 11, 28, 12, 14,  6,  4,  2, -1, -1, -1, -1, -1
+    1,  0,  3, 16, 11, 28, 12, 14,  6,  4,  2, -1, -1, -1, -1, -1
 ];
 
 /// Generator coefficients
@@ -470,7 +439,8 @@ impl error::Error for Error {
 /// assert_eq!(base5.unwrap(), vec![0x1f, 0x1c]);
 /// ```
 pub fn convert_bits<T>(data: &[T], from: u32, to: u32, pad: bool) -> Result<Vec<u8>, Error>
-    where T: Into<u8> + Copy
+where
+    T: Into<u8> + Copy,
 {
     if from > 8 || to > 8 || from == 0 || to == 0 {
         panic!("convert_bits `from` and `to` parameters 0 or greater than 8");
@@ -478,12 +448,12 @@ pub fn convert_bits<T>(data: &[T], from: u32, to: u32, pad: bool) -> Result<Vec<
     let mut acc: u32 = 0;
     let mut bits: u32 = 0;
     let mut ret: Vec<u8> = Vec::new();
-    let maxv: u32 = (1<<to) - 1;
+    let maxv: u32 = (1 << to) - 1;
     for value in data {
         let v: u32 = u32::from(Into::<u8>::into(*value));
         if (v >> from) != 0 {
             // Input value exceeds `from` bit size
-            return Err(Error::InvalidData(v as u8))
+            return Err(Error::InvalidData(v as u8));
         }
         acc = (acc << from) | v;
         bits += from;
@@ -497,41 +467,21 @@ pub fn convert_bits<T>(data: &[T], from: u32, to: u32, pad: bool) -> Result<Vec<
             ret.push(((acc << (to - bits)) & maxv) as u8);
         }
     } else if bits >= from || ((acc << (to - bits)) & maxv) != 0 {
-        return Err(Error::InvalidPadding)
+        return Err(Error::InvalidPadding);
     }
     Ok(ret)
 }
 
 #[cfg(test)]
 mod tests {
-    use Bech32;
-    use Error;
-    use convert_bits;
-    use CheckBase32;
-
-    #[test]
-    fn new_checks() {
-        assert!(Bech32::new_check_data("test".into(), vec![1, 2, 3, 4]).is_ok());
-        assert_eq!(Bech32::new_check_data("".into(), vec![1, 2, 3, 4]), Err(Error::InvalidLength));
-        assert_eq!(Bech32::new_check_data("test".into(), vec![30, 31, 35, 20]), Err(Error::InvalidData(35)));
-
-        let both = Bech32::new_check_data("".into(), vec![30, 31, 35, 20]);
-        assert!(both == Err(Error::InvalidLength) || both == Err(Error::InvalidData(35)));
-
-        assert!(Bech32::new("test".into(), [1u8, 2, 3, 4].check_base32().unwrap()).is_ok());
-        assert_eq!(Bech32::new("".into(), [1u8, 2, 3, 4].check_base32().unwrap()), Err(Error::InvalidLength));
-    }
+    use super::*;
 
     #[test]
     fn getters() {
-        let bech: Bech32 = "BC1SW50QA3JX3S".parse().unwrap();
+        let decoded = decode("BC1SW50QA3JX3S").unwrap();
         let data = [16, 14, 20, 15, 0].check_base32().unwrap();
-        assert_eq!(bech.hrp(), "bc");
-        assert_eq!(
-            bech.data(),
-            data.as_slice()
-        );
-        assert_eq!(bech.into_parts(), ("bc".to_owned(), data));
+        assert_eq!(&decoded.0, "bc");
+        assert_eq!(decoded.1, data.as_slice());
     }
 
     #[test]
@@ -544,12 +494,13 @@ mod tests {
             "split1checkupstagehandshakeupstreamerranterredcaperred2y9e3w",
         );
         for s in strings {
-            let decode_result = s.parse::<Bech32>();
+            let decode_result = decode(s);
             if !decode_result.is_ok() {
                 panic!("Did not decode: {:?} Reason: {:?}", s, decode_result.unwrap_err());
             }
             assert!(decode_result.is_ok());
-            let encode_result = decode_result.unwrap().to_string();
+            let decoded = decode_result.unwrap();
+            let encode_result = encode(&decoded.0, decoded.1).unwrap();
             assert_eq!(s.to_lowercase(), encode_result.to_lowercase());
         }
     }
@@ -578,7 +529,7 @@ mod tests {
         );
         for p in pairs {
             let (s, expected_error) = p;
-            let dec_result = s.parse::<Bech32>();
+            let dec_result = decode(s);
             if dec_result.is_ok() {
                 println!("{:?}", dec_result.unwrap());
                 panic!("Should be invalid: {:?}", s);
@@ -590,7 +541,7 @@ mod tests {
     #[test]
     fn valid_conversion() {
         // Set of [data, from_bits, to_bits, pad, result]
-        let tests: Vec<(Vec<u8>, u32, u32, bool, Vec<u8>)> = vec!(
+        let tests: Vec<(Vec<u8>, u32, u32, bool, Vec<u8>)> = vec![
             (vec![0x01], 1, 1, true, vec![0x01]),
             (vec![0x01, 0x01], 1, 1, true, vec![0x01, 0x01]),
             (vec![0x01], 8, 8, true, vec![0x01]),
@@ -599,7 +550,7 @@ mod tests {
             (vec![0x01], 8, 1, true, vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01]),
             (vec![0xff], 8, 5, true, vec![0x1f, 0x1c]),
             (vec![0x1f, 0x1c], 5, 8, false, vec![0xff]),
-        );
+        ];
         for t in tests {
             let (data, from_bits, to_bits, pad, expected_result) = t;
             let result = convert_bits(&data, from_bits, to_bits, pad);
@@ -611,10 +562,10 @@ mod tests {
     #[test]
     fn invalid_conversion() {
         // Set of [data, from_bits, to_bits, pad, expected error]
-        let tests: Vec<(Vec<u8>, u32, u32, bool, Error)> = vec!(
+        let tests: Vec<(Vec<u8>, u32, u32, bool, Error)> = vec![
             (vec![0xff], 8, 5, false, Error::InvalidPadding),
             (vec![0x02], 1, 1, true, Error::InvalidData(0x02)),
-        );
+        ];
         for t in tests {
             let (data, from_bits, to_bits, pad, expected_error) = t;
             let result = convert_bits(&data, from_bits, to_bits, pad);
@@ -644,6 +595,17 @@ mod tests {
         assert!([0u8, 1, 2, 30, 31].check_base32().is_ok());
         assert!([0u8, 1, 2, 30, 31, 32].check_base32().is_err());
         assert!([0u8, 1, 2, 30, 31, 255].check_base32().is_err());
+
+        assert!([1u8, 2, 3, 4].check_base32().is_ok());
+        assert_eq!([30u8, 31, 35, 20].check_base32(), Err(Error::InvalidData(35)));
+    }
+
+    #[test]
+    fn test_encode() {
+        assert_eq!(
+            encode("", vec![1u8, 2, 3, 4].check_base32().unwrap()),
+            Err(Error::InvalidLength)
+        );
     }
 
     #[test]
@@ -664,10 +626,7 @@ mod tests {
 
     #[test]
     fn reverse_charset() {
-        // AsciiExt is needed for Rust 1.14 but not for newer versions
-        #[allow(unused_imports, deprecated)]
-        use std::ascii::AsciiExt;
-        use ::CHARSET_REV;
+        use CHARSET_REV;
 
         fn get_char_value(c: char) -> i8 {
             let charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
@@ -677,9 +636,8 @@ mod tests {
             }
         }
 
-        let expected_rev_charset = (0u8..128).map(|i| {
-            get_char_value(i as char)
-        }).collect::<Vec<_>>();
+        let expected_rev_charset =
+            (0u8..128).map(|i| get_char_value(i as char)).collect::<Vec<_>>();
 
         assert_eq!(&(CHARSET_REV[..]), expected_rev_charset.as_slice());
     }
