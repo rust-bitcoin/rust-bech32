@@ -73,6 +73,11 @@ impl u5 {
     pub fn to_u8(&self) -> u8 {
         self.0
     }
+
+    /// Get char representing this 5 bit value as defined in BIP173
+    pub fn to_char(&self) -> char {
+        CHARSET[self.to_u8() as usize]
+    }
 }
 
 impl Into<u8> for u5 {
@@ -84,6 +89,94 @@ impl Into<u8> for u5 {
 impl AsRef<u8> for u5 {
     fn as_ref(&self) -> &u8 {
         &self.0
+    }
+}
+
+/// Allocationless Bech32 writer that accumulates the checksum data internally and writes them out
+/// in the end.
+pub struct Bech32Writer<'a> {
+    formatter: &'a mut fmt::Write,
+    chk: u32,
+}
+
+impl<'a> Bech32Writer<'a> {
+    /// Creates a new writer that can write a bech32 string without allocating itself.
+    ///
+    /// This is a rather low-level API and doesn't check the HRP or data length for standard
+    /// compliance.
+    pub fn new(hrp: &str, fmt: &'a mut fmt::Write) -> Result<Bech32Writer<'a>, fmt::Error> {
+        let mut writer = Bech32Writer {
+            formatter: fmt,
+            chk: 1,
+        };
+
+        writer.formatter.write_str(hrp)?;
+        writer.formatter.write_char(SEP)?;
+
+        // expand HRP
+        for b in hrp.bytes() {
+            writer.polymod_step(u5(b >> 5));
+        }
+        writer.polymod_step(u5(0));
+        for b in hrp.bytes() {
+            writer.polymod_step(u5(b & 0x1f));
+        }
+
+        Ok(writer)
+    }
+
+    fn polymod_step(&mut self, v: u5) {
+        let b = (self.chk >> 25) as u8;
+        self.chk = (self.chk & 0x1ffffff) << 5 ^ (u32::from(*v.as_ref()));
+        for i in 0..5 {
+            if (b >> i) & 1 == 1 {
+                self.chk ^= GEN[i]
+            }
+        }
+    }
+
+    /// Write out the checksum at the end. If this method isn't called this will happen on drop.
+    pub fn finalize(mut self) -> fmt::Result{
+        self.inner_finalize()?;
+        std::mem::forget(self);
+        Ok(())
+    }
+
+    fn inner_finalize(&mut self) -> fmt::Result {
+        // Pad with 6 zeros
+        for _ in 0..6 {
+            self.polymod_step(u5(0))
+        }
+
+        let plm: u32 = self.chk ^ 1;
+
+        for p in 0..6 {
+            self.formatter.write_char(
+                u5(((plm >> (5 * (5 - p))) & 0x1f) as u8).to_char()
+            )?;
+        }
+
+        Ok(())
+    }
+
+    /// Writes a part of the data part
+    pub fn write(&mut self, data: &[u5]) -> fmt::Result {
+        for b in data {
+            self.write_u5(*b)?;
+        }
+        Ok(())
+    }
+
+    /// Writes a single 5 bit value of the data part
+    pub fn write_u5(&mut self, data: u5) -> fmt::Result {
+        self.polymod_step(data);
+        self.formatter.write_char(data.to_char())
+    }
+}
+
+impl<'a> Drop for Bech32Writer<'a> {
+    fn drop(&mut self) {
+        self.inner_finalize().expect("Unhandled error writing the checksum on drop.")
     }
 }
 
@@ -200,18 +293,15 @@ pub fn encode_to_fmt<T: AsRef<[u5]>>(
     data: T,
 ) -> Result<fmt::Result, Error> {
     check_hrp(&hrp)?;
-    let checksum = create_checksum(hrp.as_bytes(), data.as_ref());
-    let data_part = data.as_ref().iter().chain(checksum.iter());
-
-    if let Err(e) = write!(fmt, "{}{}", hrp, SEP) {
-        return Ok(Err(e));
+    match Bech32Writer::new(hrp, fmt) {
+        Ok(mut writer) => {
+            Ok(writer.write(data.as_ref()).and_then(|_| {
+                // Finalize manually to avoid panic on drop if write fails
+                writer.finalize()
+            }))
+        },
+        Err(e) => Ok(Err(e)),
     }
-    for p in data_part {
-        if let Err(e) = fmt.write_char(CHARSET[*p.as_ref() as usize]) {
-            return Ok(Err(e));
-        }
-    }
-    Ok(Ok(()))
 }
 
 /// Encode a bech32 payload to string.
@@ -300,19 +390,6 @@ pub fn decode(s: &str) -> Result<(String, Vec<u5>), Error> {
     data.truncate(dbl - 6);
 
     Ok((hrp_lower, data))
-}
-
-fn create_checksum(hrp: &[u8], data: &[u5]) -> Vec<u5> {
-    let mut values: Vec<u5> = hrp_expand(hrp);
-    values.extend_from_slice(data);
-    // Pad with 6 zeros
-    values.extend_from_slice(&[u5::try_from_u8(0).unwrap(); 6]);
-    let plm: u32 = polymod(&values) ^ 1;
-    let mut checksum: Vec<u5> = Vec::new();
-    for p in 0..6 {
-        checksum.push(u5::try_from_u8(((plm >> (5 * (5 - p))) & 0x1f) as u8).unwrap());
-    }
-    checksum
 }
 
 fn verify_checksum(hrp: &[u8], data: &[u5]) -> bool {
@@ -640,5 +717,38 @@ mod tests {
             (0u8..128).map(|i| get_char_value(i as char)).collect::<Vec<_>>();
 
         assert_eq!(&(CHARSET_REV[..]), expected_rev_charset.as_slice());
+    }
+
+    #[test]
+    fn writer() {
+        let hrp = "lnbc";
+        let data = "Hello World!".as_bytes().to_base32();
+
+        let mut written_str = String::new();
+        {
+            let mut writer = Bech32Writer::new(hrp, &mut written_str).unwrap();
+            writer.write(&data).unwrap();
+            writer.finalize().unwrap();
+        }
+
+        let encoded_str = encode(hrp, data).unwrap();
+
+        assert_eq!(encoded_str, written_str);
+    }
+
+    #[test]
+    fn write_on_drop() {
+        let hrp = "lntb";
+        let data = "Hello World!".as_bytes().to_base32();
+
+        let mut written_str = String::new();
+        {
+            let mut writer = Bech32Writer::new(hrp, &mut written_str).unwrap();
+            writer.write(&data).unwrap();
+        }
+
+        let encoded_str = encode(hrp, data).unwrap();
+
+        assert_eq!(encoded_str, written_str);
     }
 }
