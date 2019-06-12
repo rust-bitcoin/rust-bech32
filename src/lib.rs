@@ -92,6 +92,23 @@ impl AsRef<u8> for u5 {
     }
 }
 
+/// Interface to write `u5`s into a sink
+pub trait WriteBase32 {
+    /// Write error
+    type Err: fmt::Debug;
+
+    /// Write a `u5` slice
+    fn write(&mut self, data: &[u5]) -> Result<(), Self::Err> {
+        for b in data {
+            self.write_u5(*b)?;
+        }
+        Ok(())
+    }
+
+    /// Write a single `u5`
+    fn write_u5(&mut self, data: u5) -> Result<(), Self::Err>;
+}
+
 /// Allocationless Bech32 writer that accumulates the checksum data internally and writes them out
 /// in the end.
 pub struct Bech32Writer<'a> {
@@ -136,7 +153,7 @@ impl<'a> Bech32Writer<'a> {
     }
 
     /// Write out the checksum at the end. If this method isn't called this will happen on drop.
-    pub fn finalize(mut self) -> fmt::Result{
+    pub fn finalize(mut self) -> fmt::Result {
         self.inner_finalize()?;
         std::mem::forget(self);
         Ok(())
@@ -158,17 +175,12 @@ impl<'a> Bech32Writer<'a> {
 
         Ok(())
     }
-
-    /// Writes a part of the data part
-    pub fn write(&mut self, data: &[u5]) -> fmt::Result {
-        for b in data {
-            self.write_u5(*b)?;
-        }
-        Ok(())
-    }
+}
+impl<'a> WriteBase32 for Bech32Writer<'a> {
+    type Err = fmt::Error;
 
     /// Writes a single 5 bit value of the data part
-    pub fn write_u5(&mut self, data: u5) -> fmt::Result {
+    fn write_u5(&mut self, data: u5) -> fmt::Result {
         self.polymod_step(data);
         self.formatter.write_char(data.to_char())
     }
@@ -190,6 +202,20 @@ pub trait FromBase32: Sized {
     fn from_base32(b32: &[u5]) -> Result<Self, Self::Err>;
 }
 
+impl WriteBase32 for Vec<u5> {
+    type Err = ();
+
+    fn write(&mut self, data: &[u5]) -> Result<(), Self::Err> {
+        self.extend_from_slice(data);
+        Ok(())
+    }
+
+    fn write_u5(&mut self, data: u5) -> Result<(), Self::Err> {
+        self.push(data);
+        Ok(())
+    }
+}
+
 impl FromBase32 for Vec<u8> {
     type Err = Error;
 
@@ -201,18 +227,77 @@ impl FromBase32 for Vec<u8> {
 }
 
 /// A trait for converting a value to a type `T` that represents a `u5` slice.
-pub trait ToBase32<T: AsRef<[u5]>> {
-    /// Convert `Self` to base32 slice
-    fn to_base32(&self) -> T;
+pub trait ToBase32 {
+    /// Convert `Self` to base32 vector
+    fn to_base32(&self) -> Vec<u5> {
+        let mut vec = Vec::new();
+        self.write_base32(&mut vec).unwrap();
+        vec
+    }
+
+    /// Encode as base32 and write it to the supplied writer
+    /// Implementations shouldn't allocate.
+    fn write_base32<W: WriteBase32>(&self, writer: &mut W) -> Result<(), <W as WriteBase32>::Err>;
 }
 
-impl<T: AsRef<[u8]>> ToBase32<Vec<u5>> for T {
-    /// Convert base256 to base32, adds padding if necessary
-    fn to_base32(&self) -> Vec<u5> {
-        convert_bits(self.as_ref(), 8, 5, true)
-            .expect("both error conditions are impossible (InvalidPadding, InvalidData)")
-            .check_base32()
-            .expect("after conversion all elements are in range")
+/// Interface to calculate the length of the base32 representation before actually serializing
+pub trait Base32Len : ToBase32 {
+    /// Calculate the base32 serialized length
+    fn base32_len(&self) -> usize;
+}
+
+impl<T: AsRef<[u8]>> ToBase32 for T {
+    fn write_base32<W: WriteBase32>(&self, writer: &mut W) -> Result<(), <W as WriteBase32>::Err> {
+        // Amount of bits left over from last round, stored in buffer.
+        let mut buffer_bits = 0u32;
+        // Holds all unwritten bits left over from last round. The bits are stored beginning from
+        // the most significant bit. E.g. if buffer_bits=3, then the byte with bits a, b and c will
+        // look as follows: [a, b, c, 0, 0, 0, 0, 0]
+        let mut buffer: u8 = 0;
+
+        for &b in self.as_ref() {
+            // Write first u5 if we have to write two u5s this round. That only happens if the
+            // buffer holds too many bits, so we don't have to combine buffer bits with new bits
+            // from this rounds byte.
+            if buffer_bits >= 5 {
+                writer.write_u5(u5((buffer & 0b11111000) >> 3 ))?;
+                buffer = buffer << 5;
+                buffer_bits -= 5;
+            }
+
+            // Combine all bits from buffer with enough bits from this rounds byte so that they fill
+            // a u5. Save reamining bits from byte to buffer.
+            let from_buffer = buffer >> 3;
+            let from_byte = b >> (3 + buffer_bits); // buffer_bits <= 4
+
+            writer.write_u5(u5(from_buffer | from_byte))?;
+            buffer = b << (5 - buffer_bits);
+            buffer_bits = 3 + buffer_bits;
+        }
+
+        // There can be at most two u5s left in the buffer after processing all bytes, write them.
+        if buffer_bits >= 5 {
+            writer.write_u5(u5((buffer & 0b11111000) >> 3))?;
+            buffer = buffer << 5;
+            buffer_bits -= 5;
+        }
+
+        if buffer_bits != 0 {
+            writer.write_u5(u5(buffer >> 3))?;
+        }
+
+        Ok(())
+    }
+}
+
+impl<T: AsRef<[u8]>> Base32Len for T {
+    fn base32_len(&self) -> usize {
+        let bits = self.as_ref().len() * 8;
+        if bits % 5 == 0 {
+            bits / 5
+        } else {
+            bits / 5 + 1
+        }
     }
 }
 
