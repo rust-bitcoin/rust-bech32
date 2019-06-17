@@ -2,7 +2,7 @@ language: rust
 rust:
   - stable
   - nightly
-  - 1.14.0  # shipping debian version 2018 03
+  - 1.22.0  # project wide min version
 cache: cargo
 
 script:
