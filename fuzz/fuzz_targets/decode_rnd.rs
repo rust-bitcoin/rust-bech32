@@ -4,13 +4,13 @@ use std::str::FromStr;
 
 fn do_test(data: &[u8]) {
     let data_str = String::from_utf8_lossy(data);
-    let decoded = data_str.parse::<bech32::Bech32>();
+    let decoded = bech32::decode(&data_str);
     let b32 = match decoded {
         Ok(b32) => b32,
         Err(_) => return,
     };
 
-    assert_eq!(b32.to_string(), data_str);
+    assert_eq!(bech32::encode(&b32.0, b32.1).unwrap(), data_str);
 }
 
 #[cfg(feature = "afl")]
