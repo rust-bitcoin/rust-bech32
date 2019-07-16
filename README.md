@@ -1,32 +1,8 @@
 # Bech32 Rust
+[![Docs.rs badge](https://docs.rs/bech32/badge.svg)](https://docs.rs/bech32/)
+[![Build Status](https://travis-ci.org/rust-bitcoin/rust-bech32.svg?branch=master)](https://travis-ci.org/rust-bitcoin/rust-bech32)
 
 Rust implementation of the Bech32 encoding format described in [BIP-0173](https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki).
+You can find some usage examples in the [documentation](https://docs.rs/bech32/).
 
 Bitcoin-specific address encoding is handled by the `bitcoin-bech32` crate.
-
-## Examples
-```rust
-use bech32::Bech32;
-
-let b = Bech32::new_check_data("bech32".into(), vec![0x00, 0x01, 0x02]).unwrap();
-let encoded = b.to_string();
-assert_eq!(encoded, "bech321qpz4nc4pe".to_string());
-
-let c = encoded.parse::<Bech32>();
-assert_eq!(b, c.unwrap());
-```
-
-If the data is already range-checked the `Bech32::new` function can be used which will never
-return `Err(Error::InvalidData)`.
-
-```rust
-use bech32::{Bech32, u5, ToBase32};
-
-// converts base256 data to base32 and adds padding if needed
-let checked_data: Vec<u5> = [0xb4, 0xff, 0xa5].to_base32();
-
-let b = Bech32::new("bech32".into(), checked_data).expect("hrp is not empty");
-let encoded = b.to_string();
-
-assert_eq!(encoded, "bech321knl623tk6v7".to_string());
-```
