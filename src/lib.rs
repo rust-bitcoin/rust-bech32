@@ -751,7 +751,7 @@ mod tests {
             let result = catch_unwind(|| {
                 let _ = convert_bits(&[0], from, to, true);
             });
-            take_hook();
+            let _ = take_hook();
             assert!(result.is_err());
         }
     }
