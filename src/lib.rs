@@ -75,12 +75,12 @@ impl u5 {
     }
 
     /// Returns a copy of the underlying `u8` value
-    pub fn to_u8(&self) -> u8 {
+    pub fn to_u8(self) -> u8 {
         self.0
     }
 
     /// Get char representing this 5 bit value as defined in BIP173
-    pub fn to_char(&self) -> char {
+    pub fn to_char(self) -> char {
         CHARSET[self.to_u8() as usize]
     }
 }
@@ -149,10 +149,11 @@ impl<'a> Bech32Writer<'a> {
 
     fn polymod_step(&mut self, v: u5) {
         let b = (self.chk >> 25) as u8;
-        self.chk = (self.chk & 0x1ffffff) << 5 ^ (u32::from(*v.as_ref()));
-        for i in 0..5 {
+        self.chk = (self.chk & 0x01ff_ffff) << 5 ^ (u32::from(*v.as_ref()));
+        
+        for (i, item) in GEN.iter().enumerate() {
             if (b >> i) & 1 == 1 {
-                self.chk ^= GEN[i]
+                self.chk ^= item;
             }
         }
     }
@@ -265,8 +266,9 @@ impl<T: AsRef<[u8]>> ToBase32 for T {
             // buffer holds too many bits, so we don't have to combine buffer bits with new bits
             // from this rounds byte.
             if buffer_bits >= 5 {
-                writer.write_u5(u5((buffer & 0b11111000) >> 3))?;
-                buffer = buffer << 5;
+
+                writer.write_u5(u5((buffer & 0b1111_1000) >> 3 ))?;
+                buffer <<= 5;
                 buffer_bits -= 5;
             }
 
@@ -277,13 +279,13 @@ impl<T: AsRef<[u8]>> ToBase32 for T {
 
             writer.write_u5(u5(from_buffer | from_byte))?;
             buffer = b << (5 - buffer_bits);
-            buffer_bits = 3 + buffer_bits;
+            buffer_bits += 3;
         }
 
         // There can be at most two u5s left in the buffer after processing all bytes, write them.
         if buffer_bits >= 5 {
-            writer.write_u5(u5((buffer & 0b11111000) >> 3))?;
-            buffer = buffer << 5;
+            writer.write_u5(u5((buffer & 0b1111_1000) >> 3))?;
+            buffer <<= 5;
             buffer_bits -= 5;
         }
 
@@ -511,10 +513,11 @@ fn polymod(values: &[u5]) -> u32 {
     let mut b: u8;
     for v in values {
         b = (chk >> 25) as u8;
-        chk = (chk & 0x1ffffff) << 5 ^ (u32::from(*v.as_ref()));
-        for i in 0..5 {
+        chk = (chk & 0x01ff_ffff) << 5 ^ (u32::from(*v.as_ref()));
+
+        for (i, item) in GEN.iter().enumerate() {
             if (b >> i) & 1 == 1 {
-                chk ^= GEN[i]
+                chk ^= item;
             }
         }
     }
@@ -545,7 +548,7 @@ const CHARSET_REV: [i8; 128] = [
 ];
 
 /// Generator coefficients
-const GEN: [u32; 5] = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+const GEN: [u32; 5] = [0x3b6a_57b2, 0x2650_8e6d, 0x1ea1_19fa, 0x3d42_33dd, 0x2a14_62b3];
 
 /// Error types for Bech32 encoding / decoding
 #[derive(Copy, Clone, PartialEq, Debug)]
