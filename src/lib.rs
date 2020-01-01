@@ -44,7 +44,6 @@
 // Allow trait objects without dyn on nightly and make 1.22 ignore the unknown lint
 #![allow(unknown_lints)]
 #![allow(bare_trait_objects)]
-
 #![deny(missing_docs)]
 #![deny(non_upper_case_globals)]
 #![deny(non_camel_case_types)]
@@ -150,7 +149,7 @@ impl<'a> Bech32Writer<'a> {
     fn polymod_step(&mut self, v: u5) {
         let b = (self.chk >> 25) as u8;
         self.chk = (self.chk & 0x01ff_ffff) << 5 ^ (u32::from(*v.as_ref()));
-        
+
         for (i, item) in GEN.iter().enumerate() {
             if (b >> i) & 1 == 1 {
                 self.chk ^= item;
@@ -174,9 +173,8 @@ impl<'a> Bech32Writer<'a> {
         let plm: u32 = self.chk ^ 1;
 
         for p in 0..6 {
-            self.formatter.write_char(
-                u5(((plm >> (5 * (5 - p))) & 0x1f) as u8).to_char()
-            )?;
+            self.formatter
+                .write_char(u5(((plm >> (5 * (5 - p))) & 0x1f) as u8).to_char())?;
         }
 
         Ok(())
@@ -194,7 +192,8 @@ impl<'a> WriteBase32 for Bech32Writer<'a> {
 
 impl<'a> Drop for Bech32Writer<'a> {
     fn drop(&mut self) {
-        self.inner_finalize().expect("Unhandled error writing the checksum on drop.")
+        self.inner_finalize()
+            .expect("Unhandled error writing the checksum on drop.")
     }
 }
 
@@ -266,8 +265,7 @@ impl<T: AsRef<[u8]>> ToBase32 for T {
             // buffer holds too many bits, so we don't have to combine buffer bits with new bits
             // from this rounds byte.
             if buffer_bits >= 5 {
-
-                writer.write_u5(u5((buffer & 0b1111_1000) >> 3 ))?;
+                writer.write_u5(u5((buffer & 0b1111_1000) >> 3))?;
                 buffer <<= 5;
                 buffer_bits -= 5;
             }
@@ -528,6 +526,7 @@ fn polymod(values: &[u5]) -> u32 {
 const SEP: char = '1';
 
 /// Encoding character set. Maps data value -> char
+#[rustfmt::skip]
 const CHARSET: [char; 32] = [
     'q','p','z','r','y','9','x','8',
     'g','f','2','t','v','d','w','0',
@@ -536,6 +535,7 @@ const CHARSET: [char; 32] = [
 ];
 
 /// Reverse character set. Maps ASCII byte -> CHARSET index on [0,31]
+#[rustfmt::skip]
 const CHARSET_REV: [i8; 128] = [
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -548,7 +548,13 @@ const CHARSET_REV: [i8; 128] = [
 ];
 
 /// Generator coefficients
-const GEN: [u32; 5] = [0x3b6a_57b2, 0x2650_8e6d, 0x1ea1_19fa, 0x3d42_33dd, 0x2a14_62b3];
+const GEN: [u32; 5] = [
+    0x3b6a_57b2,
+    0x2650_8e6d,
+    0x1ea1_19fa,
+    0x3d42_33dd,
+    0x2a14_62b3,
+];
 
 /// Error types for Bech32 encoding / decoding
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -672,7 +678,11 @@ mod tests {
         for s in strings {
             let decode_result = decode(s);
             if !decode_result.is_ok() {
-                panic!("Did not decode: {:?} Reason: {:?}", s, decode_result.unwrap_err());
+                panic!(
+                    "Did not decode: {:?} Reason: {:?}",
+                    s,
+                    decode_result.unwrap_err()
+                );
             }
             assert!(decode_result.is_ok());
             let decoded = decode_result.unwrap();
@@ -710,7 +720,12 @@ mod tests {
                 println!("{:?}", dec_result.unwrap());
                 panic!("Should be invalid: {:?}", s);
             }
-            assert_eq!(dec_result.unwrap_err(), expected_error, "testing input '{}'", s);
+            assert_eq!(
+                dec_result.unwrap_err(),
+                expected_error,
+                "testing input '{}'",
+                s
+            );
         }
     }
 
@@ -723,7 +738,13 @@ mod tests {
             (vec![0x01], 8, 8, true, vec![0x01]),
             (vec![0x01], 8, 4, true, vec![0x00, 0x01]),
             (vec![0x01], 8, 2, true, vec![0x00, 0x00, 0x00, 0x01]),
-            (vec![0x01], 8, 1, true, vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01]),
+            (
+                vec![0x01],
+                8,
+                1,
+                true,
+                vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01],
+            ),
             (vec![0xff], 8, 5, true, vec![0x1f, 0x1c]),
             (vec![0x1f, 0x1c], 5, 8, false, vec![0xff]),
         ];
@@ -773,7 +794,10 @@ mod tests {
         assert!([0u8, 1, 2, 30, 31, 255].check_base32().is_err());
 
         assert!([1u8, 2, 3, 4].check_base32().is_ok());
-        assert_eq!([30u8, 31, 35, 20].check_base32(), Err(Error::InvalidData(35)));
+        assert_eq!(
+            [30u8, 31, 35, 20].check_base32(),
+            Err(Error::InvalidData(35))
+        );
     }
 
     #[test]
@@ -787,7 +811,10 @@ mod tests {
     #[test]
     fn from_base32() {
         use FromBase32;
-        assert_eq!(Vec::from_base32(&[0x1f, 0x1c].check_base32().unwrap()), Ok(vec![0xff]));
+        assert_eq!(
+            Vec::from_base32(&[0x1f, 0x1c].check_base32().unwrap()),
+            Ok(vec![0xff])
+        );
         assert_eq!(
             Vec::from_base32(&[0x1f, 0x1f].check_base32().unwrap()),
             Err(Error::InvalidPadding)
