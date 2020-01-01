@@ -18,18 +18,18 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//! Encoding and decoding Bech32 format
+//! Encoding and decoding of the Bech32 format
 //!
-//! Bech32 is a 5-bit (base-32) encoding scheme that produces strings that comprise
-//! a human-readable part, a separator, a data part, and a checksum. The encoding
-//! implements a BCH code that guarantees error detection of up to four characters
-//! with less than 1 in 1 billion chance of failing to detect more errors.
+//! Bech32 is an encoding scheme that is easy to use for humans and efficient to encode in QR codes.
 //!
-//! The Bech32 encoding was originally formulated in [BIP-0173](https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki)
+//! A Bech32 string consists of a human-readable part (HRP), a separator (the character `'1'`), and a data part.
+//! A checksum at the end of the string provides error detection to prevent mistakes when the string is written off or read out loud.
+//!
+//! The original description in [BIP-0173](https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki) has more details.
 //!
 //! # Examples
 //!
-//! ```rust
+//! ```
 //! use bech32::{self, FromBase32, ToBase32};
 //!
 //! let encoded = bech32::encode("bech32", vec![0x00, 0x01, 0x02].to_base32()).unwrap();
