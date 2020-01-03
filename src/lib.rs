@@ -53,6 +53,7 @@
 #![cfg_attr(feature = "strict", deny(warnings))]
 
 use std::{error, fmt};
+use std::borrow::Cow;
 
 // AsciiExt is needed for Rust 1.14 but not for newer versions
 #[allow(unused_imports, deprecated)]
@@ -245,7 +246,7 @@ pub trait ToBase32 {
 }
 
 /// Interface to calculate the length of the base32 representation before actually serializing
-pub trait Base32Len : ToBase32 {
+pub trait Base32Len: ToBase32 {
     /// Calculate the base32 serialized length
     fn base32_len(&self) -> usize;
 }
@@ -264,7 +265,7 @@ impl<T: AsRef<[u8]>> ToBase32 for T {
             // buffer holds too many bits, so we don't have to combine buffer bits with new bits
             // from this rounds byte.
             if buffer_bits >= 5 {
-                writer.write_u5(u5((buffer & 0b11111000) >> 3 ))?;
+                writer.write_u5(u5((buffer & 0b11111000) >> 3))?;
                 buffer = buffer << 5;
                 buffer_bits -= 5;
             }
@@ -319,7 +320,10 @@ impl<'f, T: AsRef<[u8]>> CheckBase32<Vec<u5>> for T {
     type Err = Error;
 
     fn check_base32(self) -> Result<Vec<u5>, Self::Err> {
-        self.as_ref().iter().map(|x| u5::try_from_u8(*x)).collect::<Result<Vec<u5>, Error>>()
+        self.as_ref()
+            .iter()
+            .map(|x| u5::try_from_u8(*x))
+            .collect::<Result<Vec<u5>, Error>>()
     }
 }
 
@@ -331,7 +335,6 @@ enum Case {
 }
 
 /// Check if the HRP is valid. Returns the case of the HRP, if any.
-/// True for uppercase, false for lowercase, None for only digits.
 ///
 /// # Errors
 /// * **MixedCase**: If the HRP contains both uppercase and lowercase characters.
@@ -381,14 +384,18 @@ pub fn encode_to_fmt<T: AsRef<[u5]>>(
     hrp: &str,
     data: T,
 ) -> Result<fmt::Result, Error> {
-    check_hrp(&hrp)?;
-    match Bech32Writer::new(hrp, fmt) {
+    let hrp_lower = match check_hrp(&hrp)? {
+        Case::Upper => Cow::Owned(hrp.to_lowercase()),
+        Case::Lower | Case::None => Cow::Borrowed(hrp),
+    };
+
+    match Bech32Writer::new(&hrp_lower, fmt) {
         Ok(mut writer) => {
             Ok(writer.write(data.as_ref()).and_then(|_| {
                 // Finalize manually to avoid panic on drop if write fails
                 writer.finalize()
             }))
-        },
+        }
         Err(e) => Ok(Err(e)),
     }
 }
@@ -802,8 +809,9 @@ mod tests {
             }
         }
 
-        let expected_rev_charset =
-            (0u8..128).map(|i| get_char_value(i as char)).collect::<Vec<_>>();
+        let expected_rev_charset = (0u8..128)
+            .map(|i| get_char_value(i as char))
+            .collect::<Vec<_>>();
 
         assert_eq!(&(CHARSET_REV[..]), expected_rev_charset.as_slice());
     }
@@ -839,5 +847,14 @@ mod tests {
         let encoded_str = encode(hrp, data).unwrap();
 
         assert_eq!(encoded_str, written_str);
+    }
+
+    #[test]
+    fn test_hrp_case() {
+        // Tests for issue with HRP case checking being ignored for encoding
+        use ToBase32;
+        let encoded_str = encode("HRP", [0x00, 0x00].to_base32()).unwrap();
+
+        assert_eq!(encoded_str, "hrp1qqqq40atq3");
     }
 }
