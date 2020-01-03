@@ -53,6 +53,7 @@
 #![cfg_attr(feature = "strict", deny(warnings))]
 
 use std::{error, fmt};
+use std::borrow::Cow;
 
 // AsciiExt is needed for Rust 1.14 but not for newer versions
 #[allow(unused_imports, deprecated)]
@@ -384,8 +385,8 @@ pub fn encode_to_fmt<T: AsRef<[u5]>>(
     data: T,
 ) -> Result<fmt::Result, Error> {
     let hrp_lower = match check_hrp(&hrp)? {
-        Case::Upper => hrp.to_lowercase(),
-        Case::Lower | Case::None => String::from(hrp),
+        Case::Upper => Cow::Owned(hrp.to_lowercase()),
+        Case::Lower | Case::None => Cow::Borrowed(hrp),
     };
 
     match Bech32Writer::new(&hrp_lower, fmt) {
