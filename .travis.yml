@@ -11,6 +11,14 @@ script:
 
 jobs:
   include:
+  - stage: best practices
+    rust: stable
+    install:
+      - rustup component add rustfmt
+      - rustup component add clippy
+    script:
+      - rustfmt --check src/lib.rs
+      - cargo clippy -- -D warnings
   - stage: fuzz
     before_install:
     - sudo apt-get -qq update
