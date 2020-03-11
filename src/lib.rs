@@ -51,6 +51,9 @@
 #![deny(unused_mut)]
 #![cfg_attr(feature = "strict", deny(warnings))]
 
+extern crate void;
+use void::Void;
+
 use std::borrow::Cow;
 use std::{error, fmt};
 
@@ -208,7 +211,7 @@ pub trait FromBase32: Sized {
 }
 
 impl WriteBase32 for Vec<u5> {
-    type Err = ();
+    type Err = Void;
 
     fn write(&mut self, data: &[u5]) -> Result<(), Self::Err> {
         self.extend_from_slice(data);
