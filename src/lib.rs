@@ -71,7 +71,7 @@ use alloc::borrow::Cow;
 #[cfg(any(feature = "std", test))]
 use std::borrow::Cow;
 
-use core::{fmt, mem};
+use core::{convert::Infallible, fmt, mem};
 
 /// Integer in the range `0..32`
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Default, PartialOrd, Ord, Hash)]
@@ -232,7 +232,7 @@ pub trait FromBase32: Sized {
 }
 
 impl WriteBase32 for Vec<u5> {
-    type Err = ();
+    type Err = Infallible;
 
     fn write(&mut self, data: &[u5]) -> Result<(), Self::Err> {
         self.extend_from_slice(data);
