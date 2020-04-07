@@ -54,6 +54,7 @@ assert_eq!(Vec::<u8>::from_base32(&data).unwrap(), vec![0x00, 0x01, 0x02]);
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
 #[macro_use]
 extern crate alloc as std;
 
