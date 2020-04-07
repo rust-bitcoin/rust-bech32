@@ -27,7 +27,9 @@
 //!
 //! The original description in [BIP-0173](https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki) has more details.
 //!
-#![cfg_attr(feature = "std", doc = "
+#![cfg_attr(
+    feature = "std",
+    doc = "
 # Examples
 
 ```
@@ -40,7 +42,8 @@ let (hrp, data) = bech32::decode(&encoded).unwrap();
 assert_eq!(hrp, \"bech32\");
 assert_eq!(Vec::<u8>::from_base32(&data).unwrap(), vec![0x00, 0x01, 0x02]);
 ```
-")]
+"
+)]
 
 // Allow trait objects without dyn on nightly and make 1.22 ignore the unknown lint
 #![allow(unknown_lints)]
@@ -63,7 +66,7 @@ extern crate alloc as std;
 // but that is an unstable feature at the time of writing
 // https://github.com/rust-lang/rust/issues/58935
 #[cfg(not(feature = "std"))]
-use std::{vec::Vec, string::String};
+use std::{string::String, vec::Vec};
 
 use std::borrow::Cow;
 use std::fmt;
@@ -620,7 +623,9 @@ impl std::error::Error for Error {
 /// Function will panic if attempting to convert `from` or `to` a bit size that
 /// is 0 or larger than 8 bits.
 ///
-#[cfg_attr(feature = "std", doc = "
+#[cfg_attr(
+    feature = "std",
+    doc = "
 # Examples
 
 ```rust
@@ -634,7 +639,8 @@ let base5 = convert_bits(&[0xff], 8, 5, true);
 assert_eq!(base5.unwrap(), vec![0x1f, 0x1c]);
 # }
 ```
-")]
+"
+)]
 pub fn convert_bits<T>(data: &[T], from: u32, to: u32, pad: bool) -> Result<Vec<u8>, Error>
 where
     T: Into<u8> + Copy,
