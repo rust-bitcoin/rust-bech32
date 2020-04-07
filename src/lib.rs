@@ -27,19 +27,20 @@
 //!
 //! The original description in [BIP-0173](https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki) has more details.
 //!
-//! # Examples
-//!
-//! ```
-//! use bech32::{self, FromBase32, ToBase32};
-//!
-//! let encoded = bech32::encode("bech32", vec![0x00, 0x01, 0x02].to_base32()).unwrap();
-//! assert_eq!(encoded, "bech321qqqsyrhqy2a".to_string());
-//!
-//! let (hrp, data) = bech32::decode(&encoded).unwrap();
-//! assert_eq!(hrp, "bech32");
-//! assert_eq!(Vec::<u8>::from_base32(&data).unwrap(), vec![0x00, 0x01, 0x02]);
-//! ```
-//!
+#![cfg_attr(feature = "std", doc = "
+# Examples
+
+```
+use bech32::{self, FromBase32, ToBase32};
+
+let encoded = bech32::encode(\"bech32\", vec![0x00, 0x01, 0x02].to_base32()).unwrap();
+assert_eq!(encoded, \"bech321qqqsyrhqy2a\".to_string());
+
+let (hrp, data) = bech32::decode(&encoded).unwrap();
+assert_eq!(hrp, \"bech32\");
+assert_eq!(Vec::<u8>::from_base32(&data).unwrap(), vec![0x00, 0x01, 0x02]);
+```
+")]
 
 // Allow trait objects without dyn on nightly and make 1.22 ignore the unknown lint
 #![allow(unknown_lints)]
@@ -51,12 +52,20 @@
 #![deny(unused_mut)]
 #![cfg_attr(feature = "strict", deny(warnings))]
 
-use std::borrow::Cow;
-use std::{error, fmt};
+#![cfg_attr(not(feature = "std"), no_std)]
+#[cfg(not(feature = "std"))]
+#[macro_use]
+extern crate alloc as std;
 
-// AsciiExt is needed for Rust 1.14 but not for newer versions
-#[allow(unused_imports, deprecated)]
-use std::ascii::AsciiExt;
+// Ideally we'd write
+// use std::prelude::v1::*;
+// but that is an unstable feature at the time of writing
+// https://github.com/rust-lang/rust/issues/58935
+#[cfg(not(feature = "std"))]
+use std::{vec::Vec, string::String};
+
+use std::borrow::Cow;
+use std::fmt;
 
 /// Integer in the range `0..32`
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Default, PartialOrd, Ord, Hash)]
@@ -160,7 +169,7 @@ impl<'a> Bech32Writer<'a> {
     /// Write out the checksum at the end. If this method isn't called this will happen on drop.
     pub fn finalize(mut self) -> fmt::Result {
         self.inner_finalize()?;
-        std::mem::forget(self);
+        core::mem::forget(self);
         Ok(())
     }
 
@@ -585,7 +594,8 @@ impl fmt::Display for Error {
     }
 }
 
-impl error::Error for Error {
+#[cfg(feature = "std")]
+impl std::error::Error for Error {
     fn description(&self) -> &str {
         match *self {
             Error::MissingSeparator => "missing human-readable separator",
@@ -609,13 +619,21 @@ impl error::Error for Error {
 /// Function will panic if attempting to convert `from` or `to` a bit size that
 /// is 0 or larger than 8 bits.
 ///
-/// # Examples
-///
-/// ```rust
-/// use bech32::convert_bits;
-/// let base5 = convert_bits(&[0xff], 8, 5, true);
-/// assert_eq!(base5.unwrap(), vec![0x1f, 0x1c]);
-/// ```
+#[cfg_attr(feature = "std", doc = "
+# Examples
+
+```rust
+# #![cfg_attr(not(feature = \"std\"), no_std)]
+# #[cfg(not(feature = \"std\"))]
+# #[macro_use]
+# extern crate alloc as std;
+# fn main() {
+use bech32::convert_bits;
+let base5 = convert_bits(&[0xff], 8, 5, true);
+assert_eq!(base5.unwrap(), vec![0x1f, 0x1c]);
+# }
+```
+")]
 pub fn convert_bits<T>(data: &[T], from: u32, to: u32, pad: bool) -> Result<Vec<u8>, Error>
 where
     T: Into<u8> + Copy,
@@ -713,6 +731,7 @@ mod tests {
             let (s, expected_error) = p;
             let dec_result = decode(s);
             if dec_result.is_ok() {
+                #[cfg(feature = "std")]
                 println!("{:?}", dec_result.unwrap());
                 panic!("Should be invalid: {:?}", s);
             }
@@ -767,6 +786,8 @@ mod tests {
         }
     }
 
+    // unfortunately this test uses panic features which are unavailable in `core`
+    #[cfg(feature = "std")]
     #[test]
     fn convert_bits_invalid_bit_size() {
         use std::panic::{catch_unwind, set_hook, take_hook};
