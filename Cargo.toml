@@ -8,8 +8,11 @@ readme = "README.md"
 keywords = ["base32", "encoding", "bech32"]
 categories = ["encoding"]
 license = "MIT"
+edition = "2018"
 
 [features]
+default = ["std"]
+std = []
 # Only for CI to make all warnings errors, do not activate otherwise (may break forward compatibility)
 strict = []
 

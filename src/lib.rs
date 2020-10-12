@@ -50,12 +50,21 @@
 #![deny(non_snake_case)]
 #![deny(unused_mut)]
 #![cfg_attr(feature = "strict", deny(warnings))]
+#![cfg_attr(not(feature = "std"), no_std)]
 
+use core::fmt;
+
+#[cfg(feature = "std")]
 use std::borrow::Cow;
-use std::{error, fmt};
+
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+#[cfg(not(feature = "std"))]
+use alloc::{borrow::Cow, string::String, vec::Vec};
 
 // AsciiExt is needed for Rust 1.14 but not for newer versions
 #[allow(unused_imports, deprecated)]
+#[cfg(feature = "std")]
 use std::ascii::AsciiExt;
 
 /// Integer in the range `0..32`
@@ -160,6 +169,7 @@ impl<'a> Bech32Writer<'a> {
     /// Write out the checksum at the end. If this method isn't called this will happen on drop.
     pub fn finalize(mut self) -> fmt::Result {
         self.inner_finalize()?;
+        #[cfg(feature = "std")]
         std::mem::forget(self);
         Ok(())
     }
@@ -585,7 +595,8 @@ impl fmt::Display for Error {
     }
 }
 
-impl error::Error for Error {
+#[cfg(feature = "std")]
+impl std::error::Error for Error {
     fn description(&self) -> &str {
         match *self {
             Error::MissingSeparator => "missing human-readable separator",
