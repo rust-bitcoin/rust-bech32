@@ -553,7 +553,7 @@ const GEN: [u32; 5] = [
 ];
 
 /// Error types for Bech32 encoding / decoding
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Error {
     /// String does not contain the separator character
     MissingSeparator,
