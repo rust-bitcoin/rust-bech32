@@ -426,16 +426,16 @@ impl Variant {
     // Produce the variant based on the remainder of the polymod operation
     fn from_remainder(c: u32) -> Option<Self> {
         match c {
-            BECH32_CONST => Some(Self::Bech32),
-            BECH32M_CONST => Some(Self::Bech32m),
+            BECH32_CONST => Some(Variant::Bech32),
+            BECH32M_CONST => Some(Variant::Bech32m),
             _ => None,
         }
     }
 
     fn constant(self) -> u32 {
         match self {
-            Self::Bech32 => BECH32_CONST,
-            Self::Bech32m => BECH32M_CONST,
+            Variant::Bech32 => BECH32_CONST,
+            Variant::Bech32m => BECH32M_CONST,
         }
     }
 }
