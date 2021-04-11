@@ -57,10 +57,6 @@
 use std::borrow::Cow;
 use std::{error, fmt};
 
-// AsciiExt is needed for Rust 1.14 but not for newer versions
-#[allow(unused_imports, deprecated)]
-use std::ascii::AsciiExt;
-
 /// Integer in the range `0..32`
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Default, PartialOrd, Ord, Hash)]
 #[allow(non_camel_case_types)]
