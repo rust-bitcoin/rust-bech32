@@ -29,19 +29,21 @@
 //! The original description in [BIP-0173](https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki)
 //! has more details.
 //!
-//! # Examples
-//!
-//! ```
-//! use bech32::{self, FromBase32, ToBase32, Variant};
-//!
-//! let encoded = bech32::encode("bech32", vec![0x00, 0x01, 0x02].to_base32(), Variant::Bech32).unwrap();
-//! assert_eq!(encoded, "bech321qqqsyrhqy2a".to_string());
-//!
-//! let (hrp, data, variant) = bech32::decode(&encoded).unwrap();
-//! assert_eq!(hrp, "bech32");
-//! assert_eq!(Vec::<u8>::from_base32(&data).unwrap(), vec![0x00, 0x01, 0x02]);
-//! assert_eq!(variant, Variant::Bech32);
-//! ```
+#![cfg_attr(
+    feature = "std",
+    doc = "
+# Examples
+```
+use bech32::{self, FromBase32, ToBase32, Variant};
+let encoded = bech32::encode(\"bech32\", vec![0x00, 0x01, 0x02].to_base32(), Variant::Bech32).unwrap();
+assert_eq!(encoded, \"bech321qqqsyrhqy2a\".to_string());
+let (hrp, data, variant) = bech32::decode(&encoded).unwrap();
+assert_eq!(hrp, \"bech32\");
+assert_eq!(Vec::<u8>::from_base32(&data).unwrap(), vec![0x00, 0x01, 0x02]);
+assert_eq!(variant, Variant::Bech32);
+```
+"
+)]
 //!
 
 // Allow trait objects without dyn on nightly and make 1.22 ignore the unknown lint
@@ -53,13 +55,23 @@
 #![deny(non_snake_case)]
 #![deny(unused_mut)]
 #![cfg_attr(feature = "strict", deny(warnings))]
+#![cfg_attr(all(not(feature = "std"), not(test)), no_std)]
 
+#[cfg(all(not(feature = "std"), not(test)))]
+extern crate alloc;
+
+#[cfg(any(test, feature = "std"))]
+extern crate core;
+
+#[cfg(all(not(feature = "std"), not(test)))]
+use alloc::{string::String, vec::Vec};
+
+#[cfg(all(not(feature = "std"), not(test)))]
+use alloc::borrow::Cow;
+#[cfg(any(feature = "std", test))]
 use std::borrow::Cow;
-use std::{error, fmt};
 
-// AsciiExt is needed for Rust 1.14 but not for newer versions
-#[allow(unused_imports, deprecated)]
-use std::ascii::AsciiExt;
+use core::{fmt, mem};
 
 /// Integer in the range `0..32`
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Default, PartialOrd, Ord, Hash)]
@@ -169,7 +181,7 @@ impl<'a> Bech32Writer<'a> {
     /// Write out the checksum at the end. If this method isn't called this will happen on drop.
     pub fn finalize(mut self) -> fmt::Result {
         self.inner_finalize()?;
-        std::mem::forget(self);
+        mem::forget(self);
         Ok(())
     }
 
@@ -626,7 +638,8 @@ impl fmt::Display for Error {
     }
 }
 
-impl error::Error for Error {
+#[cfg(any(feature = "std", test))]
+impl std::error::Error for Error {
     fn description(&self) -> &str {
         match *self {
             Error::MissingSeparator => "missing human-readable separator",
