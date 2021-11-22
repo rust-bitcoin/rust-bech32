@@ -887,7 +887,6 @@ mod tests {
 
     #[test]
     fn from_base32() {
-        use FromBase32;
         assert_eq!(
             Vec::from_base32(&[0x1f, 0x1c].check_base32().unwrap()),
             Ok(vec![0xff])
@@ -900,14 +899,11 @@ mod tests {
 
     #[test]
     fn to_base32() {
-        use ToBase32;
         assert_eq!([0xffu8].to_base32(), [0x1f, 0x1c].check_base32().unwrap());
     }
 
     #[test]
     fn reverse_charset() {
-        use CHARSET_REV;
-
         fn get_char_value(c: char) -> i8 {
             let charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
             match charset.find(c.to_ascii_lowercase()) {
@@ -959,7 +955,6 @@ mod tests {
     #[test]
     fn test_hrp_case() {
         // Tests for issue with HRP case checking being ignored for encoding
-        use ToBase32;
         let encoded_str = encode("HRP", [0x00, 0x00].to_base32(), Variant::Bech32).unwrap();
 
         assert_eq!(encoded_str, "hrp1qqqq40atq3");
