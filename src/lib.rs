@@ -99,9 +99,9 @@ impl u5 {
     }
 }
 
-impl Into<u8> for u5 {
-    fn into(self) -> u8 {
-        self.0
+impl From<u5> for u8 {
+    fn from(v: u5) -> u8 {
+        v.0
     }
 }
 
