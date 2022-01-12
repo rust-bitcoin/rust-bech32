@@ -71,7 +71,7 @@ use alloc::borrow::Cow;
 #[cfg(any(feature = "std", test))]
 use std::borrow::Cow;
 
-use core::{fmt, mem};
+use core::fmt;
 
 /// Integer in the range `0..32`
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Default, PartialOrd, Ord, Hash)]
@@ -134,6 +134,7 @@ pub struct Bech32Writer<'a> {
     formatter: &'a mut fmt::Write,
     chk: u32,
     variant: Variant,
+    finalized: bool,
 }
 
 impl<'a> Bech32Writer<'a> {
@@ -150,6 +151,7 @@ impl<'a> Bech32Writer<'a> {
             formatter: fmt,
             chk: 1,
             variant,
+            finalized: false,
         };
 
         writer.formatter.write_str(hrp)?;
@@ -181,7 +183,7 @@ impl<'a> Bech32Writer<'a> {
     /// Write out the checksum at the end. If this method isn't called this will happen on drop.
     pub fn finalize(mut self) -> fmt::Result {
         self.inner_finalize()?;
-        mem::forget(self);
+        self.finalized = true;
         Ok(())
     }
 
@@ -213,8 +215,12 @@ impl<'a> WriteBase32 for Bech32Writer<'a> {
 
 impl<'a> Drop for Bech32Writer<'a> {
     fn drop(&mut self) {
-        self.inner_finalize()
-            .expect("Unhandled error writing the checksum on drop.")
+        if !self.finalized {
+            if let Err(e) = self.inner_finalize() {
+                // the drop can be caused by a panic, panicing on drop can cause a double panic, not good
+                eprintln!("Unhandled error writing the checksum on drop: {}", e);
+            }
+        }
     }
 }
 
