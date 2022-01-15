@@ -406,7 +406,7 @@ pub fn encode_to_fmt<T: AsRef<[u5]>>(
     data: T,
     variant: Variant,
 ) -> Result<fmt::Result, Error> {
-    let hrp_lower = match check_hrp(&hrp)? {
+    let hrp_lower = match check_hrp(hrp)? {
         Case::Upper => Cow::Owned(hrp.to_lowercase()),
         Case::Lower | Case::None => Cow::Borrowed(hrp),
     };
@@ -485,7 +485,7 @@ pub fn decode(s: &str) -> Result<(String, Vec<u5>, Variant), Error> {
         return Err(Error::InvalidLength);
     }
 
-    let mut case = check_hrp(&raw_hrp)?;
+    let mut case = check_hrp(raw_hrp)?;
     let hrp_lower = match case {
         Case::Upper => raw_hrp.to_lowercase(),
         // already lowercase
@@ -529,7 +529,7 @@ pub fn decode(s: &str) -> Result<(String, Vec<u5>, Variant), Error> {
         .collect::<Result<Vec<u5>, Error>>()?;
 
     // Ensure checksum
-    match verify_checksum(&hrp_lower.as_bytes(), &data) {
+    match verify_checksum(hrp_lower.as_bytes(), &data) {
         Some(variant) => {
             // Remove checksum from data payload
             let dbl: usize = data.len();
