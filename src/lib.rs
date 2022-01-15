@@ -803,6 +803,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::type_complexity)]
     fn valid_conversion() {
         // Set of [data, from_bits, to_bits, pad, result]
         let tests: Vec<(Vec<u8>, u32, u32, bool, Vec<u8>)> = vec![
