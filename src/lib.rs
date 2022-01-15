@@ -370,13 +370,13 @@ fn check_hrp(hrp: &str) -> Result<Case, Error> {
     let mut has_upper: bool = false;
     for b in hrp.bytes() {
         // Valid subset of ASCII
-        if b < 33 || b > 126 {
+        if !(33..=126).contains(&b) {
             return Err(Error::InvalidChar(b as char));
         }
 
-        if b >= b'a' && b <= b'z' {
+        if (b'a'..=b'z').contains(&b) {
             has_lower = true;
-        } else if b >= b'A' && b <= b'Z' {
+        } else if (b'A'..=b'Z').contains(&b) {
             has_upper = true;
         };
 
@@ -520,7 +520,7 @@ pub fn decode(s: &str) -> Result<(String, Vec<u5>, Variant), Error> {
             // c should be <128 since it is in the ASCII range, CHARSET_REV.len() == 128
             let num_value = CHARSET_REV[c as usize];
 
-            if num_value > 31 || num_value < 0 {
+            if !(0..=31).contains(&num_value) {
                 return Err(Error::InvalidChar(c));
             }
 
