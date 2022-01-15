@@ -432,7 +432,7 @@ pub enum Variant {
 }
 
 const BECH32_CONST: u32 = 1;
-const BECH32M_CONST: u32 = 0x2bc830a3;
+const BECH32M_CONST: u32 = 0x2bc8_30a3;
 
 impl Variant {
     // Produce the variant based on the remainder of the polymod operation
