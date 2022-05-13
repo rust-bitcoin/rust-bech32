@@ -10,7 +10,5 @@ You can find some usage examples in the [documentation](https://docs.rs/bech32/)
 Bitcoin-specific address encoding is handled by the `bitcoin-bech32` crate.
 
 # MSRV
-The minimum supported Rust version with the standard library is **1.29**.
-
-With nostd, we use the `alloc` dependency, so the MSRV is instead **1.36**.
+The minimum supported Rust version with the standard library is **1.41.1**.
 
