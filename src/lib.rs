@@ -61,14 +61,12 @@ extern crate alloc;
 extern crate core;
 
 #[cfg(all(not(feature = "std"), not(test)))]
-use alloc::{string::String, vec::Vec};
-
-#[cfg(all(not(feature = "std"), not(test)))]
 use alloc::borrow::Cow;
+#[cfg(all(not(feature = "std"), not(test)))]
+use alloc::{string::String, vec::Vec};
+use core::{fmt, mem};
 #[cfg(any(feature = "std", test))]
 use std::borrow::Cow;
-
-use core::{fmt, mem};
 
 /// Integer in the range `0..32`
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Default, PartialOrd, Ord, Hash)]
@@ -86,26 +84,18 @@ impl u5 {
     }
 
     /// Returns a copy of the underlying `u8` value
-    pub fn to_u8(self) -> u8 {
-        self.0
-    }
+    pub fn to_u8(self) -> u8 { self.0 }
 
     /// Get char representing this 5 bit value as defined in BIP173
-    pub fn to_char(self) -> char {
-        CHARSET[self.to_u8() as usize]
-    }
+    pub fn to_char(self) -> char { CHARSET[self.to_u8() as usize] }
 }
 
 impl From<u5> for u8 {
-    fn from(v: u5) -> u8 {
-        v.0
-    }
+    fn from(v: u5) -> u8 { v.0 }
 }
 
 impl AsRef<u8> for u5 {
-    fn as_ref(&self) -> &u8 {
-        &self.0
-    }
+    fn as_ref(&self) -> &u8 { &self.0 }
 }
 
 /// Interface to write `u5`s into a sink
@@ -143,11 +133,7 @@ impl<'a> Bech32Writer<'a> {
         variant: Variant,
         fmt: &'a mut dyn fmt::Write,
     ) -> Result<Bech32Writer<'a>, fmt::Error> {
-        let mut writer = Bech32Writer {
-            formatter: fmt,
-            chk: 1,
-            variant,
-        };
+        let mut writer = Bech32Writer { formatter: fmt, chk: 1, variant };
 
         writer.formatter.write_str(hrp)?;
         writer.formatter.write_char(SEP)?;
@@ -191,8 +177,7 @@ impl<'a> Bech32Writer<'a> {
         let plm: u32 = self.chk ^ self.variant.constant();
 
         for p in 0..6 {
-            self.formatter
-                .write_char(u5(((plm >> (5 * (5 - p))) & 0x1f) as u8).to_char())?;
+            self.formatter.write_char(u5(((plm >> (5 * (5 - p))) & 0x1f) as u8).to_char())?;
         }
 
         Ok(())
@@ -210,8 +195,7 @@ impl<'a> WriteBase32 for Bech32Writer<'a> {
 
 impl<'a> Drop for Bech32Writer<'a> {
     fn drop(&mut self) {
-        self.inner_finalize()
-            .expect("Unhandled error writing the checksum on drop.")
+        self.inner_finalize().expect("Unhandled error writing the checksum on drop.")
     }
 }
 
@@ -244,9 +228,7 @@ impl FromBase32 for Vec<u8> {
 
     /// Convert base32 to base256, removes null-padding if present, returns
     /// `Err(Error::InvalidPadding)` if padding bits are unequal `0`
-    fn from_base32(b32: &[u5]) -> Result<Self, Self::Err> {
-        convert_bits(b32, 5, 8, false)
-    }
+    fn from_base32(b32: &[u5]) -> Result<Self, Self::Err> { convert_bits(b32, 5, 8, false) }
 }
 
 /// A trait for converting a value to a type `T` that represents a `u5` slice.
@@ -338,10 +320,7 @@ impl<T: AsRef<[u8]>> CheckBase32<Vec<u5>> for T {
     type Err = Error;
 
     fn check_base32(self) -> Result<Vec<u5>, Self::Err> {
-        self.as_ref()
-            .iter()
-            .map(|x| u5::try_from_u8(*x))
-            .collect::<Result<Vec<u5>, Error>>()
+        self.as_ref().iter().map(|x| u5::try_from_u8(*x)).collect::<Result<Vec<u5>, Error>>()
     }
 }
 
@@ -594,13 +573,7 @@ const CHARSET_REV: [i8; 128] = [
 ];
 
 /// Generator coefficients
-const GEN: [u32; 5] = [
-    0x3b6a_57b2,
-    0x2650_8e6d,
-    0x1ea1_19fa,
-    0x3d42_33dd,
-    0x2a14_62b3,
-];
+const GEN: [u32; 5] = [0x3b6a_57b2, 0x2650_8e6d, 0x1ea1_19fa, 0x3d42_33dd, 0x2a14_62b3];
 
 /// Error types for Bech32 encoding / decoding
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
@@ -809,13 +782,7 @@ mod tests {
             (vec![0x01], 8, 8, true, vec![0x01]),
             (vec![0x01], 8, 4, true, vec![0x00, 0x01]),
             (vec![0x01], 8, 2, true, vec![0x00, 0x00, 0x00, 0x01]),
-            (
-                vec![0x01],
-                8,
-                1,
-                true,
-                vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01],
-            ),
+            (vec![0x01], 8, 1, true, vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01]),
             (vec![0xff], 8, 5, true, vec![0x1f, 0x1c]),
             (vec![0x1f, 0x1c], 5, 8, false, vec![0xff]),
         ];
@@ -865,30 +832,20 @@ mod tests {
         assert!([0u8, 1, 2, 30, 31, 255].check_base32().is_err());
 
         assert!([1u8, 2, 3, 4].check_base32().is_ok());
-        assert_eq!(
-            [30u8, 31, 35, 20].check_base32(),
-            Err(Error::InvalidData(35))
-        );
+        assert_eq!([30u8, 31, 35, 20].check_base32(), Err(Error::InvalidData(35)));
     }
 
     #[test]
     fn test_encode() {
         assert_eq!(
-            encode(
-                "",
-                vec![1u8, 2, 3, 4].check_base32().unwrap(),
-                Variant::Bech32
-            ),
+            encode("", vec![1u8, 2, 3, 4].check_base32().unwrap(), Variant::Bech32),
             Err(Error::InvalidLength)
         );
     }
 
     #[test]
     fn from_base32() {
-        assert_eq!(
-            Vec::from_base32(&[0x1f, 0x1c].check_base32().unwrap()),
-            Ok(vec![0xff])
-        );
+        assert_eq!(Vec::from_base32(&[0x1f, 0x1c].check_base32().unwrap()), Ok(vec![0xff]));
         assert_eq!(
             Vec::from_base32(&[0x1f, 0x1f].check_base32().unwrap()),
             Err(Error::InvalidPadding)
@@ -910,9 +867,8 @@ mod tests {
             }
         }
 
-        let expected_rev_charset = (0u8..128)
-            .map(|i| get_char_value(i as char))
-            .collect::<Vec<_>>();
+        let expected_rev_charset =
+            (0u8..128).map(|i| get_char_value(i as char)).collect::<Vec<_>>();
 
         assert_eq!(&(CHARSET_REV[..]), expected_rev_charset.as_slice());
     }
