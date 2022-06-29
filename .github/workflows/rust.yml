@@ -27,16 +27,12 @@ jobs:
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        rust:
-          - stable
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: ${{ matrix.rust }}
+          toolchain: nightly
           override: true
       - run: rustup component add rustfmt
       - uses: actions-rs/cargo@v1
