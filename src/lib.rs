@@ -29,8 +29,6 @@ assert_eq!(variant, Variant::Bech32);
 )]
 //!
 
-// Allow trait objects without dyn on nightly.
-#![allow(bare_trait_objects)]
 #![deny(missing_docs)]
 #![deny(non_upper_case_globals)]
 #![deny(non_camel_case_types)]
@@ -171,7 +169,7 @@ const CHECKSUM_LENGTH: usize = 6;
 /// Allocationless Bech32 writer that accumulates the checksum data internally and writes them out
 /// in the end.
 pub struct Bech32Writer<'a> {
-    formatter: &'a mut fmt::Write,
+    formatter: &'a mut dyn fmt::Write,
     chk: u32,
     variant: Variant,
 }
@@ -184,7 +182,7 @@ impl<'a> Bech32Writer<'a> {
     pub fn new(
         hrp: &str,
         variant: Variant,
-        fmt: &'a mut fmt::Write,
+        fmt: &'a mut dyn fmt::Write,
     ) -> Result<Bech32Writer<'a>, fmt::Error> {
         let mut writer = Bech32Writer { formatter: fmt, chk: 1, variant };
 
@@ -511,7 +509,7 @@ fn check_hrp(hrp: &str) -> Result<Case, Error> {
 /// * No length limits are enforced for the data part
 #[cfg(feature = "alloc")]
 pub fn encode_to_fmt<T: AsRef<[u5]>>(
-    fmt: &mut fmt::Write,
+    fmt: &mut dyn fmt::Write,
     hrp: &str,
     data: T,
     variant: Variant,
@@ -529,7 +527,7 @@ pub fn encode_to_fmt<T: AsRef<[u5]>>(
 ///
 /// See `encode_to_fmt` for meaning of errors.
 pub fn encode_to_fmt_anycase<T: AsRef<[u5]>>(
-    fmt: &mut fmt::Write,
+    fmt: &mut dyn fmt::Write,
     hrp: &str,
     data: T,
     variant: Variant,
@@ -553,7 +551,7 @@ pub fn encode_to_fmt_anycase<T: AsRef<[u5]>>(
 /// # Deviations from standard
 /// * No length limits are enforced for the data part
 pub fn encode_without_checksum_to_fmt<T: AsRef<[u5]>>(
-    fmt: &mut fmt::Write,
+    fmt: &mut dyn fmt::Write,
     hrp: &str,
     data: T,
 ) -> Result<fmt::Result, Error> {
