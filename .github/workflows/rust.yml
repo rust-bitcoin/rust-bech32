@@ -11,6 +11,7 @@ jobs:
         rust:
           - 1.41.1
           - stable
+          - beta
           - nightly
     steps:
       - uses: actions/checkout@v2
@@ -24,19 +25,15 @@ jobs:
           command: test
           args: --verbose --features strict
 
-  fmt:
-    name: Rustfmt
+  rustfmt:
+    name: Run rustfmt
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        rust:
-          - stable
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: ${{ matrix.rust }}
+          toolchain: stable
           override: true
       - run: rustup component add rustfmt
       - uses: actions-rs/cargo@v1
@@ -45,18 +42,14 @@ jobs:
           args: --all -- --check
 
   clippy:
-    name: Clippy
+    name: Run clippy
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        rust:
-          - stable
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: ${{ matrix.rust }}
+          toolchain: stable
           override: true
       - run: rustup component add clippy
       - uses: actions-rs/cargo@v1
