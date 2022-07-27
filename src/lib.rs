@@ -337,7 +337,7 @@ pub trait CheckBase32<T: AsRef<[u5]>> {
     fn check_base32(self) -> Result<T, Self::Err>;
 }
 
-impl<'f, T: AsRef<[u8]>> CheckBase32<Vec<u5>> for T {
+impl<T: AsRef<[u8]>> CheckBase32<Vec<u5>> for T {
     type Err = Error;
 
     fn check_base32(self) -> Result<Vec<u5>, Self::Err> {
