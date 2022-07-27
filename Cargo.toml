@@ -1,20 +1,3 @@
-[package]
-name = "bech32"
-version = "0.9.0"
-authors = ["Clark Moody", "The rust-bitcoin developers"]
-repository = "https://github.com/rust-bitcoin/rust-bech32"
-documentation = "https://docs.rs/bech32/"
-description = "Encodes and decodes the Bech32 format"
-readme = "README.md"
-keywords = ["base32", "encoding", "bech32"]
-categories = ["encoding"]
-license = "MIT"
-edition = "2018"
-
-[features]
-default = ["std"]
-std = []
-# Only for CI to make all warnings errors, do not activate otherwise (may break forward compatibility)
-strict = []
-
-[dependencies]
+[workspace]
+members = ["bech32"]
+exclude = ["embedded"]
