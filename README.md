@@ -1,4 +1,5 @@
-# Bech32 Rust
+Rust Bech32
+===========
 
 [![Docs.rs badge](https://docs.rs/bech32/badge.svg)](https://docs.rs/bech32/)
 [![Continuous Integration](https://github.com/rust-bitcoin/rust-bech32/workflows/Continuous%20Integration/badge.svg)](https://github.com/rust-bitcoin/rust-bech32/actions?query=workflow%3A%22Continuous+Integration%22)
@@ -14,3 +15,15 @@ Bitcoin-specific address encoding is handled by the `bitcoin-bech32` crate.
 ## MSRV
 
 This library should always compile with any combination of features excluding "arrayvec" on **Rust 1.48.0**.
+
+
+## Githooks
+
+To assist devs in catching errors _before_ running CI we provide some githooks. If you do not
+already have locally configured githooks you can use the ones in this repository by running, in the
+root directory of the repository:
+```
+git config --local core.hooksPath githooks/
+```
+
+Alternatively add symlinks in your `.git/hooks` directory to any of the githooks we provide.
