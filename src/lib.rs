@@ -46,8 +46,7 @@ assert_eq!(variant, Variant::Bech32);
 )]
 //!
 
-// Allow trait objects without dyn on nightly and make 1.22 ignore the unknown lint
-#![allow(unknown_lints)]
+// Allow trait objects without dyn on nightly.
 #![allow(bare_trait_objects)]
 #![deny(missing_docs)]
 #![deny(non_upper_case_globals)]
