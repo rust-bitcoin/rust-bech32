@@ -85,3 +85,19 @@ jobs:
           RUSTFLAGS: "-C link-arg=-Tlink.x"
           CARGO_TARGET_THUMBV7M_NONE_EABI_RUNNER: "qemu-system-arm -cpu cortex-m3 -machine mps2-an385 -nographic -semihosting-config enable=on,target=native -kernel"
         run: cd embedded/with-allocator && cargo run --target thumbv7m-none-eabi
+
+  EmbeddedNoAlloc:
+    name: no_std no alloc
+    runs-on: ubuntu-latest
+    strategy:
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: rustc
+          args: -- -C link-arg=-nostartfiles

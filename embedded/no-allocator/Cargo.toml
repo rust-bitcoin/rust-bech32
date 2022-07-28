@@ -1,0 +1,15 @@
+[package]
+authors = ["Tobin C. Harding <me@tobin.cc>"]
+edition = "2018"
+readme = "README.md"
+name = "no-allocator"
+version = "0.1.0"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+
+[dependencies]
+bech32 = { path = "../../", default_features = false }
