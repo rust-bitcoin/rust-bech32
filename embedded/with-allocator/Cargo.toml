@@ -2,7 +2,7 @@
 authors = ["Riccardo Casatta <riccardo@casatta.it>"]
 edition = "2018"
 readme = "README.md"
-name = "embedded"
+name = "with-allocator"
 version = "0.1.0"
 
 [dependencies]
@@ -11,10 +11,10 @@ cortex-m-rt = "0.6.10"
 cortex-m-semihosting = "0.3.3"
 panic-halt = "0.2.0"
 alloc-cortex-m = "0.4.1"
-bech32 = { path="../", default-features = false }
+bech32 = { path="../../", default-features = false }
 
 [[bin]]
-name = "embedded"
+name = "with-allocator"
 test = false
 bench = false
 

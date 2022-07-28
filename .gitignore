@@ -2,5 +2,5 @@
 *.o
 /Cargo.lock
 
-/embedded/Cargo.lock
-/embedded/.cargo
+/embedded/with-allocator/Cargo.lock
+/embedded/with-allocator/.cargo
