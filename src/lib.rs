@@ -596,17 +596,14 @@ impl fmt::Display for Error {
     }
 }
 
-#[cfg(any(feature = "std", test))]
+#[cfg(feature = "std")]
 impl std::error::Error for Error {
-    fn description(&self) -> &str {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        use self::Error::*;
+
         match *self {
-            Error::MissingSeparator => "missing human-readable separator",
-            Error::InvalidChecksum => "invalid checksum",
-            Error::InvalidLength => "invalid length",
-            Error::InvalidChar(_) => "invalid character",
-            Error::InvalidData(_) => "invalid data point",
-            Error::InvalidPadding => "invalid padding",
-            Error::MixedCase => "mixed-case strings not allowed",
+            MissingSeparator | InvalidChecksum | InvalidLength | InvalidChar(_)
+            | InvalidData(_) | InvalidPadding | MixedCase => None,
         }
     }
 }
