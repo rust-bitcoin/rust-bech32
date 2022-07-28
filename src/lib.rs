@@ -563,22 +563,22 @@ const CHARSET_REV: [i8; 128] = [
 /// Generator coefficients
 const GEN: [u32; 5] = [0x3b6a_57b2, 0x2650_8e6d, 0x1ea1_19fa, 0x3d42_33dd, 0x2a14_62b3];
 
-/// Error types for Bech32 encoding / decoding
+/// Error types for Bech32 encoding / decoding.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Error {
-    /// String does not contain the separator character
+    /// String does not contain the separator character.
     MissingSeparator,
-    /// The checksum does not match the rest of the data
+    /// The checksum does not match the rest of the data.
     InvalidChecksum,
-    /// The data or human-readable part is too long or too short
+    /// The data or human-readable part is too long or too short.
     InvalidLength,
-    /// Some part of the string contains an invalid character
+    /// Some part of the string contains an invalid character.
     InvalidChar(char),
-    /// Some part of the data has an invalid value
+    /// Some part of the data has an invalid value.
     InvalidData(u8),
-    /// The bit conversion failed due to a padding issue
+    /// The bit conversion failed due to a padding issue.
     InvalidPadding,
-    /// The whole string must be of one case
+    /// The whole string must be of one case.
     MixedCase,
 }
 
