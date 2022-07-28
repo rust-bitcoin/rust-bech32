@@ -3,7 +3,7 @@ on: [pull_request]
 name: Continuous Integration
 
 jobs:
-  test:
+  Test:
     name: Test Suite
     runs-on: ubuntu-latest
     strategy:
@@ -13,20 +13,17 @@ jobs:
           - stable
           - nightly
     steps:
+      - name: Checkout Crate
       - uses: actions/checkout@v2
+      - name: Checkout Toolchain
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: ${{ matrix.rust }}
           override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --verbose --no-default-features --features strict alloc
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --verbose --no-default-features --features strict std
+      - name: Run Test Script
+        env: ${{ matrix.rust }}
+        run: ./contrib/test.sh
 
   fmt:
     name: Rustfmt

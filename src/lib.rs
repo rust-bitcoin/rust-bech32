@@ -67,9 +67,9 @@ extern crate core;
 use alloc::borrow::Cow;
 #[cfg(all(feature = "alloc", not(feature = "std")))]
 use alloc::{string::String, vec::Vec};
-use core::convert::TryFrom;
 #[cfg(feature = "alloc")]
 use core::convert::Infallible;
+use core::convert::TryFrom;
 use core::{fmt, mem};
 #[cfg(feature = "std")]
 use std::borrow::Cow;
