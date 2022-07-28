@@ -22,7 +22,11 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --verbose --features strict
+          args: --verbose --no-default-features --features strict alloc
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --verbose --no-default-features --features strict std
 
   fmt:
     name: Rustfmt

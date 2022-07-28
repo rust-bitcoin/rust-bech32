@@ -57,19 +57,21 @@ assert_eq!(variant, Variant::Bech32);
 #![cfg_attr(feature = "strict", deny(warnings))]
 #![cfg_attr(all(not(feature = "std"), not(test)), no_std)]
 
-#[cfg(all(not(feature = "std"), not(test)))]
+#[cfg(feature = "alloc")]
 extern crate alloc;
 
 #[cfg(any(test, feature = "std"))]
 extern crate core;
 
-#[cfg(all(not(feature = "std"), not(test)))]
+#[cfg(all(feature = "alloc", not(feature = "std")))]
 use alloc::borrow::Cow;
-#[cfg(all(not(feature = "std"), not(test)))]
+#[cfg(all(feature = "alloc", not(feature = "std")))]
 use alloc::{string::String, vec::Vec};
-use core::convert::{Infallible, TryFrom};
+use core::convert::TryFrom;
+#[cfg(feature = "alloc")]
+use core::convert::Infallible;
 use core::{fmt, mem};
-#[cfg(any(feature = "std", test))]
+#[cfg(feature = "std")]
 use std::borrow::Cow;
 
 /// Integer in the range `0..32`
@@ -220,6 +222,7 @@ pub trait FromBase32: Sized {
     fn from_base32(b32: &[u5]) -> Result<Self, Self::Err>;
 }
 
+#[cfg(feature = "alloc")]
 impl WriteBase32 for Vec<u5> {
     type Err = Infallible;
 
@@ -234,6 +237,7 @@ impl WriteBase32 for Vec<u5> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl FromBase32 for Vec<u8> {
     type Err = Error;
 
@@ -243,6 +247,7 @@ impl FromBase32 for Vec<u8> {
 }
 
 /// A trait for converting a value to a type `T` that represents a `u5` slice.
+#[cfg(feature = "alloc")]
 pub trait ToBase32 {
     /// Convert `Self` to base32 vector
     fn to_base32(&self) -> Vec<u5> {
@@ -257,11 +262,13 @@ pub trait ToBase32 {
 }
 
 /// Interface to calculate the length of the base32 representation before actually serializing
+#[cfg(feature = "alloc")]
 pub trait Base32Len: ToBase32 {
     /// Calculate the base32 serialized length
     fn base32_len(&self) -> usize;
 }
 
+#[cfg(feature = "alloc")]
 impl<T: AsRef<[u8]>> ToBase32 for T {
     fn write_base32<W: WriteBase32>(&self, writer: &mut W) -> Result<(), <W as WriteBase32>::Err> {
         // Amount of bits left over from last round, stored in buffer.
@@ -306,6 +313,7 @@ impl<T: AsRef<[u8]>> ToBase32 for T {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<T: AsRef<[u8]>> Base32Len for T {
     fn base32_len(&self) -> usize {
         let bits = self.as_ref().len() * 8;
@@ -327,6 +335,7 @@ pub trait CheckBase32<T: AsRef<[u5]>> {
     fn check_base32(self) -> Result<T, Self::Err>;
 }
 
+#[cfg(feature = "alloc")]
 impl<T: AsRef<[u8]>> CheckBase32<Vec<u5>> for T {
     type Err = Error;
 
@@ -336,6 +345,7 @@ impl<T: AsRef<[u8]>> CheckBase32<Vec<u5>> for T {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
+#[cfg(feature = "alloc")]
 enum Case {
     Upper,
     Lower,
@@ -348,6 +358,7 @@ enum Case {
 /// * **MixedCase**: If the HRP contains both uppercase and lowercase characters.
 /// * **InvalidChar**: If the HRP contains any non-ASCII characters (outside 33..=126).
 /// * **InvalidLength**: If the HRP is outside 1..83 characters long.
+#[cfg(feature = "alloc")]
 fn check_hrp(hrp: &str) -> Result<Case, Error> {
     if hrp.is_empty() || hrp.len() > 83 {
         return Err(Error::InvalidLength);
@@ -387,6 +398,7 @@ fn check_hrp(hrp: &str) -> Result<Case, Error> {
 /// * If [check_hrp] returns an error for the given HRP.
 /// # Deviations from standard
 /// * No length limits are enforced for the data part
+#[cfg(feature = "alloc")]
 pub fn encode_to_fmt<T: AsRef<[u5]>>(
     fmt: &mut fmt::Write,
     hrp: &str,
@@ -416,6 +428,7 @@ pub fn encode_to_fmt<T: AsRef<[u5]>>(
 /// * If [check_hrp] returns an error for the given HRP.
 /// # Deviations from standard
 /// * No length limits are enforced for the data part
+#[cfg(feature = "alloc")]
 pub fn encode_without_checksum_to_fmt<T: AsRef<[u5]>>(
     fmt: &mut fmt::Write,
     hrp: &str,
@@ -454,6 +467,7 @@ const BECH32M_CONST: u32 = 0x2bc8_30a3;
 
 impl Variant {
     // Produce the variant based on the remainder of the polymod operation
+    #[cfg(feature = "alloc")]
     fn from_remainder(c: u32) -> Option<Self> {
         match c {
             BECH32_CONST => Some(Variant::Bech32),
@@ -476,6 +490,7 @@ impl Variant {
 /// * If [check_hrp] returns an error for the given HRP.
 /// # Deviations from standard
 /// * No length limits are enforced for the data part
+#[cfg(feature = "alloc")]
 pub fn encode<T: AsRef<[u5]>>(hrp: &str, data: T, variant: Variant) -> Result<String, Error> {
     let mut buf = String::new();
     encode_to_fmt(&mut buf, hrp, data, variant)?.unwrap();
@@ -488,6 +503,7 @@ pub fn encode<T: AsRef<[u5]>>(hrp: &str, data: T, variant: Variant) -> Result<St
 /// * If [check_hrp] returns an error for the given HRP.
 /// # Deviations from standard
 /// * No length limits are enforced for the data part
+#[cfg(feature = "alloc")]
 pub fn encode_without_checksum<T: AsRef<[u5]>>(hrp: &str, data: T) -> Result<String, Error> {
     let mut buf = String::new();
     encode_without_checksum_to_fmt(&mut buf, hrp, data)?.unwrap();
@@ -497,6 +513,7 @@ pub fn encode_without_checksum<T: AsRef<[u5]>>(hrp: &str, data: T) -> Result<Str
 /// Decode a bech32 string into the raw HRP and the data bytes.
 ///
 /// Returns the HRP in lowercase, the data with the checksum removed, and the encoding.
+#[cfg(feature = "alloc")]
 pub fn decode(s: &str) -> Result<(String, Vec<u5>, Variant), Error> {
     let (hrp_lower, mut data) = split_and_decode(s)?;
     if data.len() < CHECKSUM_LENGTH {
@@ -518,9 +535,11 @@ pub fn decode(s: &str) -> Result<(String, Vec<u5>, Variant), Error> {
 /// Decode a bech32 string into the raw HRP and the data bytes, assuming no checksum.
 ///
 /// Returns the HRP in lowercase and the data.
+#[cfg(feature = "alloc")]
 pub fn decode_without_checksum(s: &str) -> Result<(String, Vec<u5>), Error> { split_and_decode(s) }
 
 /// Decode a bech32 string into the raw HRP and the `u5` data.
+#[cfg(feature = "alloc")]
 fn split_and_decode(s: &str) -> Result<(String, Vec<u5>), Error> {
     // Split at separator and check for two pieces
     let (raw_hrp, raw_data) = match s.rfind(SEP) {
@@ -577,12 +596,14 @@ fn split_and_decode(s: &str) -> Result<(String, Vec<u5>), Error> {
     Ok((hrp_lower, data))
 }
 
+#[cfg(feature = "alloc")]
 fn verify_checksum(hrp: &[u8], data: &[u5]) -> Option<Variant> {
     let mut exp = hrp_expand(hrp);
     exp.extend_from_slice(data);
     Variant::from_remainder(polymod(&exp))
 }
 
+#[cfg(feature = "alloc")]
 fn hrp_expand(hrp: &[u8]) -> Vec<u5> {
     let mut v: Vec<u5> = Vec::new();
     for b in hrp {
@@ -595,6 +616,7 @@ fn hrp_expand(hrp: &[u8]) -> Vec<u5> {
     v
 }
 
+#[cfg(feature = "alloc")]
 fn polymod(values: &[u5]) -> u32 {
     let mut chk: u32 = 1;
     let mut b: u8;
@@ -623,6 +645,7 @@ const CHARSET: [char; 32] = [
 ];
 
 /// Reverse character set. Maps ASCII byte -> CHARSET index on [0,31]
+#[cfg(feature = "alloc")]
 const CHARSET_REV: [i8; 128] = [
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -697,6 +720,7 @@ impl std::error::Error for Error {
 /// let base5 = convert_bits(&[0xff], 8, 5, true);
 /// assert_eq!(base5.unwrap(), vec![0x1f, 0x1c]);
 /// ```
+#[cfg(feature = "alloc")]
 pub fn convert_bits<T>(data: &[T], from: u32, to: u32, pad: bool) -> Result<Vec<u8>, Error>
 where
     T: Into<u8> + Copy,
@@ -732,6 +756,7 @@ where
 }
 
 #[cfg(test)]
+#[cfg(feature = "alloc")] // Note, all the unit tests currently require an allocator.
 mod tests {
     use super::*;
 
