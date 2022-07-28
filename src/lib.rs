@@ -43,6 +43,8 @@ extern crate alloc;
 #[cfg(any(test, feature = "std"))]
 extern crate core;
 
+mod internal_macros;
+
 #[cfg(all(not(feature = "std"), not(test)))]
 use alloc::borrow::Cow;
 #[cfg(all(not(feature = "std"), not(test)))]
@@ -51,6 +53,8 @@ use core::convert::TryFrom;
 use core::{fmt, mem};
 #[cfg(any(feature = "std", test))]
 use std::borrow::Cow;
+
+use crate::internal_macros::write_err;
 
 /// Integer in the range `0..32`
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Default, PartialOrd, Ord, Hash)]
@@ -70,12 +74,12 @@ impl From<u5> for u8 {
 }
 
 impl TryFrom<u8> for u5 {
-    type Error = Error;
+    type Error = OverflowError;
 
     /// Errors if `value` is out of range.
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         if value > 31 {
-            Err(Error::InvalidData(value))
+            Err(OverflowError(value))
         } else {
             Ok(u5(value))
         }
@@ -84,6 +88,21 @@ impl TryFrom<u8> for u5 {
 
 impl AsRef<u8> for u5 {
     fn as_ref(&self) -> &u8 { &self.0 }
+}
+
+/// Value is invalid, overflows a `u5`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct OverflowError(u8);
+
+impl fmt::Display for OverflowError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "value is invalid, overflows a u5)")
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for OverflowError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> { None }
 }
 
 /// Interface to write `u5`s into a sink
@@ -308,7 +327,12 @@ impl<T: AsRef<[u8]>> CheckBase32<Vec<u5>> for T {
     type Err = Error;
 
     fn check_base32(self) -> Result<Vec<u5>, Self::Err> {
-        self.as_ref().iter().map(|x| u5::try_from(*x)).collect::<Result<Vec<u5>, Error>>()
+        let res = self
+            .as_ref()
+            .iter()
+            .map(|x| u5::try_from(*x))
+            .collect::<Result<Vec<u5>, OverflowError>>()?;
+        Ok(res)
     }
 }
 
@@ -564,7 +588,7 @@ const CHARSET_REV: [i8; 128] = [
 const GEN: [u32; 5] = [0x3b6a_57b2, 0x2650_8e6d, 0x1ea1_19fa, 0x3d42_33dd, 0x2a14_62b3];
 
 /// Error types for Bech32 encoding / decoding.
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Error {
     /// String does not contain the separator character.
     MissingSeparator,
@@ -580,6 +604,8 @@ pub enum Error {
     InvalidPadding,
     /// The whole string must be of one case.
     MixedCase,
+    /// u5 overflow during construction.
+    Overflow(OverflowError),
 }
 
 impl fmt::Display for Error {
@@ -594,6 +620,7 @@ impl fmt::Display for Error {
             InvalidData(n) => write!(f, "invalid data point ({})", n),
             InvalidPadding => write!(f, "invalid padding"),
             MixedCase => write!(f, "mixed-case strings not allowed"),
+            Overflow(ref e) => write_err!(f, "u5 overflow during construction"; e),
         }
     }
 }
@@ -606,8 +633,14 @@ impl std::error::Error for Error {
         match *self {
             MissingSeparator | InvalidChecksum | InvalidLength | InvalidChar(_)
             | InvalidData(_) | InvalidPadding | MixedCase => None,
+            Overflow(ref e) => Some(e),
         }
     }
+}
+
+impl From<OverflowError> for Error {
+    #[inline]
+    fn from(e: OverflowError) -> Error { Error::Overflow(e) }
 }
 
 /// Convert between bit sizes
@@ -819,7 +852,7 @@ mod tests {
         assert!([0u8, 1, 2, 30, 31, 255].check_base32().is_err());
 
         assert!([1u8, 2, 3, 4].check_base32().is_ok());
-        assert_eq!([30u8, 31, 35, 20].check_base32(), Err(Error::InvalidData(35)));
+        assert_eq!([30u8, 31, 35, 20].check_base32(), Err(Error::Overflow(OverflowError(35))));
     }
 
     #[test]
