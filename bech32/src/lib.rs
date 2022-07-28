@@ -54,53 +54,9 @@ use core::{fmt, mem};
 #[cfg(any(feature = "std", test))]
 use std::borrow::Cow;
 
+use u5::u5;
+
 use crate::internal_macros::write_err;
-
-/// Integer in the range `0..32`
-#[derive(PartialEq, Eq, Debug, Copy, Clone, Default, PartialOrd, Ord, Hash)]
-#[allow(non_camel_case_types)]
-pub struct u5(u8);
-
-impl u5 {
-    /// Returns a copy of the underlying `u8` value
-    pub fn to_u8(self) -> u8 { self.0 }
-}
-
-impl From<u5> for u8 {
-    fn from(v: u5) -> u8 { v.0 }
-}
-
-impl TryFrom<u8> for u5 {
-    type Error = OverflowError;
-
-    /// Errors if `value` is out of range.
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        if value > 31 {
-            Err(OverflowError(value))
-        } else {
-            Ok(u5(value))
-        }
-    }
-}
-
-impl AsRef<u8> for u5 {
-    fn as_ref(&self) -> &u8 { &self.0 }
-}
-
-/// Value is invalid, overflows a `u5`.
-#[derive(Clone, Debug, PartialEq)]
-pub struct OverflowError(u8);
-
-impl fmt::Display for OverflowError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "value is invalid, overflows a u5)")
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for OverflowError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> { None }
-}
 
 /// Trait to extend the `u5` type.
 pub trait U5Ext {
@@ -154,11 +110,11 @@ impl<'a> Bech32Writer<'a> {
 
         // expand HRP
         for b in hrp.bytes() {
-            writer.polymod_step(u5(b >> 5));
+            writer.polymod_step(u5::from_low_5_bits(b >> 5));
         }
-        writer.polymod_step(u5(0));
+        writer.polymod_step(u5::ZERO);
         for b in hrp.bytes() {
-            writer.polymod_step(u5(b & 0x1f));
+            writer.polymod_step(u5::from_low_5_bits(b));
         }
 
         Ok(writer)
@@ -185,13 +141,14 @@ impl<'a> Bech32Writer<'a> {
     fn inner_finalize(&mut self) -> fmt::Result {
         // Pad with 6 zeros
         for _ in 0..6 {
-            self.polymod_step(u5(0))
+            self.polymod_step(u5::ZERO)
         }
 
         let plm: u32 = self.chk ^ self.variant.constant();
 
         for p in 0..6 {
-            self.formatter.write_char(u5(((plm >> (5 * (5 - p))) & 0x1f) as u8).to_char())?;
+            self.formatter
+                .write_char(u5::from_low_5_bits((plm >> (5 * (5 - p))) as u8).to_char())?;
         }
 
         Ok(())
@@ -279,7 +236,7 @@ impl<T: AsRef<[u8]>> ToBase32 for T {
             // buffer holds too many bits, so we don't have to combine buffer bits with new bits
             // from this rounds byte.
             if buffer_bits >= 5 {
-                writer.write_u5(u5((buffer & 0b1111_1000) >> 3))?;
+                writer.write_u5(u5::from_low_5_bits((buffer & 0b1111_1000) >> 3))?;
                 buffer <<= 5;
                 buffer_bits -= 5;
             }
@@ -289,20 +246,20 @@ impl<T: AsRef<[u8]>> ToBase32 for T {
             let from_buffer = buffer >> 3;
             let from_byte = b >> (3 + buffer_bits); // buffer_bits <= 4
 
-            writer.write_u5(u5(from_buffer | from_byte))?;
+            writer.write_u5(u5::from_low_5_bits(from_buffer | from_byte))?;
             buffer = b << (5 - buffer_bits);
             buffer_bits += 3;
         }
 
         // There can be at most two u5s left in the buffer after processing all bytes, write them.
         if buffer_bits >= 5 {
-            writer.write_u5(u5((buffer & 0b1111_1000) >> 3))?;
+            writer.write_u5(u5::from_low_5_bits((buffer & 0b1111_1000) >> 3))?;
             buffer <<= 5;
             buffer_bits -= 5;
         }
 
         if buffer_bits != 0 {
-            writer.write_u5(u5(buffer >> 3))?;
+            writer.write_u5(u5::from_low_5_bits(buffer >> 3))?;
         }
 
         Ok(())
@@ -338,7 +295,7 @@ impl<T: AsRef<[u8]>> CheckBase32<Vec<u5>> for T {
             .as_ref()
             .iter()
             .map(|x| u5::try_from(*x))
-            .collect::<Result<Vec<u5>, OverflowError>>()?;
+            .collect::<Result<Vec<u5>, ::u5::OverflowError>>()?;
         Ok(res)
     }
 }
@@ -612,7 +569,7 @@ pub enum Error {
     /// The whole string must be of one case.
     MixedCase,
     /// u5 overflow during construction.
-    Overflow(OverflowError),
+    Overflow(::u5::OverflowError),
 }
 
 impl fmt::Display for Error {
@@ -645,9 +602,9 @@ impl std::error::Error for Error {
     }
 }
 
-impl From<OverflowError> for Error {
+impl From<::u5::OverflowError> for Error {
     #[inline]
-    fn from(e: OverflowError) -> Error { Error::Overflow(e) }
+    fn from(e: ::u5::OverflowError) -> Error { Error::Overflow(e) }
 }
 
 /// Convert between bit sizes
@@ -859,7 +816,11 @@ mod tests {
         assert!([0u8, 1, 2, 30, 31, 255].check_base32().is_err());
 
         assert!([1u8, 2, 3, 4].check_base32().is_ok());
-        assert_eq!([30u8, 31, 35, 20].check_base32(), Err(Error::Overflow(OverflowError(35))));
+        match [30u8, 31, 35, 20].check_base32() {
+            Ok(_) => panic!("should err"),
+            Err(Error::Overflow(_)) => {},
+            Err(_) => panic!("should be overflow error"),
+        }
     }
 
     #[test]

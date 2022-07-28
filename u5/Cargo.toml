@@ -1,22 +1,20 @@
 [package]
-name = "bech32"
-version = "0.9.0"
+name = "u5"
+version = "0.1.0"
 authors = ["Clark Moody", "The rust-bitcoin developers"]
 repository = "https://github.com/rust-bitcoin/rust-bech32"
-documentation = "https://docs.rs/bech32/"
-description = "Encodes and decodes the Bech32 format"
+documentation = "https://docs.rs/u5/"
+description = "5 bit integer (range 0..32)"
 readme = "README.md"
 keywords = ["base32", "encoding", "bech32"]
-categories = ["encoding"]
 license = "MIT"
 edition = "2018"
 
 [features]
 default = ["std"]
-std = ["u5/std"]
+std = []
 
 # Only for CI to make all warnings errors, do not activate otherwise (may break forward compatibility)
 strict = []
 
 [dependencies]
-u5 = { path = "../u5", default-features = false }
