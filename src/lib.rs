@@ -64,9 +64,6 @@ pub struct u5(u8);
 impl u5 {
     /// Returns a copy of the underlying `u8` value
     pub fn to_u8(self) -> u8 { self.0 }
-
-    /// Get char representing this 5 bit value as defined in BIP173
-    pub fn to_char(self) -> char { CHARSET[self.to_u8() as usize] }
 }
 
 impl From<u5> for u8 {
@@ -103,6 +100,16 @@ impl fmt::Display for OverflowError {
 #[cfg(feature = "std")]
 impl std::error::Error for OverflowError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> { None }
+}
+
+/// Trait to extend the `u5` type.
+pub trait U5Ext {
+    /// Get char representing this 5 bit value as defined in BIP173.
+    fn to_char(self) -> char;
+}
+
+impl U5Ext for u5 {
+    fn to_char(self) -> char { CHARSET[self.to_u8() as usize] }
 }
 
 /// Interface to write `u5`s into a sink
