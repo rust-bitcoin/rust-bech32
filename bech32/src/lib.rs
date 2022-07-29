@@ -818,7 +818,7 @@ mod tests {
         assert!([1u8, 2, 3, 4].check_base32().is_ok());
         match [30u8, 31, 35, 20].check_base32() {
             Ok(_) => panic!("should err"),
-            Err(Error::Overflow(_)) => {},
+            Err(Error::Overflow(_)) => {}
             Err(_) => panic!("should be overflow error"),
         }
     }
