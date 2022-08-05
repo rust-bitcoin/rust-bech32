@@ -128,6 +128,8 @@ pub trait WriteBase32 {
     fn write_u5(&mut self, data: u5) -> Result<(), Self::Err>;
 }
 
+const CHECKSUM_LENGTH: usize = 6;
+
 /// Allocationless Bech32 writer that accumulates the checksum data internally and writes them out
 /// in the end.
 pub struct Bech32Writer<'a> {
@@ -187,13 +189,13 @@ impl<'a> Bech32Writer<'a> {
 
     fn inner_finalize(&mut self) -> fmt::Result {
         // Pad with 6 zeros
-        for _ in 0..6 {
+        for _ in 0..CHECKSUM_LENGTH {
             self.polymod_step(u5(0))
         }
 
         let plm: u32 = self.chk ^ self.variant.constant();
 
-        for p in 0..6 {
+        for p in 0..CHECKSUM_LENGTH {
             self.formatter
                 .write_char(u5(((plm >> (5 * (5 - p))) & 0x1f) as u8).to_char())?;
         }
@@ -469,7 +471,7 @@ pub fn encode<T: AsRef<[u5]>>(hrp: &str, data: T, variant: Variant) -> Result<St
 /// Returns the HRP in lowercase..
 pub fn decode(s: &str) -> Result<(String, Vec<u5>, Variant), Error> {
     // Ensure overall length is within bounds
-    if s.len() < 8 {
+    if s.len() < CHECKSUM_LENGTH + 2 {
         return Err(Error::InvalidLength);
     }
 
@@ -481,7 +483,7 @@ pub fn decode(s: &str) -> Result<(String, Vec<u5>, Variant), Error> {
             (hrp, &data[1..])
         }
     };
-    if raw_data.len() < 6 {
+    if raw_data.len() < CHECKSUM_LENGTH {
         return Err(Error::InvalidLength);
     }
 
@@ -533,7 +535,7 @@ pub fn decode(s: &str) -> Result<(String, Vec<u5>, Variant), Error> {
         Some(variant) => {
             // Remove checksum from data payload
             let dbl: usize = data.len();
-            data.truncate(dbl - 6);
+            data.truncate(dbl - CHECKSUM_LENGTH);
 
             Ok((hrp_lower, data, variant))
         }
