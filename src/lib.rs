@@ -400,6 +400,7 @@ fn check_hrp(hrp: &str) -> Result<Case, Error> {
 ///
 /// # Errors
 /// * If [check_hrp] returns an error for the given HRP.
+/// * If `fmt` fails on write
 /// # Deviations from standard
 /// * No length limits are enforced for the data part
 pub fn encode_to_fmt<T: AsRef<[u5]>>(
@@ -407,21 +408,17 @@ pub fn encode_to_fmt<T: AsRef<[u5]>>(
     hrp: &str,
     data: T,
     variant: Variant,
-) -> Result<fmt::Result, Error> {
+) -> Result<(), Error> {
     let hrp_lower = match check_hrp(hrp)? {
         Case::Upper => Cow::Owned(hrp.to_lowercase()),
         Case::Lower | Case::None => Cow::Borrowed(hrp),
     };
 
-    match Bech32Writer::new(&hrp_lower, variant, fmt) {
-        Ok(mut writer) => {
-            Ok(writer.write(data.as_ref()).and_then(|_| {
-                // Finalize manually to avoid panic on drop if write fails
-                writer.finalize()
-            }))
-        }
-        Err(e) => Ok(Err(e)),
-    }
+    let mut writer = Bech32Writer::new(&hrp_lower, variant, fmt)?;
+    Ok(writer.write(data.as_ref()).and_then(|_| {
+        // Finalize manually to avoid panic on drop if write fails
+        writer.finalize()
+    })?)
 }
 
 /// Used for encode/decode operations for the two variants of Bech32
@@ -462,7 +459,7 @@ impl Variant {
 /// * No length limits are enforced for the data part
 pub fn encode<T: AsRef<[u5]>>(hrp: &str, data: T, variant: Variant) -> Result<String, Error> {
     let mut buf = String::new();
-    encode_to_fmt(&mut buf, hrp, data, variant)?.unwrap();
+    encode_to_fmt(&mut buf, hrp, data, variant)?;
     Ok(buf)
 }
 
@@ -624,6 +621,14 @@ pub enum Error {
     InvalidPadding,
     /// The whole string must be of one case
     MixedCase,
+    /// Writing UTF-8 data failed
+    WriteFailure(fmt::Error),
+}
+
+impl From<fmt::Error> for Error {
+    fn from(error: fmt::Error) -> Self {
+        Self::WriteFailure(error)
+    }
 }
 
 impl fmt::Display for Error {
@@ -636,6 +641,7 @@ impl fmt::Display for Error {
             Error::InvalidData(n) => write!(f, "invalid data point ({})", n),
             Error::InvalidPadding => write!(f, "invalid padding"),
             Error::MixedCase => write!(f, "mixed-case strings not allowed"),
+            Error::WriteFailure(_) => write!(f, "failed writing utf-8 data"),
         }
     }
 }
@@ -651,6 +657,7 @@ impl std::error::Error for Error {
             Error::InvalidData(_) => "invalid data point",
             Error::InvalidPadding => "invalid padding",
             Error::MixedCase => "mixed-case strings not allowed",
+            Error::WriteFailure(_) => "failed writing utf-8 data",
         }
     }
 }
