@@ -128,6 +128,8 @@ pub trait WriteBase32 {
     fn write_u5(&mut self, data: u5) -> Result<(), Self::Err>;
 }
 
+const CHECKSUM_LENGTH: usize = 6;
+
 /// Allocationless Bech32 writer that accumulates the checksum data internally and writes them out
 /// in the end.
 pub struct Bech32Writer<'a> {
@@ -180,20 +182,20 @@ impl<'a> Bech32Writer<'a> {
 
     /// Write out the checksum at the end. If this method isn't called this will happen on drop.
     pub fn finalize(mut self) -> fmt::Result {
-        self.inner_finalize()?;
+        self.write_checksum()?;
         mem::forget(self);
         Ok(())
     }
 
-    fn inner_finalize(&mut self) -> fmt::Result {
+    fn write_checksum(&mut self) -> fmt::Result {
         // Pad with 6 zeros
-        for _ in 0..6 {
+        for _ in 0..CHECKSUM_LENGTH {
             self.polymod_step(u5(0))
         }
 
         let plm: u32 = self.chk ^ self.variant.constant();
 
-        for p in 0..6 {
+        for p in 0..CHECKSUM_LENGTH {
             self.formatter
                 .write_char(u5(((plm >> (5 * (5 - p))) & 0x1f) as u8).to_char())?;
         }
@@ -201,6 +203,7 @@ impl<'a> Bech32Writer<'a> {
         Ok(())
     }
 }
+
 impl<'a> WriteBase32 for Bech32Writer<'a> {
     type Err = fmt::Error;
 
@@ -213,7 +216,7 @@ impl<'a> WriteBase32 for Bech32Writer<'a> {
 
 impl<'a> Drop for Bech32Writer<'a> {
     fn drop(&mut self) {
-        self.inner_finalize()
+        self.write_checksum()
             .expect("Unhandled error writing the checksum on drop.")
     }
 }
@@ -398,6 +401,7 @@ fn check_hrp(hrp: &str) -> Result<Case, Error> {
 ///
 /// # Errors
 /// * If [check_hrp] returns an error for the given HRP.
+/// * If `fmt` fails on write
 /// # Deviations from standard
 /// * No length limits are enforced for the data part
 pub fn encode_to_fmt<T: AsRef<[u5]>>(
@@ -405,21 +409,43 @@ pub fn encode_to_fmt<T: AsRef<[u5]>>(
     hrp: &str,
     data: T,
     variant: Variant,
-) -> Result<fmt::Result, Error> {
+) -> Result<(), Error> {
     let hrp_lower = match check_hrp(hrp)? {
         Case::Upper => Cow::Owned(hrp.to_lowercase()),
         Case::Lower | Case::None => Cow::Borrowed(hrp),
     };
 
-    match Bech32Writer::new(&hrp_lower, variant, fmt) {
-        Ok(mut writer) => {
-            Ok(writer.write(data.as_ref()).and_then(|_| {
-                // Finalize manually to avoid panic on drop if write fails
-                writer.finalize()
-            }))
-        }
-        Err(e) => Ok(Err(e)),
+    let mut writer = Bech32Writer::new(&hrp_lower, variant, fmt)?;
+    Ok(writer.write(data.as_ref()).and_then(|_| {
+        // Finalize manually to avoid panic on drop if write fails
+        writer.finalize()
+    })?)
+}
+
+/// Encode a bech32 payload without a checksum to an [fmt::Write].
+/// This method is intended for implementing traits from [std::fmt].
+///
+/// # Errors
+/// * If [check_hrp] returns an error for the given HRP.
+/// * If `fmt` fails on write
+/// # Deviations from standard
+/// * No length limits are enforced for the data part
+pub fn encode_without_checksum_to_fmt<T: AsRef<[u5]>>(
+    fmt: &mut fmt::Write,
+    hrp: &str,
+    data: T,
+) -> Result<(), Error> {
+    let hrp = match check_hrp(hrp)? {
+        Case::Upper => Cow::Owned(hrp.to_lowercase()),
+        Case::Lower | Case::None => Cow::Borrowed(hrp),
+    };
+
+    fmt.write_str(&hrp)?;
+    fmt.write_char(SEP)?;
+    for b in data.as_ref() {
+        fmt.write_char(b.to_char())?;
     }
+    Ok(())
 }
 
 /// Used for encode/decode operations for the two variants of Bech32
@@ -460,19 +486,52 @@ impl Variant {
 /// * No length limits are enforced for the data part
 pub fn encode<T: AsRef<[u5]>>(hrp: &str, data: T, variant: Variant) -> Result<String, Error> {
     let mut buf = String::new();
-    encode_to_fmt(&mut buf, hrp, data, variant)?.unwrap();
+    encode_to_fmt(&mut buf, hrp, data, variant)?;
+    Ok(buf)
+}
+
+/// Encode a bech32 payload to string without the checksum.
+///
+/// # Errors
+/// * If [check_hrp] returns an error for the given HRP.
+/// # Deviations from standard
+/// * No length limits are enforced for the data part
+pub fn encode_without_checksum<T: AsRef<[u5]>>(hrp: &str, data: T) -> Result<String, Error> {
+    let mut buf = String::new();
+    encode_without_checksum_to_fmt(&mut buf, hrp, data)?;
     Ok(buf)
 }
 
 /// Decode a bech32 string into the raw HRP and the data bytes.
 ///
-/// Returns the HRP in lowercase..
+/// Returns the HRP in lowercase, the data with the checksum removed, and the encoding.
 pub fn decode(s: &str) -> Result<(String, Vec<u5>, Variant), Error> {
-    // Ensure overall length is within bounds
-    if s.len() < 8 {
+    let (hrp_lower, mut data) = split_and_decode(s)?;
+    if data.len() < CHECKSUM_LENGTH {
         return Err(Error::InvalidLength);
     }
 
+    // Ensure checksum
+    match verify_checksum(hrp_lower.as_bytes(), &data) {
+        Some(variant) => {
+            // Remove checksum from data payload
+            data.truncate(data.len() - CHECKSUM_LENGTH);
+
+            Ok((hrp_lower, data, variant))
+        }
+        None => Err(Error::InvalidChecksum),
+    }
+}
+
+/// Decode a bech32 string into the raw HRP and the data bytes, assuming no checksum.
+///
+/// Returns the HRP in lowercase and the data.
+pub fn decode_without_checksum(s: &str) -> Result<(String, Vec<u5>), Error> {
+    split_and_decode(s)
+}
+
+/// Decode a bech32 string into the raw HRP and the `u5` data.
+fn split_and_decode(s: &str) -> Result<(String, Vec<u5>), Error> {
     // Split at separator and check for two pieces
     let (raw_hrp, raw_data) = match s.rfind(SEP) {
         None => return Err(Error::MissingSeparator),
@@ -481,9 +540,6 @@ pub fn decode(s: &str) -> Result<(String, Vec<u5>, Variant), Error> {
             (hrp, &data[1..])
         }
     };
-    if raw_data.len() < 6 {
-        return Err(Error::InvalidLength);
-    }
 
     let mut case = check_hrp(raw_hrp)?;
     let hrp_lower = match case {
@@ -493,7 +549,7 @@ pub fn decode(s: &str) -> Result<(String, Vec<u5>, Variant), Error> {
     };
 
     // Check data payload
-    let mut data = raw_data
+    let data = raw_data
         .chars()
         .map(|c| {
             // Only check if c is in the ASCII range, all invalid ASCII
@@ -528,17 +584,7 @@ pub fn decode(s: &str) -> Result<(String, Vec<u5>, Variant), Error> {
         })
         .collect::<Result<Vec<u5>, Error>>()?;
 
-    // Ensure checksum
-    match verify_checksum(hrp_lower.as_bytes(), &data) {
-        Some(variant) => {
-            // Remove checksum from data payload
-            let dbl: usize = data.len();
-            data.truncate(dbl - 6);
-
-            Ok((hrp_lower, data, variant))
-        }
-        None => Err(Error::InvalidChecksum),
-    }
+    Ok((hrp_lower, data))
 }
 
 fn verify_checksum(hrp: &[u8], data: &[u5]) -> Option<Variant> {
@@ -622,6 +668,14 @@ pub enum Error {
     InvalidPadding,
     /// The whole string must be of one case
     MixedCase,
+    /// Writing UTF-8 data failed
+    WriteFailure(fmt::Error),
+}
+
+impl From<fmt::Error> for Error {
+    fn from(error: fmt::Error) -> Self {
+        Self::WriteFailure(error)
+    }
 }
 
 impl fmt::Display for Error {
@@ -634,6 +688,7 @@ impl fmt::Display for Error {
             Error::InvalidData(n) => write!(f, "invalid data point ({})", n),
             Error::InvalidPadding => write!(f, "invalid padding"),
             Error::MixedCase => write!(f, "mixed-case strings not allowed"),
+            Error::WriteFailure(_) => write!(f, "failed writing utf-8 data"),
         }
     }
 }
@@ -649,6 +704,7 @@ impl std::error::Error for Error {
             Error::InvalidData(_) => "invalid data point",
             Error::InvalidPadding => "invalid padding",
             Error::MixedCase => "mixed-case strings not allowed",
+            Error::WriteFailure(_) => "failed writing utf-8 data",
         }
     }
 }
@@ -792,6 +848,8 @@ mod tests {
                 Error::InvalidLength),
             ("1p2gdwpf",
                 Error::InvalidLength),
+            ("bc1p2",
+                Error::InvalidLength),
         );
         for p in pairs {
             let (s, expected_error) = p;
@@ -921,7 +979,7 @@ mod tests {
     }
 
     #[test]
-    fn writer() {
+    fn write_with_checksum() {
         let hrp = "lnbc";
         let data = "Hello World!".as_bytes().to_base32();
 
@@ -938,7 +996,26 @@ mod tests {
     }
 
     #[test]
-    fn write_on_drop() {
+    fn write_without_checksum() {
+        let hrp = "lnbc";
+        let data = "Hello World!".as_bytes().to_base32();
+
+        let mut written_str = String::new();
+        {
+            let mut writer = Bech32Writer::new(hrp, Variant::Bech32, &mut written_str).unwrap();
+            writer.write(&data).unwrap();
+        }
+
+        let encoded_str = encode_without_checksum(hrp, data).unwrap();
+
+        assert_eq!(
+            encoded_str,
+            written_str[..written_str.len() - CHECKSUM_LENGTH]
+        );
+    }
+
+    #[test]
+    fn write_with_checksum_on_drop() {
         let hrp = "lntb";
         let data = "Hello World!".as_bytes().to_base32();
 
@@ -951,6 +1028,19 @@ mod tests {
         let encoded_str = encode(hrp, data, Variant::Bech32).unwrap();
 
         assert_eq!(encoded_str, written_str);
+    }
+
+    #[test]
+    fn roundtrip_without_checksum() {
+        let hrp = "lnbc";
+        let data = "Hello World!".as_bytes().to_base32();
+
+        let encoded = encode_without_checksum(hrp, data.clone()).expect("failed to encode");
+        let (decoded_hrp, decoded_data) =
+            decode_without_checksum(&encoded).expect("failed to decode");
+
+        assert_eq!(decoded_hrp, hrp);
+        assert_eq!(decoded_data, data);
     }
 
     #[test]
