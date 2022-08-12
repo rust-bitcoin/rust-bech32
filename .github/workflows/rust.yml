@@ -70,7 +70,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Set up QEMU
-        run: sudo apt install qemu-system-arm
+        run: sudo apt update && sudo apt install -y qemu-system-arm gcc-arm-none-eabi
       - name: Checkout Toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -82,5 +82,5 @@ jobs:
       - name: Run
         env:
           RUSTFLAGS: "-C link-arg=-Tlink.x"
-          CARGO_TARGET_THUMBV7M_NONE_EABI_RUNNER: "qemu-system-arm -cpu cortex-m3 -machine lm3s6965evb -nographic -semihosting-config enable=on,target=native -kernel"
+          CARGO_TARGET_THUMBV7M_NONE_EABI_RUNNER: "qemu-system-arm -cpu cortex-m3 -machine mps2-an385 -nographic -semihosting-config enable=on,target=native -kernel"
         run: cd embedded && cargo run --target thumbv7m-none-eabi
