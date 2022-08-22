@@ -659,22 +659,22 @@ const GEN: [u32; 5] = [
     0x2a14_62b3,
 ];
 
-/// Error types for Bech32 encoding / decoding
+/// Error types for Bech32 encoding / decoding.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Error {
-    /// String does not contain the separator character
+    /// String does not contain the separator character.
     MissingSeparator,
-    /// The checksum does not match the rest of the data
+    /// The checksum does not match the rest of the data.
     InvalidChecksum,
-    /// The data or human-readable part is too long or too short
+    /// The data or human-readable part is too long or too short.
     InvalidLength,
-    /// Some part of the string contains an invalid character
+    /// Some part of the string contains an invalid character.
     InvalidChar(char),
-    /// Some part of the data has an invalid value
+    /// Some part of the data has an invalid value.
     InvalidData(u8),
-    /// The bit conversion failed due to a padding issue
+    /// The bit conversion failed due to a padding issue.
     InvalidPadding,
-    /// The whole string must be of one case
+    /// The whole string must be of one case.
     MixedCase,
 }
 
@@ -692,17 +692,14 @@ impl fmt::Display for Error {
     }
 }
 
-#[cfg(any(feature = "std", test))]
+#[cfg(feature = "std")]
 impl std::error::Error for Error {
-    fn description(&self) -> &str {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        use self::Error::*;
+
         match *self {
-            Error::MissingSeparator => "missing human-readable separator",
-            Error::InvalidChecksum => "invalid checksum",
-            Error::InvalidLength => "invalid length",
-            Error::InvalidChar(_) => "invalid character",
-            Error::InvalidData(_) => "invalid data point",
-            Error::InvalidPadding => "invalid padding",
-            Error::MixedCase => "mixed-case strings not allowed",
+            MissingSeparator | InvalidChecksum | InvalidLength | InvalidChar(_)
+            | InvalidData(_) | InvalidPadding | MixedCase => None,
         }
     }
 }
