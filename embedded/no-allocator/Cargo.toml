@@ -5,11 +5,21 @@ readme = "README.md"
 name = "no-allocator"
 version = "0.1.0"
 
+[dependencies]
+cortex-m = "0.6.0"
+cortex-m-rt = "0.6.10"
+cortex-m-semihosting = "0.3.3"
+panic-halt = "0.2.0"
+arrayvec = { version = "0.7.1", default-features = false }
+bech32 = { path = "../../", default-features = false, features = ["arrayvec"] }
+
+[[bin]]
+name = "no-allocator"
+test = false
+bench = false
+
 [profile.dev]
 panic = "abort"
 
 [profile.release]
 panic = "abort"
-
-[dependencies]
-bech32 = { path = "../../", default_features = false }

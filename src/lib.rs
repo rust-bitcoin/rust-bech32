@@ -63,18 +63,19 @@ extern crate alloc;
 #[cfg(any(test, feature = "std"))]
 extern crate core;
 
-#[cfg(all(feature = "alloc", not(feature = "std")))]
+#[cfg(all(feature = "alloc", not(feature = "std"), not(test)))]
 use alloc::borrow::Cow;
-#[cfg(all(feature = "alloc", not(feature = "std")))]
+#[cfg(all(feature = "alloc", not(feature = "std"), not(test)))]
 use alloc::{string::String, vec::Vec};
-#[cfg(feature = "alloc")]
-use core::convert::Infallible;
-use core::convert::TryFrom;
+use core::convert::{Infallible, TryFrom};
 use core::{fmt, mem};
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", all(feature = "alloc", test)))]
 use std::borrow::Cow;
 
 mod error;
+
+#[cfg(feature = "arrayvec")]
+use arrayvec::{ArrayVec, CapacityError};
 
 /// Integer in the range `0..32`
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Default, PartialOrd, Ord, Hash)]
@@ -151,10 +152,10 @@ impl AsRef<u8> for u5 {
 /// Interface to write `u5`s into a sink
 pub trait WriteBase32 {
     /// Write error
-    type Err: fmt::Debug;
+    type Error: fmt::Debug;
 
     /// Write a `u5` slice
-    fn write(&mut self, data: &[u5]) -> Result<(), Self::Err> {
+    fn write(&mut self, data: &[u5]) -> Result<(), Self::Error> {
         for b in data {
             self.write_u5(*b)?;
         }
@@ -162,7 +163,26 @@ pub trait WriteBase32 {
     }
 
     /// Write a single `u5`
-    fn write_u5(&mut self, data: u5) -> Result<(), Self::Err>;
+    fn write_u5(&mut self, data: u5) -> Result<(), Self::Error> { self.write(&[data]) }
+}
+
+/// Interface to write `u8`s into a sink
+///
+/// Like `std::io::Writer`, but because the associated type is no_std compatible.
+pub trait WriteBase256 {
+    /// Write error
+    type Error: fmt::Debug;
+
+    /// Write a `u8` slice
+    fn write(&mut self, data: &[u8]) -> Result<(), Self::Error> {
+        for b in data {
+            self.write_u8(*b)?;
+        }
+        Ok(())
+    }
+
+    /// Write a single `u8`
+    fn write_u8(&mut self, data: u8) -> Result<(), Self::Error> { self.write(&[data]) }
 }
 
 const CHECKSUM_LENGTH: usize = 6;
@@ -237,7 +257,7 @@ impl<'a> Bech32Writer<'a> {
 }
 
 impl<'a> WriteBase32 for Bech32Writer<'a> {
-    type Err = fmt::Error;
+    type Error = fmt::Error;
 
     /// Writes a single 5 bit value of the data part
     fn write_u5(&mut self, data: u5) -> fmt::Result {
@@ -256,40 +276,93 @@ impl<'a> Drop for Bech32Writer<'a> {
 /// `ToBase32`.
 pub trait FromBase32: Sized {
     /// The associated error which can be returned from parsing (e.g. because of bad padding).
-    type Err;
+    type Error;
 
     /// Convert a base32 slice to `Self`.
-    fn from_base32(b32: &[u5]) -> Result<Self, Self::Err>;
+    fn from_base32(b32: &[u5]) -> Result<Self, Self::Error>;
 }
 
-#[cfg(feature = "alloc")]
-impl WriteBase32 for Vec<u5> {
-    type Err = Infallible;
+macro_rules! write_base_n {
+    { $tr:ident, $ty:ident, $meth:ident } => {
+        #[cfg(feature = "arrayvec")]
+        impl<const L: usize> $tr for ArrayVec<$ty, L> {
+            type Error = CapacityError;
 
-    fn write(&mut self, data: &[u5]) -> Result<(), Self::Err> {
-        self.extend_from_slice(data);
-        Ok(())
+            fn write(&mut self, data: &[$ty]) -> Result<(), Self::Error> {
+                self.try_extend_from_slice(data)?;
+                Ok(())
+            }
+
+            fn $meth(&mut self, data: $ty) -> Result<(), Self::Error> {
+                self.push(data);
+                Ok(())
+            }
+        }
+
+        #[cfg(feature = "alloc")]
+        impl $tr for Vec<$ty> {
+            type Error = Infallible;
+
+            fn write(&mut self, data: &[$ty]) -> Result<(), Self::Error> {
+                self.extend_from_slice(data);
+                Ok(())
+            }
+
+            fn $meth(&mut self, data: $ty) -> Result<(), Self::Error> {
+                self.push(data);
+                Ok(())
+            }
+        }
     }
+}
 
-    fn write_u5(&mut self, data: u5) -> Result<(), Self::Err> {
-        self.push(data);
-        Ok(())
+write_base_n! { WriteBase32, u5, write_u5 }
+write_base_n! { WriteBase256, u8, write_u8 }
+
+#[cfg(feature = "arrayvec")]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+/// Combination of Errors for use with array vec
+pub enum ComboError {
+    /// Error from this crate
+    Bech32Error(Error),
+    /// Error from `arrayvec`.
+    WriteError(CapacityError),
+}
+#[cfg(feature = "arrayvec")]
+impl From<Error> for ComboError {
+    fn from(e: Error) -> ComboError { ComboError::Bech32Error(e) }
+}
+#[cfg(feature = "arrayvec")]
+impl From<CapacityError> for ComboError {
+    fn from(e: CapacityError) -> ComboError { ComboError::WriteError(e) }
+}
+
+#[cfg(feature = "arrayvec")]
+impl<const L: usize> FromBase32 for ArrayVec<u8, L> {
+    type Error = ComboError;
+
+    /// Convert base32 to base256, removes null-padding if present, returns
+    /// `Err(Error::InvalidPadding)` if padding bits are unequal `0`
+    fn from_base32(b32: &[u5]) -> Result<Self, Self::Error> {
+        let mut ret: ArrayVec<u8, L> = ArrayVec::new();
+        convert_bits_in::<ComboError, _, _>(b32, 5, 8, false, &mut ret)?;
+        Ok(ret)
     }
 }
 
 #[cfg(feature = "alloc")]
 impl FromBase32 for Vec<u8> {
-    type Err = Error;
+    type Error = Error;
 
     /// Convert base32 to base256, removes null-padding if present, returns
     /// `Err(Error::InvalidPadding)` if padding bits are unequal `0`
-    fn from_base32(b32: &[u5]) -> Result<Self, Self::Err> { convert_bits(b32, 5, 8, false) }
+    fn from_base32(b32: &[u5]) -> Result<Self, Self::Error> { convert_bits(b32, 5, 8, false) }
 }
 
 /// A trait for converting a value to a type `T` that represents a `u5` slice.
-#[cfg(feature = "alloc")]
 pub trait ToBase32 {
     /// Convert `Self` to base32 vector
+    #[cfg(feature = "alloc")]
     fn to_base32(&self) -> Vec<u5> {
         let mut vec = Vec::new();
         self.write_base32(&mut vec).unwrap();
@@ -298,19 +371,21 @@ pub trait ToBase32 {
 
     /// Encode as base32 and write it to the supplied writer
     /// Implementations shouldn't allocate.
-    fn write_base32<W: WriteBase32>(&self, writer: &mut W) -> Result<(), <W as WriteBase32>::Err>;
+    fn write_base32<W: WriteBase32>(&self, writer: &mut W)
+        -> Result<(), <W as WriteBase32>::Error>;
 }
 
 /// Interface to calculate the length of the base32 representation before actually serializing
-#[cfg(feature = "alloc")]
 pub trait Base32Len: ToBase32 {
     /// Calculate the base32 serialized length
     fn base32_len(&self) -> usize;
 }
 
-#[cfg(feature = "alloc")]
 impl<T: AsRef<[u8]> + ?Sized> ToBase32 for T {
-    fn write_base32<W: WriteBase32>(&self, writer: &mut W) -> Result<(), <W as WriteBase32>::Err> {
+    fn write_base32<W: WriteBase32>(
+        &self,
+        writer: &mut W,
+    ) -> Result<(), <W as WriteBase32>::Error> {
         // Amount of bits left over from last round, stored in buffer.
         let mut buffer_bits = 0u32;
         // Holds all unwritten bits left over from last round. The bits are stored beginning from
@@ -353,7 +428,6 @@ impl<T: AsRef<[u8]> + ?Sized> ToBase32 for T {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl<T: AsRef<[u8]> + ?Sized> Base32Len for T {
     fn base32_len(&self) -> usize {
         let bits = self.as_ref().len() * 8;
@@ -367,28 +441,42 @@ impl<T: AsRef<[u8]> + ?Sized> Base32Len for T {
 
 /// A trait to convert between u8 arrays and u5 arrays without changing the content of the elements,
 /// but checking that they are in range.
-pub trait CheckBase32<T: AsRef<[u5]>> {
+pub trait CheckBase32<T> {
     /// Error type if conversion fails
-    type Err;
+    type Error;
 
     /// Check if all values are in range and return array-like struct of `u5` values
-    fn check_base32(self) -> Result<T, Self::Err>;
+    fn check_base32(self) -> Result<T, Self::Error>;
 }
 
-#[cfg(feature = "alloc")]
-impl<T: AsRef<[u8]>> CheckBase32<Vec<u5>> for T {
-    type Err = Error;
+impl<T, U: AsRef<[u8]>> CheckBase32<T> for U
+where
+    T: AsRef<[u5]>,
+    T: core::iter::FromIterator<u5>,
+{
+    type Error = Error;
 
-    fn check_base32(self) -> Result<Vec<u5>, Self::Err> {
+    fn check_base32(self) -> Result<T, Self::Error> {
         self.as_ref()
             .iter()
             .map(|x| u5::try_from(*x).map_err(Error::TryFrom))
-            .collect::<Result<Vec<u5>, Error>>()
+            .collect::<Result<T, Error>>()
+    }
+}
+
+impl<U: AsRef<[u8]>> CheckBase32<()> for U {
+    type Error = Error;
+
+    fn check_base32(self) -> Result<(), Error> {
+        self.as_ref()
+            .iter()
+            .map(|x| u5::try_from(*x).map(|_| ()).map_err(Error::TryFrom))
+            .find(|r| r.is_err())
+            .unwrap_or(Ok(()))
     }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-#[cfg(feature = "alloc")]
 enum Case {
     Upper,
     Lower,
@@ -401,7 +489,6 @@ enum Case {
 /// * **MixedCase**: If the HRP contains both uppercase and lowercase characters.
 /// * **InvalidChar**: If the HRP contains any non-ASCII characters (outside 33..=126).
 /// * **InvalidLength**: If the HRP is outside 1..83 characters long.
-#[cfg(feature = "alloc")]
 fn check_hrp(hrp: &str) -> Result<Case, Error> {
     if hrp.is_empty() || hrp.len() > 83 {
         return Err(Error::InvalidLength);
@@ -453,7 +540,20 @@ pub fn encode_to_fmt<T: AsRef<[u5]>>(
         Case::Lower | Case::None => Cow::Borrowed(hrp),
     };
 
-    match Bech32Writer::new(&hrp_lower, variant, fmt) {
+    encode_to_fmt_anycase(fmt, &hrp_lower, data, variant)
+}
+
+/// Encode a bech32 payload to an [fmt::Write], but with any case.
+/// This method is intended for implementing traits from [core::fmt] without [std].
+///
+/// See `encode_to_fmt` for meaning of errors.
+pub fn encode_to_fmt_anycase<T: AsRef<[u5]>>(
+    fmt: &mut fmt::Write,
+    hrp: &str,
+    data: T,
+    variant: Variant,
+) -> Result<fmt::Result, Error> {
+    match Bech32Writer::new(hrp, variant, fmt) {
         Ok(mut writer) => {
             Ok(writer.write(data.as_ref()).and_then(|_| {
                 // Finalize manually to avoid panic on drop if write fails
@@ -471,12 +571,12 @@ pub fn encode_to_fmt<T: AsRef<[u5]>>(
 /// * If [check_hrp] returns an error for the given HRP.
 /// # Deviations from standard
 /// * No length limits are enforced for the data part
-#[cfg(feature = "alloc")]
 pub fn encode_without_checksum_to_fmt<T: AsRef<[u5]>>(
     fmt: &mut fmt::Write,
     hrp: &str,
     data: T,
 ) -> Result<fmt::Result, Error> {
+    #[cfg(feature = "alloc")]
     let hrp = match check_hrp(hrp)? {
         Case::Upper => Cow::Owned(hrp.to_lowercase()),
         Case::Lower | Case::None => Cow::Borrowed(hrp),
@@ -510,7 +610,6 @@ const BECH32M_CONST: u32 = 0x2bc8_30a3;
 
 impl Variant {
     // Produce the variant based on the remainder of the polymod operation
-    #[cfg(feature = "alloc")]
     fn from_remainder(c: u32) -> Option<Self> {
         match c {
             BECH32_CONST => Some(Variant::Bech32),
@@ -639,27 +738,108 @@ fn split_and_decode(s: &str) -> Result<(String, Vec<u5>), Error> {
     Ok((hrp_lower, data))
 }
 
+// TODO deduplicate some
+/// Decode a lowercase bech32 string into the raw HRP and the data bytes.
+///
+/// Less flexible than [decode], but don't allocate.
+pub fn decode_lowercase<'a, 'b, E, R, S>(
+    s: &'a str,
+    data: &'b mut R,
+    scratch: &mut S,
+) -> Result<(&'a str, &'b [u5], Variant), E>
+where
+    R: WriteBase32 + AsRef<[u5]>,
+    S: WriteBase32 + AsRef<[u5]>,
+    E: From<R::Error>,
+    E: From<S::Error>,
+    E: From<Error>,
+{
+    // Ensure overall length is within bounds
+    if s.len() < 8 {
+        Err(Error::InvalidLength)?;
+    }
+
+    // Split at separator and check for two pieces
+    let (hrp_lower, raw_data) = match s.rfind(SEP) {
+        None => Err(Error::MissingSeparator)?,
+        Some(sep) => {
+            let (hrp, data) = s.split_at(sep);
+            (hrp, &data[1..])
+        }
+    };
+    if raw_data.len() < 6 {
+        Err(Error::InvalidLength)?;
+    }
+
+    let case = match check_hrp(hrp_lower)? {
+        Case::Upper => Err(Error::MixedCase)?,
+        // already lowercase
+        Case::Lower | Case::None => Case::Lower,
+    };
+
+    // Check data payload
+    for c in raw_data.chars() {
+        // Only check if c is in the ASCII range, all invalid ASCII
+        // characters have the value -1 in CHARSET_REV (which covers
+        // the whole ASCII range) and will be filtered out later.
+        if !c.is_ascii() {
+            Err(Error::InvalidChar(c))?;
+        }
+
+        match case {
+            Case::Upper => Err(Error::MixedCase)?,
+            Case::None | Case::Lower => {}
+        }
+
+        // c should be <128 since it is in the ASCII range, CHARSET_REV.len() == 128
+        let num_value = CHARSET_REV[c as usize];
+
+        if !(0..32).contains(&num_value) {
+            Err(Error::InvalidChar(c))?;
+        }
+
+        data.write_u5(
+            u5::try_from(num_value as u8).expect("range checked above, num_value <= 31"),
+        )?;
+    }
+
+    // Ensure checksum
+    let variant = verify_checksum_in(hrp_lower.as_bytes(), data.as_ref(), scratch)?
+        .ok_or(Error::MissingSeparator)?;
+
+    let dbl: usize = data.as_ref().len();
+    Ok((hrp_lower, &(*data).as_ref()[..dbl.saturating_sub(6)], variant))
+}
+
 #[cfg(feature = "alloc")]
 fn verify_checksum(hrp: &[u8], data: &[u5]) -> Option<Variant> {
-    let mut exp = hrp_expand(hrp);
-    exp.extend_from_slice(data);
-    Variant::from_remainder(polymod(&exp))
-}
-
-#[cfg(feature = "alloc")]
-fn hrp_expand(hrp: &[u8]) -> Vec<u5> {
     let mut v: Vec<u5> = Vec::new();
-    for b in hrp {
-        v.push(u5::try_from(*b >> 5).expect("can't be out of range, max. 7"));
+    match verify_checksum_in(hrp, data, &mut v) {
+        Ok(v) => v,
+        Err(e) => match e {},
     }
-    v.push(u5::try_from(0).unwrap());
-    for b in hrp {
-        v.push(u5::try_from(*b & 0x1f).expect("can't be out of range, max. 31"));
-    }
-    v
 }
 
-#[cfg(feature = "alloc")]
+fn verify_checksum_in<T>(hrp: &[u8], data: &[u5], v: &mut T) -> Result<Option<Variant>, T::Error>
+where
+    T: WriteBase32 + AsRef<[u5]>,
+{
+    hrp_expand_in(hrp, v)?;
+    v.write(data)?;
+    Ok(Variant::from_remainder(polymod(v.as_ref())))
+}
+
+fn hrp_expand_in<T: WriteBase32>(hrp: &[u8], v: &mut T) -> Result<(), T::Error> {
+    for b in hrp {
+        v.write_u5(u5::try_from(*b >> 5).expect("can't be out of range, max. 7"))?;
+    }
+    v.write_u5(u5::try_from(0).unwrap())?;
+    for b in hrp {
+        v.write_u5(u5::try_from(*b & 0x1f).expect("can't be out of range, max. 31"))?;
+    }
+    Ok(())
+}
+
 fn polymod(values: &[u5]) -> u32 {
     let mut chk: u32 = 1;
     let mut b: u8;
@@ -688,7 +868,6 @@ const CHARSET: [char; 32] = [
 ];
 
 /// Reverse character set. Maps ASCII byte -> CHARSET index on [0,31]
-#[cfg(feature = "alloc")]
 const CHARSET_REV: [i8; 128] = [
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -720,6 +899,10 @@ pub enum Error {
     Overflow,
     /// Conversion to u5 failed.
     TryFrom(TryFromIntError),
+}
+
+impl From<Infallible> for Error {
+    fn from(v: Infallible) -> Self { match v {} }
 }
 
 impl fmt::Display for Error {
@@ -815,50 +998,94 @@ pub fn convert_bits<T>(data: &[T], from: u32, to: u32, pad: bool) -> Result<Vec<
 where
     T: Into<u8> + Copy,
 {
+    let mut ret: Vec<u8> = Vec::new();
+    convert_bits_in::<Error, _, _>(data, from, to, pad, &mut ret)?;
+    Ok(ret)
+}
+
+/// Convert between bit sizes without allocating
+///
+/// Like [convert_bits].
+pub fn convert_bits_in<E, T, R>(
+    data: &[T],
+    from: u32,
+    to: u32,
+    pad: bool,
+    ret: &mut R,
+) -> Result<(), E>
+where
+    T: Into<u8> + Copy,
+    R: WriteBase256,
+    E: From<Error>,
+    E: From<R::Error>,
+{
     if from > 8 || to > 8 || from == 0 || to == 0 {
         panic!("convert_bits `from` and `to` parameters 0 or greater than 8");
     }
     let mut acc: u32 = 0;
     let mut bits: u32 = 0;
-    let mut ret: Vec<u8> = Vec::new();
     let maxv: u32 = (1 << to) - 1;
     for value in data {
         let v: u32 = u32::from(Into::<u8>::into(*value));
         if (v >> from) != 0 {
             // Input value exceeds `from` bit size
-            return Err(Error::Overflow);
+            Err(Error::Overflow)?;
         }
         acc = (acc << from) | v;
         bits += from;
         while bits >= to {
             bits -= to;
-            ret.push(((acc >> bits) & maxv) as u8);
+            ret.write_u8(((acc >> bits) & maxv) as u8)?;
         }
     }
     if pad {
         if bits > 0 {
-            ret.push(((acc << (to - bits)) & maxv) as u8);
+            ret.write_u8(((acc << (to - bits)) & maxv) as u8)?;
         }
     } else if bits >= from || ((acc << (to - bits)) & maxv) != 0 {
-        return Err(Error::InvalidPadding);
+        Err(Error::InvalidPadding)?;
     }
-    Ok(ret)
+    Ok(())
 }
 
 #[cfg(test)]
-#[cfg(feature = "alloc")] // Note, all the unit tests currently require an allocator.
 mod tests {
+    #[cfg(feature = "arrayvec")]
+    use arrayvec::ArrayString;
+
     use super::*;
 
+    trait TextExt {
+        fn check_base32_vec(self) -> Result<Vec<u5>, Error>;
+    }
+    impl<U: AsRef<[u8]>> TextExt for U {
+        fn check_base32_vec(self) -> Result<Vec<u5>, Error> { self.check_base32() }
+    }
+
     #[test]
+    #[cfg(feature = "alloc")]
+    fn getters_in() {
+        let mut data_scratch = Vec::new();
+        let mut scratch = Vec::new();
+        let decoded =
+            decode_lowercase::<Error, _, _>("bc1sw50qa3jx3s", &mut data_scratch, &mut scratch)
+                .unwrap();
+        let data = [16, 14, 20, 15, 0].check_base32_vec().unwrap();
+        assert_eq!(decoded.0, "bc");
+        assert_eq!(decoded.1, data.as_slice());
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
     fn getters() {
         let decoded = decode("BC1SW50QA3JX3S").unwrap();
-        let data = [16, 14, 20, 15, 0].check_base32().unwrap();
+        let data = [16, 14, 20, 15, 0].check_base32_vec().unwrap();
         assert_eq!(&decoded.0, "bc");
         assert_eq!(decoded.1, data.as_slice());
     }
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn valid_checksum() {
         let strings: Vec<&str> = vec!(
             // Bech32
@@ -888,6 +1115,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn invalid_strings() {
         let pairs: Vec<(&str, Error)> = vec!(
             (" 1nwldj5",
@@ -948,6 +1176,7 @@ mod tests {
 
     #[test]
     #[allow(clippy::type_complexity)]
+    #[cfg(feature = "alloc")]
     fn valid_conversion() {
         // Set of [data, from_bits, to_bits, pad, result]
         let tests: Vec<(Vec<u8>, u32, u32, bool, Vec<u8>)> = vec![
@@ -969,6 +1198,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn invalid_conversion() {
         // Set of [data, from_bits, to_bits, pad, expected error]
         let tests: Vec<(Vec<u8>, u32, u32, bool, Error)> = vec![
@@ -984,6 +1214,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn convert_bits_invalid_bit_size() {
         use std::panic::{catch_unwind, set_hook, take_hook};
 
@@ -1001,37 +1232,40 @@ mod tests {
 
     #[test]
     fn check_base32() {
-        assert!([0u8, 1, 2, 30, 31].check_base32().is_ok());
-        assert!([0u8, 1, 2, 30, 31, 32].check_base32().is_err());
-        assert!([0u8, 1, 2, 30, 31, 255].check_base32().is_err());
+        assert!([0u8, 1, 2, 30, 31].check_base32_vec().is_ok());
+        assert!([0u8, 1, 2, 30, 31, 32].check_base32_vec().is_err());
+        assert!([0u8, 1, 2, 30, 31, 255].check_base32_vec().is_err());
 
-        assert!([1u8, 2, 3, 4].check_base32().is_ok());
+        assert!([1u8, 2, 3, 4].check_base32_vec().is_ok());
         assert_eq!(
-            [30u8, 31, 35, 20].check_base32(),
+            [30u8, 31, 35, 20].check_base32_vec(),
             Err(Error::TryFrom(TryFromIntError::PosOverflow))
         )
     }
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn test_encode() {
         assert_eq!(
-            encode("", vec![1u8, 2, 3, 4].check_base32().unwrap(), Variant::Bech32),
+            encode("", vec![1u8, 2, 3, 4].check_base32_vec().unwrap(), Variant::Bech32),
             Err(Error::InvalidLength)
         );
     }
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn from_base32() {
-        assert_eq!(Vec::from_base32(&[0x1f, 0x1c].check_base32().unwrap()), Ok(vec![0xff]));
+        assert_eq!(Vec::from_base32(&[0x1f, 0x1c].check_base32_vec().unwrap()), Ok(vec![0xff]));
         assert_eq!(
-            Vec::from_base32(&[0x1f, 0x1f].check_base32().unwrap()),
+            Vec::from_base32(&[0x1f, 0x1f].check_base32_vec().unwrap()),
             Err(Error::InvalidPadding)
         );
     }
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn to_base32() {
-        assert_eq!([0xffu8].to_base32(), [0x1f, 0x1c].check_base32().unwrap());
+        assert_eq!([0xffu8].to_base32(), [0x1f, 0x1c].check_base32_vec().unwrap());
     }
 
     #[test]
@@ -1051,6 +1285,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn write_with_checksum() {
         let hrp = "lnbc";
         let data = "Hello World!".as_bytes().to_base32();
@@ -1068,6 +1303,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn write_without_checksum() {
         let hrp = "lnbc";
         let data = "Hello World!".as_bytes().to_base32();
@@ -1084,6 +1320,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn write_with_checksum_on_drop() {
         let hrp = "lntb";
         let data = "Hello World!".as_bytes().to_base32();
@@ -1100,6 +1337,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn roundtrip_without_checksum() {
         let hrp = "lnbc";
         let data = "Hello World!".as_bytes().to_base32();
@@ -1113,6 +1351,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn test_hrp_case() {
         // Tests for issue with HRP case checking being ignored for encoding
         let encoded_str = encode("HRP", [0x00, 0x00].to_base32(), Variant::Bech32).unwrap();
@@ -1127,5 +1366,31 @@ mod tests {
         assert!(u5::try_from(32_u32).is_err());
         assert!(u5::try_from(32_u64).is_err());
         assert!(u5::try_from(32_u128).is_err());
+    }
+
+    #[test]
+    #[cfg(feature = "arrayvec")]
+    fn test_arrayvec() {
+        let mut encoded = ArrayString::<30>::new();
+
+        let mut base32 = ArrayVec::<u5, 30>::new();
+
+        [0x00u8, 0x01, 0x02].write_base32(&mut base32).unwrap();
+
+        encode_to_fmt_anycase(&mut encoded, "bech32", &base32, Variant::Bech32).unwrap().unwrap();
+        assert_eq!(&*encoded, "bech321qqqsyrhqy2a");
+
+        println!("{}", encoded);
+
+        let mut decoded = ArrayVec::<u5, 30>::new();
+
+        let mut scratch = ArrayVec::<u5, 30>::new();
+
+        let (hrp, data, variant) =
+            decode_lowercase::<ComboError, _, _>(&encoded, &mut decoded, &mut scratch).unwrap();
+        assert_eq!(hrp, "bech32");
+        let res = ArrayVec::<u8, 30>::from_base32(data).unwrap();
+        assert_eq!(&res, [0x00, 0x01, 0x02].as_ref());
+        assert_eq!(variant, Variant::Bech32);
     }
 }

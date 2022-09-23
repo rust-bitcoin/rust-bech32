@@ -88,7 +88,14 @@ jobs:
     steps:
       - name: Checkout Crate
         uses: actions/checkout@v3
+      - name: Set up QEMU
+        run: sudo apt update && sudo apt install -y qemu-system-arm gcc-arm-none-eabi
       - name: Checkout Toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: thumbv7m-none-eabi
       - name: Run
-        run: cd embedded/no-allocator && cargo rustc -- -C link-arg=-nostartfiles
+        env:
+          RUSTFLAGS: "-C link-arg=-Tlink.x"
+          CARGO_TARGET_THUMBV7M_NONE_EABI_RUNNER: "qemu-system-arm -cpu cortex-m3 -machine mps2-an385 -nographic -semihosting-config enable=on,target=native -kernel"
+        run: cd embedded/no-allocator && cargo run --target thumbv7m-none-eabi
