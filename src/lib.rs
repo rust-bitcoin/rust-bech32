@@ -67,7 +67,7 @@ extern crate core;
 use alloc::borrow::Cow;
 #[cfg(all(not(feature = "std"), not(test)))]
 use alloc::{string::String, vec::Vec};
-use core::convert::Infallible;
+use core::convert::{Infallible, TryFrom};
 use core::{fmt, mem};
 #[cfg(any(feature = "std", test))]
 use std::borrow::Cow;
@@ -78,15 +78,6 @@ use std::borrow::Cow;
 pub struct u5(u8);
 
 impl u5 {
-    /// Convert a `u8` to `u5` if in range, return `Error` otherwise
-    pub fn try_from_u8(value: u8) -> Result<u5, Error> {
-        if value > 31 {
-            Err(Error::InvalidData(value))
-        } else {
-            Ok(u5(value))
-        }
-    }
-
     /// Returns a copy of the underlying `u8` value
     pub fn to_u8(self) -> u8 { self.0 }
 
@@ -96,6 +87,19 @@ impl u5 {
 
 impl From<u5> for u8 {
     fn from(v: u5) -> u8 { v.0 }
+}
+
+impl TryFrom<u8> for u5 {
+    type Error = Error;
+
+    /// Errors if `value` is out of range.
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        if value > 31 {
+            Err(Error::InvalidData(value))
+        } else {
+            Ok(u5(value))
+        }
+    }
 }
 
 impl AsRef<u8> for u5 {
@@ -327,7 +331,7 @@ impl<T: AsRef<[u8]>> CheckBase32<Vec<u5>> for T {
     type Err = Error;
 
     fn check_base32(self) -> Result<Vec<u5>, Self::Err> {
-        self.as_ref().iter().map(|x| u5::try_from_u8(*x)).collect::<Result<Vec<u5>, Error>>()
+        self.as_ref().iter().map(|x| u5::try_from(*x)).collect::<Result<Vec<u5>, Error>>()
     }
 }
 
@@ -566,7 +570,7 @@ fn split_and_decode(s: &str) -> Result<(String, Vec<u5>), Error> {
                 return Err(Error::InvalidChar(c));
             }
 
-            Ok(u5::try_from_u8(num_value as u8).expect("range checked above, num_value <= 31"))
+            Ok(u5::try_from(num_value as u8).expect("range checked above, num_value <= 31"))
         })
         .collect::<Result<Vec<u5>, Error>>()?;
 
@@ -582,11 +586,11 @@ fn verify_checksum(hrp: &[u8], data: &[u5]) -> Option<Variant> {
 fn hrp_expand(hrp: &[u8]) -> Vec<u5> {
     let mut v: Vec<u5> = Vec::new();
     for b in hrp {
-        v.push(u5::try_from_u8(*b >> 5).expect("can't be out of range, max. 7"));
+        v.push(u5::try_from(*b >> 5).expect("can't be out of range, max. 7"));
     }
-    v.push(u5::try_from_u8(0).unwrap());
+    v.push(u5::try_from(0).unwrap());
     for b in hrp {
-        v.push(u5::try_from_u8(*b & 0x1f).expect("can't be out of range, max. 31"));
+        v.push(u5::try_from(*b & 0x1f).expect("can't be out of range, max. 31"));
     }
     v
 }
