@@ -13,7 +13,9 @@ edition = "2018"
 
 [features]
 default = ["std"]
-std = []
+std = ["alloc"]
+alloc = []
+
 # Only for CI to make all warnings errors, do not activate otherwise (may break forward compatibility)
 strict = []
 
