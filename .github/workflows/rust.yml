@@ -1,82 +1,79 @@
-on: [pull_request]
+on: [push, pull_request]
 
 name: Continuous Integration
 
 jobs:
-  Test:
-    name: Test Suite
+  Stable:
+    name: Test - stable toolchain
     runs-on: ubuntu-latest
     strategy:
-      matrix:
-        rust:
-          - 1.41.1
-          - stable
-          - nightly
+      fail-fast: false
     steps:
       - name: Checkout Crate
-      - uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Checkout Toolchain
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ matrix.rust }}
-          override: true
-      - name: Run Test Script
-        env: ${{ matrix.rust }}
+        # https://github.com/dtolnay/rust-toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Running test script
+        env:
+          DO_LINT: true
         run: ./contrib/test.sh
 
-  fmt:
-    name: Rustfmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          override: true
-      - run: rustup component add rustfmt
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
-
-  clippy:
-    name: Clippy
+  Beta:
+    name: Test - beta toolchain
     runs-on: ubuntu-latest
     strategy:
-      matrix:
-        rust:
-          - stable
+      fail-fast: false
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ matrix.rust }}
-          override: true
-      - run: rustup component add clippy
-      - uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: -- -D warnings
+      - name: Checkout Crate
+        uses: actions/checkout@v3
+      - name: Checkout Toolchain
+        uses: dtolnay/rust-toolchain@beta
+      - name: Running test script
+        run: ./contrib/test.sh
+
+  Nightly:
+    name: Test - nightly toolchain
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Checkout Crate
+        uses: actions/checkout@v3
+      - name: Checkout Toolchain
+        uses: dtolnay/rust-toolchain@nightly
+      - name: Running test script
+        env:
+          DO_FMT: true
+        run: ./contrib/test.sh
+
+  MSRV:
+    name: Test - 1.41.1 toolchain
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Checkout Crate
+        uses: actions/checkout@v3
+      - name: Checkout Toolchain
+        uses: dtolnay/rust-toolchain@1.41.1
+      - name: Running test script
+        run: ./contrib/test.sh
 
   EmbeddedWithAlloc:
     name: no_std with alloc
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+      - name: Checkout Crate
+        uses: actions/checkout@v3
       - name: Set up QEMU
         run: sudo apt update && sudo apt install -y qemu-system-arm gcc-arm-none-eabi
       - name: Checkout Toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@nightly
         with:
-          profile: minimal
-          toolchain: nightly
-          override: true
-          components: rust-src
-          target: thumbv7m-none-eabi
+          targets: thumbv7m-none-eabi
       - name: Run
         env:
           RUSTFLAGS: "-C link-arg=-Tlink.x"
@@ -87,14 +84,11 @@ jobs:
     name: no_std no alloc
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: rustc
-          args: -- -C link-arg=-nostartfiles
+      - name: Checkout Crate
+        uses: actions/checkout@v3
+      - name: Checkout Toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Run
+        run: cd embedded/no-allocator && cargo rustc -- -C link-arg=-nostartfiles
