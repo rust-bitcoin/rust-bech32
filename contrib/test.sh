@@ -60,4 +60,15 @@ if [ "${DO_FEATURE_MATRIX-false}" = true ]; then
     fi
 fi
 
+# Build the docs if told to (this only works with the nightly toolchain)
+if [ "${DO_DOCSRS-false}" = true ]; then
+    RUSTDOCFLAGS="--cfg docsrs -D warnings -D rustdoc::broken-intra-doc-links" cargo +nightly doc --all-features
+fi
+
+# Build the docs with a stable toolchain, in unison with the DO_DOCSRS command
+# above this checks that we feature guarded docs imports correctly.
+if [ "${DO_DOCS-false}" = true ]; then
+    RUSTDOCFLAGS="-D warnings" cargo +stable doc --all-features
+fi
+
 exit 0
