@@ -30,10 +30,6 @@ assert_eq!(variant, Variant::Bech32);
 //!
 
 #![deny(missing_docs)]
-#![deny(non_upper_case_globals)]
-#![deny(non_camel_case_types)]
-#![deny(non_snake_case)]
-#![deny(unused_mut)]
 #![cfg_attr(all(not(feature = "std"), not(test)), no_std)]
 
 #[cfg(feature = "alloc")]
