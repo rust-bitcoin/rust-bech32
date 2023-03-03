@@ -148,6 +148,13 @@ impl AsRef<u8> for u5 {
     fn as_ref(&self) -> &u8 { &self.0 }
 }
 
+impl fmt::Display for u5 {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        let x = u8::from(*self);
+        fmt::Display::fmt(&x, fmt)
+    }
+}
+
 /// Interface to write `u5`s into a sink
 pub trait WriteBase32 {
     /// Write error
@@ -1127,5 +1134,42 @@ mod tests {
         assert!(u5::try_from(32_u32).is_err());
         assert!(u5::try_from(32_u64).is_err());
         assert!(u5::try_from(32_u128).is_err());
+    }
+
+    macro_rules! check_format {
+        ($($test_name:ident, $val:literal, $format_string:literal, $expected:literal);* $(;)?) => {
+            $(
+                #[test]
+                fn $test_name() {
+                    assert_eq!(format!($format_string, u5::try_from($val).unwrap()), $expected);
+                }
+            )*
+        }
+    }
+    check_format! {
+        check_fmt_0, 0_u8, "{}", "0";
+        check_fmt_1, 0_u8, "{:2}", " 0";
+        check_fmt_2, 0_u8, "{:02}", "00";
+
+        check_fmt_3, 1_u8, "{}", "1";
+        check_fmt_4, 1_u8, "{:2}", " 1";
+        check_fmt_5, 1_u8, "{:02}", "01";
+
+        check_fmt_10, 10_u8, "{}", "10";
+        check_fmt_11, 10_u8, "{:2}", "10";
+        check_fmt_12, 10_u8, "{:02}", "10";
+        check_fmt_13, 10_u8, "{:3}", " 10";
+        check_fmt_14, 10_u8, "{:03}", "010";
+
+        check_fmt_20, 1_u8, "{:<2}", "1 ";
+        check_fmt_21, 1_u8, "{:<02}", "01";
+        check_fmt_22, 1_u8, "{:>2}", " 1"; // This is default but check it anyways.
+        check_fmt_23, 1_u8, "{:>02}", "01";
+        check_fmt_24, 1_u8, "{:^3}", " 1 ";
+        check_fmt_25, 1_u8, "{:^03}", "001";
+        // Sanity check, for integral types precision is ignored.
+        check_fmt_30, 0_u8, "{:.1}", "0";
+        check_fmt_31, 0_u8, "{:4.1}", "   0";
+        check_fmt_32, 0_u8, "{:04.1}", "0000";
     }
 }
