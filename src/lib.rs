@@ -679,14 +679,16 @@ pub enum Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use Error::*;
+
         match *self {
-            Error::MissingSeparator => write!(f, "missing human-readable separator, \"{}\"", SEP),
-            Error::InvalidChecksum => write!(f, "invalid checksum"),
-            Error::InvalidLength => write!(f, "invalid length"),
-            Error::InvalidChar(n) => write!(f, "invalid character (code={})", n),
-            Error::InvalidData(n) => write!(f, "invalid data point ({})", n),
-            Error::InvalidPadding => write!(f, "invalid padding"),
-            Error::MixedCase => write!(f, "mixed-case strings not allowed"),
+            MissingSeparator => write!(f, "missing human-readable separator, \"{}\"", SEP),
+            InvalidChecksum => write!(f, "invalid checksum"),
+            InvalidLength => write!(f, "invalid length"),
+            InvalidChar(n) => write!(f, "invalid character (code={})", n),
+            InvalidData(n) => write!(f, "invalid data point ({})", n),
+            InvalidPadding => write!(f, "invalid padding"),
+            MixedCase => write!(f, "mixed-case strings not allowed"),
         }
     }
 }
@@ -694,7 +696,7 @@ impl fmt::Display for Error {
 #[cfg(feature = "std")]
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        use self::Error::*;
+        use Error::*;
 
         match *self {
             MissingSeparator | InvalidChecksum | InvalidLength | InvalidChar(_)
