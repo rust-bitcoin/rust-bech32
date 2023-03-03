@@ -269,7 +269,7 @@ pub trait Base32Len: ToBase32 {
 }
 
 #[cfg(feature = "alloc")]
-impl<T: AsRef<[u8]>> ToBase32 for T {
+impl<T: AsRef<[u8]> + ?Sized> ToBase32 for T {
     fn write_base32<W: WriteBase32>(&self, writer: &mut W) -> Result<(), <W as WriteBase32>::Err> {
         // Amount of bits left over from last round, stored in buffer.
         let mut buffer_bits = 0u32;
@@ -314,7 +314,7 @@ impl<T: AsRef<[u8]>> ToBase32 for T {
 }
 
 #[cfg(feature = "alloc")]
-impl<T: AsRef<[u8]>> Base32Len for T {
+impl<T: AsRef<[u8]> + ?Sized> Base32Len for T {
     fn base32_len(&self) -> usize {
         let bits = self.as_ref().len() * 8;
         if bits % 5 == 0 {
