@@ -74,6 +74,8 @@ use core::{fmt, mem};
 #[cfg(feature = "std")]
 use std::borrow::Cow;
 
+mod error;
+
 /// Integer in the range `0..32`
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Default, PartialOrd, Ord, Hash)]
 #[allow(non_camel_case_types)]
@@ -91,18 +93,56 @@ impl From<u5> for u8 {
     fn from(v: u5) -> u8 { v.0 }
 }
 
-impl TryFrom<u8> for u5 {
-    type Error = Error;
+macro_rules! impl_try_from_upper_bounded {
+    ($($ty:ident)+) => {
+        $(
+            impl TryFrom<$ty> for u5 {
+                type Error = TryFromIntError;
 
-    /// Errors if `value` is out of range.
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        if value > 31 {
-            Err(Error::InvalidData(value))
-        } else {
-            Ok(u5(value))
-        }
+                /// Tries to create the target number type from a source number type.
+                ///
+                /// # Errors
+                ///
+                /// Returns an error if `value` overflows a `u5`.
+                fn try_from(value: $ty) -> Result<Self, Self::Error> {
+                    if value > 31 {
+                        Err(TryFromIntError::PosOverflow)
+                    } else {
+                        let x = u8::try_from(value).expect("within range");
+                        Ok(u5(x))
+                    }
+                }
+            }
+        )+
     }
 }
+macro_rules! impl_try_from_both_bounded {
+    ($($ty:ident)+) => {
+        $(
+            impl TryFrom<$ty> for u5 {
+                type Error = TryFromIntError;
+
+                /// Tries to create the target number type from a source number type.
+                ///
+                /// # Errors
+                ///
+                /// Returns an error if `value` is outside of the range of a `u5`.
+                fn try_from(value: $ty) -> Result<Self, Self::Error> {
+                    if value < 0 {
+                        Err(TryFromIntError::NegOverflow)
+                    } else if value > 31 {
+                        Err(TryFromIntError::PosOverflow)
+                    } else {
+                        let x = u8::try_from(value).expect("within range");
+                        Ok(u5(x))
+                    }
+                }
+            }
+        )+
+    }
+}
+impl_try_from_upper_bounded!(u8 u16 u32 u64 u128);
+impl_try_from_both_bounded!(i8 i16 i32 i64 i128);
 
 impl AsRef<u8> for u5 {
     fn as_ref(&self) -> &u8 { &self.0 }
@@ -340,7 +380,10 @@ impl<T: AsRef<[u8]>> CheckBase32<Vec<u5>> for T {
     type Err = Error;
 
     fn check_base32(self) -> Result<Vec<u5>, Self::Err> {
-        self.as_ref().iter().map(|x| u5::try_from(*x)).collect::<Result<Vec<u5>, Error>>()
+        self.as_ref()
+            .iter()
+            .map(|x| u5::try_from(*x).map_err(Error::TryFrom))
+            .collect::<Result<Vec<u5>, Error>>()
     }
 }
 
@@ -669,24 +712,29 @@ pub enum Error {
     InvalidLength,
     /// Some part of the string contains an invalid character.
     InvalidChar(char),
-    /// Some part of the data has an invalid value.
-    InvalidData(u8),
     /// The bit conversion failed due to a padding issue.
     InvalidPadding,
     /// The whole string must be of one case.
     MixedCase,
+    /// Attempted to convert a value which overflows a `u5`.
+    Overflow,
+    /// Conversion to u5 failed.
+    TryFrom(TryFromIntError),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use Error::*;
+
         match *self {
-            Error::MissingSeparator => write!(f, "missing human-readable separator, \"{}\"", SEP),
-            Error::InvalidChecksum => write!(f, "invalid checksum"),
-            Error::InvalidLength => write!(f, "invalid length"),
-            Error::InvalidChar(n) => write!(f, "invalid character (code={})", n),
-            Error::InvalidData(n) => write!(f, "invalid data point ({})", n),
-            Error::InvalidPadding => write!(f, "invalid padding"),
-            Error::MixedCase => write!(f, "mixed-case strings not allowed"),
+            MissingSeparator => write!(f, "missing human-readable separator, \"{}\"", SEP),
+            InvalidChecksum => write!(f, "invalid checksum"),
+            InvalidLength => write!(f, "invalid length"),
+            InvalidChar(n) => write!(f, "invalid character (code={})", n),
+            InvalidPadding => write!(f, "invalid padding"),
+            MixedCase => write!(f, "mixed-case strings not allowed"),
+            TryFrom(ref e) => write_err!(f, "conversion to u5 failed"; e),
+            Overflow => write!(f, "attempted to convert a value which overflows a u5"),
         }
     }
 }
@@ -694,14 +742,56 @@ impl fmt::Display for Error {
 #[cfg(feature = "std")]
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        use self::Error::*;
+        use Error::*;
 
         match *self {
+            TryFrom(ref e) => Some(e),
             MissingSeparator | InvalidChecksum | InvalidLength | InvalidChar(_)
-            | InvalidData(_) | InvalidPadding | MixedCase => None,
+            | InvalidPadding | MixedCase | Overflow => None,
         }
     }
 }
+
+impl From<TryFromIntError> for Error {
+    fn from(e: TryFromIntError) -> Self { Error::TryFrom(e) }
+}
+
+/// Error return when TryFrom<T> fails for T -> u5 conversion.
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub enum TryFromIntError {
+    /// Attempted to convert a negative value to a `u5`.
+    NegOverflow,
+    /// Attempted to convert a value which overflows a `u5`.
+    PosOverflow,
+}
+
+impl fmt::Display for TryFromIntError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use TryFromIntError::*;
+
+        match *self {
+            NegOverflow => write!(f, "attempted to convert a negative value to a u5"),
+            PosOverflow => write!(f, "attempted to convert a value which overflows a u5"),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for TryFromIntError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        use TryFromIntError::*;
+
+        match *self {
+            NegOverflow | PosOverflow => None,
+        }
+    }
+}
+
+// impl From<convert::Error> for Error {
+//     fn from(e: convert::Error) -> Self {
+//         Error::InvalidData(e)
+//     }
+// }
 
 /// Convert between bit sizes
 ///
@@ -736,7 +826,7 @@ where
         let v: u32 = u32::from(Into::<u8>::into(*value));
         if (v >> from) != 0 {
             // Input value exceeds `from` bit size
-            return Err(Error::InvalidData(v as u8));
+            return Err(Error::Overflow);
         }
         acc = (acc << from) | v;
         bits += from;
@@ -883,7 +973,7 @@ mod tests {
         // Set of [data, from_bits, to_bits, pad, expected error]
         let tests: Vec<(Vec<u8>, u32, u32, bool, Error)> = vec![
             (vec![0xff], 8, 5, false, Error::InvalidPadding),
-            (vec![0x02], 1, 1, true, Error::InvalidData(0x02)),
+            (vec![0x02], 1, 1, true, Error::Overflow),
         ];
         for t in tests {
             let (data, from_bits, to_bits, pad, expected_error) = t;
@@ -916,7 +1006,10 @@ mod tests {
         assert!([0u8, 1, 2, 30, 31, 255].check_base32().is_err());
 
         assert!([1u8, 2, 3, 4].check_base32().is_ok());
-        assert_eq!([30u8, 31, 35, 20].check_base32(), Err(Error::InvalidData(35)));
+        assert_eq!(
+            [30u8, 31, 35, 20].check_base32(),
+            Err(Error::TryFrom(TryFromIntError::PosOverflow))
+        )
     }
 
     #[test]
@@ -1025,5 +1118,14 @@ mod tests {
         let encoded_str = encode("HRP", [0x00, 0x00].to_base32(), Variant::Bech32).unwrap();
 
         assert_eq!(encoded_str, "hrp1qqqq40atq3");
+    }
+
+    #[test]
+    fn try_from_err() {
+        assert!(u5::try_from(32_u8).is_err());
+        assert!(u5::try_from(32_u16).is_err());
+        assert!(u5::try_from(32_u32).is_err());
+        assert!(u5::try_from(32_u64).is_err());
+        assert!(u5::try_from(32_u128).is_err());
     }
 }
