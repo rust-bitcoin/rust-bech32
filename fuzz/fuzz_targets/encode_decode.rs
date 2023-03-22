@@ -1,6 +1,6 @@
 extern crate bech32;
 
-use std::str::FromStr;
+use std::convert::TryFrom;
 
 fn do_test(data: &[u8]) {
     if data.len() < 1 {
@@ -19,7 +19,7 @@ fn do_test(data: &[u8]) {
 
     let dp = data[hrp_end..]
         .iter()
-        .map(|b| bech32::u5::try_from_u8(b % 32).unwrap())
+        .map(|b| bech32::u5::try_from(b % 32).unwrap())
         .collect::<Vec<_>>();
 
     let variant = if data[0] > 0x0f {
