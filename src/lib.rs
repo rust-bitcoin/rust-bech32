@@ -37,7 +37,6 @@ assert_eq!(variant, Variant::Bech32);
 #![deny(non_camel_case_types)]
 #![deny(non_snake_case)]
 #![deny(unused_mut)]
-#![cfg_attr(feature = "strict", deny(warnings))]
 #![cfg_attr(all(not(feature = "std"), not(test)), no_std)]
 
 #[cfg(feature = "alloc")]

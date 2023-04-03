@@ -13,5 +13,4 @@ Bitcoin-specific address encoding is handled by the `bitcoin-bech32` crate.
 
 ## MSRV
 
-The minimum supported Rust version with the standard library is **1.41.1**.
-
+This library should always compile with any combination of features excluding "arrayvec" on **Rust 1.48.0**.

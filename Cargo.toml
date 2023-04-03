@@ -16,9 +16,6 @@ default = ["std"]
 std = ["alloc"]
 alloc = []
 
-# Only for CI to make all warnings errors, do not activate otherwise (may break forward compatibility)
-strict = []
-
 [dependencies.arrayvec]
 version = "0.7.1"
 default-features = false
