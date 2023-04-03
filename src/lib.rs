@@ -31,9 +31,13 @@ assert_eq!(variant, Variant::Bech32);
 
 #![cfg_attr(all(not(feature = "std"), not(test)), no_std)]
 // Experimental features we need.
+#![cfg_attr(bench, feature(test))]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 // Coding conventions
 #![deny(missing_docs)]
+
+#[cfg(bench)]
+extern crate test;
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -1398,5 +1402,100 @@ mod tests {
         let res = ArrayVec::<u8, 30>::from_base32(data).unwrap();
         assert_eq!(&res, [0x00, 0x01, 0x02].as_ref());
         assert_eq!(variant, Variant::Bech32);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn decode_bitcoin_bech32_address() {
+        let addr = "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
+        let (hrp, _data, variant) = crate::decode(addr).expect("address is well formed");
+        assert_eq!(hrp, "bc");
+        assert_eq!(variant, Variant::Bech32)
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn decode_bitcoin_bech32m_address() {
+        let addr = "bc1p5d7rjq7g6rdk2yhzks9smlaqtedr4dekq08ge8ztwac72sfr9rusxg3297";
+        let (hrp, _data, variant) = crate::decode(addr).expect("address is well formed");
+        assert_eq!(hrp, "bc");
+        assert_eq!(variant, Variant::Bech32m)
+    }
+}
+
+#[cfg(bench)]
+mod benches {
+    use test::{black_box, Bencher};
+
+    #[bench]
+    fn bech32_parse_address(bh: &mut Bencher) {
+        let addr = black_box("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq");
+
+        bh.iter(|| {
+            let tuple = crate::decode(&addr).expect("address is well formed");
+            black_box(&tuple);
+        })
+    }
+
+    #[bench]
+    fn bech32m_parse_address(bh: &mut Bencher) {
+        let addr = black_box("bc1p5d7rjq7g6rdk2yhzks9smlaqtedr4dekq08ge8ztwac72sfr9rusxg3297");
+
+        bh.iter(|| {
+            let tuple = crate::decode(&addr).expect("address is well formed");
+            black_box(&tuple);
+        })
+    }
+
+    // Encode with allocation.
+    #[bench]
+    fn encode_bech32_address(bh: &mut Bencher) {
+        let addr = "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
+        let (hrp, data, variant) = crate::decode(&addr).expect("address is well formed");
+
+        bh.iter(|| {
+            let s = crate::encode(&hrp, &data, variant).expect("failed to encode");
+            black_box(&s);
+        });
+    }
+
+    // Encode without allocation.
+    #[bench]
+    fn encode_to_fmt_bech32_address(bh: &mut Bencher) {
+        let addr = "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
+        let (hrp, data, variant) = crate::decode(&addr).expect("address is well formed");
+        let mut buf = String::with_capacity(64);
+
+        bh.iter(|| {
+            let res =
+                crate::encode_to_fmt(&mut buf, &hrp, &data, variant).expect("failed to encode");
+            black_box(&res);
+        });
+    }
+
+    // Encode with allocation.
+    #[bench]
+    fn encode_bech32m_address(bh: &mut Bencher) {
+        let addr = "bc1p5d7rjq7g6rdk2yhzks9smlaqtedr4dekq08ge8ztwac72sfr9rusxg3297";
+        let (hrp, data, variant) = crate::decode(&addr).expect("address is well formed");
+
+        bh.iter(|| {
+            let s = crate::encode(&hrp, &data, variant).expect("failed to encode");
+            black_box(&s);
+        });
+    }
+
+    // Encode without allocation.
+    #[bench]
+    fn encode_to_fmt_bech32m_address(bh: &mut Bencher) {
+        let addr = "bc1p5d7rjq7g6rdk2yhzks9smlaqtedr4dekq08ge8ztwac72sfr9rusxg3297";
+        let (hrp, data, variant) = crate::decode(&addr).expect("address is well formed");
+        let mut buf = String::with_capacity(64);
+
+        bh.iter(|| {
+            let res =
+                crate::encode_to_fmt(&mut buf, &hrp, &data, variant).expect("failed to encode");
+            black_box(&res);
+        });
     }
 }
