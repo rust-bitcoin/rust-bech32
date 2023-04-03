@@ -71,4 +71,16 @@ if [ "${DO_DOCS-false}" = true ]; then
     RUSTDOCFLAGS="-D warnings" cargo +stable doc --all-features
 fi
 
+# Bench if told to.
+if [ "${DO_BENCH-false}" = true ]
+then
+    # Technically we could use beta too but we only run this in CI using nightly.
+    if [ "$NIGHTLY" = false ]; then
+        echo "DO_BENCH requires a nightly toolchain (consider using RUSTUP_TOOLCHAIN)"
+        exit 1
+    fi
+
+    RUSTFLAGS='--cfg=bench' cargo bench
+fi
+
 exit 0
