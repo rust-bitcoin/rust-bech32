@@ -1,24 +1,7 @@
-// Copyright (c) 2017 Clark Moody
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// THE SOFTWARE.
+// Written by Clark Moody and the rust-bitcoin developers.
+// SPDX-License-Identifier: MIT
 
-//! Encoding and decoding of the Bech32 format
+//! Encoding and decoding of the Bech32 format.
 //!
 //! Bech32 is an encoding scheme that is easy to use for humans and efficient to encode in QR codes.
 //!
@@ -27,7 +10,7 @@
 //! when the string is written off or read out loud.
 //!
 //! The original description in [BIP-0173](https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki)
-//! has more details.
+//! has more details. See also [BIP-0350](https://github.com/bitcoin/bips/blob/master/bip-0350.mediawiki).
 //!
 #![cfg_attr(
     feature = "std",
@@ -46,16 +29,11 @@ assert_eq!(variant, Variant::Bech32);
 )]
 //!
 
-// Allow trait objects without dyn on nightly and make 1.22 ignore the unknown lint
-#![allow(unknown_lints)]
-#![allow(bare_trait_objects)]
-#![deny(missing_docs)]
-#![deny(non_upper_case_globals)]
-#![deny(non_camel_case_types)]
-#![deny(non_snake_case)]
-#![deny(unused_mut)]
-#![cfg_attr(feature = "strict", deny(warnings))]
 #![cfg_attr(all(not(feature = "std"), not(test)), no_std)]
+// Experimental features we need.
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+// Coding conventions
+#![deny(missing_docs)]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -77,16 +55,16 @@ mod error;
 #[cfg(feature = "arrayvec")]
 use arrayvec::{ArrayVec, CapacityError};
 
-/// Integer in the range `0..32`
+/// Integer in the range `0..32`.
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Default, PartialOrd, Ord, Hash)]
 #[allow(non_camel_case_types)]
 pub struct u5(u8);
 
 impl u5 {
-    /// Returns a copy of the underlying `u8` value
+    /// Returns a copy of the underlying `u8` value.
     pub fn to_u8(self) -> u8 { self.0 }
 
-    /// Get char representing this 5 bit value as defined in BIP173
+    /// Gets a character representing this 5 bit value as defined in BIP173.
     pub fn to_char(self) -> char { CHARSET[self.to_u8() as usize] }
 }
 
@@ -149,12 +127,12 @@ impl AsRef<u8> for u5 {
     fn as_ref(&self) -> &u8 { &self.0 }
 }
 
-/// Interface to write `u5`s into a sink
+/// Interface to write `u5`s into a sink.
 pub trait WriteBase32 {
-    /// Write error
+    /// Write error.
     type Error: fmt::Debug;
 
-    /// Write a `u5` slice
+    /// Writes a `u5` slice to `self`.
     fn write(&mut self, data: &[u5]) -> Result<(), Self::Error> {
         for b in data {
             self.write_u5(*b)?;
@@ -162,7 +140,7 @@ pub trait WriteBase32 {
         Ok(())
     }
 
-    /// Write a single `u5`
+    /// Writes a single `u5`.
     fn write_u5(&mut self, data: u5) -> Result<(), Self::Error> { self.write(&[data]) }
 }
 
@@ -170,10 +148,10 @@ pub trait WriteBase32 {
 ///
 /// Like `std::io::Writer`, but because the associated type is no_std compatible.
 pub trait WriteBase256 {
-    /// Write error
+    /// Write error.
     type Error: fmt::Debug;
 
-    /// Write a `u8` slice
+    /// Writes a `u8` slice.
     fn write(&mut self, data: &[u8]) -> Result<(), Self::Error> {
         for b in data {
             self.write_u8(*b)?;
@@ -181,7 +159,7 @@ pub trait WriteBase256 {
         Ok(())
     }
 
-    /// Write a single `u8`
+    /// Writes a single `u8`.
     fn write_u8(&mut self, data: u8) -> Result<(), Self::Error> { self.write(&[data]) }
 }
 
@@ -190,7 +168,7 @@ const CHECKSUM_LENGTH: usize = 6;
 /// Allocationless Bech32 writer that accumulates the checksum data internally and writes them out
 /// in the end.
 pub struct Bech32Writer<'a> {
-    formatter: &'a mut fmt::Write,
+    formatter: &'a mut dyn fmt::Write,
     chk: u32,
     variant: Variant,
 }
@@ -203,7 +181,7 @@ impl<'a> Bech32Writer<'a> {
     pub fn new(
         hrp: &str,
         variant: Variant,
-        fmt: &'a mut fmt::Write,
+        fmt: &'a mut dyn fmt::Write,
     ) -> Result<Bech32Writer<'a>, fmt::Error> {
         let mut writer = Bech32Writer { formatter: fmt, chk: 1, variant };
 
@@ -233,13 +211,16 @@ impl<'a> Bech32Writer<'a> {
         }
     }
 
-    /// Write out the checksum at the end. If this method isn't called this will happen on drop.
+    /// Writes out the checksum at the end.
+    ///
+    /// If this method isn't explicitly called this will happen on drop.
     pub fn finalize(mut self) -> fmt::Result {
         self.write_checksum()?;
         mem::forget(self);
         Ok(())
     }
 
+    /// Calculates and writes a checksum to `self`.
     fn write_checksum(&mut self) -> fmt::Result {
         // Pad with 6 zeros
         for _ in 0..CHECKSUM_LENGTH {
@@ -259,7 +240,6 @@ impl<'a> Bech32Writer<'a> {
 impl<'a> WriteBase32 for Bech32Writer<'a> {
     type Error = fmt::Error;
 
-    /// Writes a single 5 bit value of the data part
     fn write_u5(&mut self, data: u5) -> fmt::Result {
         self.polymod_step(data);
         self.formatter.write_char(data.to_char())
@@ -272,13 +252,14 @@ impl<'a> Drop for Bech32Writer<'a> {
     }
 }
 
-/// Parse/convert base32 slice to `Self`. It is the reciprocal of
-/// `ToBase32`.
+/// Parses/converts base32 slice to `Self`.
+///
+/// This trait is the reciprocal of `ToBase32`.
 pub trait FromBase32: Sized {
     /// The associated error which can be returned from parsing (e.g. because of bad padding).
     type Error;
 
-    /// Convert a base32 slice to `Self`.
+    /// Converts a base32 slice to `Self`.
     fn from_base32(b32: &[u5]) -> Result<Self, Self::Error>;
 }
 
@@ -354,14 +335,21 @@ impl<const L: usize> FromBase32 for ArrayVec<u8, L> {
 impl FromBase32 for Vec<u8> {
     type Error = Error;
 
-    /// Convert base32 to base256, removes null-padding if present, returns
-    /// `Err(Error::InvalidPadding)` if padding bits are unequal `0`
+    /// Converts base32 (slice of u5s) to base256 (vector of u8s).
+    ///
+    /// Removes null-padding if present.
+    ///
+    /// # Errors
+    ///
+    /// Uses [`convert_bits`] to convert 5 bit values to 8 bit values, see that function for errors.
     fn from_base32(b32: &[u5]) -> Result<Self, Self::Error> { convert_bits(b32, 5, 8, false) }
 }
 
 /// A trait for converting a value to a type `T` that represents a `u5` slice.
+///
+/// This trait is the reciprocal of `FromBase32`.
 pub trait ToBase32 {
-    /// Convert `Self` to base32 vector
+    /// Converts `Self` to a base32 vector.
     #[cfg(feature = "alloc")]
     fn to_base32(&self) -> Vec<u5> {
         let mut vec = Vec::new();
@@ -369,15 +357,16 @@ pub trait ToBase32 {
         vec
     }
 
-    /// Encode as base32 and write it to the supplied writer
-    /// Implementations shouldn't allocate.
+    /// Encodes `Self` as base32 and writes it to the supplied writer.
+    ///
+    /// Implementations should not allocate.
     fn write_base32<W: WriteBase32>(&self, writer: &mut W)
         -> Result<(), <W as WriteBase32>::Error>;
 }
 
-/// Interface to calculate the length of the base32 representation before actually serializing
+/// Interface to calculate the length of the base32 representation before actually serializing.
 pub trait Base32Len: ToBase32 {
-    /// Calculate the base32 serialized length
+    /// Calculates the base32 serialized length.
     fn base32_len(&self) -> usize;
 }
 
@@ -445,7 +434,7 @@ pub trait CheckBase32<T> {
     /// Error type if conversion fails
     type Error;
 
-    /// Check if all values are in range and return array-like struct of `u5` values
+    /// Checks if all values are in range and return slice-like-type of `u5` values.
     fn check_base32(self) -> Result<T, Self::Error>;
 }
 
@@ -483,9 +472,14 @@ enum Case {
     None,
 }
 
-/// Check if the HRP is valid. Returns the case of the HRP, if any.
+/// Checks if the human-readable part (HRP) is valid.
+///
+/// # Returns
+///
+/// The case of the HRP, if HRP is valid.
 ///
 /// # Errors
+///
 /// * **MixedCase**: If the HRP contains both uppercase and lowercase characters.
 /// * **InvalidChar**: If the HRP contains any non-ASCII characters (outside 33..=126).
 /// * **InvalidLength**: If the HRP is outside 1..83 characters long.
@@ -521,16 +515,18 @@ fn check_hrp(hrp: &str) -> Result<Case, Error> {
     })
 }
 
-/// Encode a bech32 payload to an [fmt::Write].
-/// This method is intended for implementing traits from [std::fmt].
+/// Encodes a bech32 payload to a writer ([`fmt::Write`]).
+///
+/// This method is intended for implementing traits from [`std::fmt`].
 ///
 /// # Errors
-/// * If [check_hrp] returns an error for the given HRP.
-/// # Deviations from standard
-/// * No length limits are enforced for the data part
+///
+/// * If human-readable part (`hrp`) is invalid.
+/// * Deviations from standard.
+/// * No length limits are enforced for the data part.
 #[cfg(feature = "alloc")]
 pub fn encode_to_fmt<T: AsRef<[u5]>>(
-    fmt: &mut fmt::Write,
+    fmt: &mut dyn fmt::Write,
     hrp: &str,
     data: T,
     variant: Variant,
@@ -548,7 +544,7 @@ pub fn encode_to_fmt<T: AsRef<[u5]>>(
 ///
 /// See `encode_to_fmt` for meaning of errors.
 pub fn encode_to_fmt_anycase<T: AsRef<[u5]>>(
-    fmt: &mut fmt::Write,
+    fmt: &mut dyn fmt::Write,
     hrp: &str,
     data: T,
     variant: Variant,
@@ -564,15 +560,17 @@ pub fn encode_to_fmt_anycase<T: AsRef<[u5]>>(
     }
 }
 
-/// Encode a bech32 payload without a checksum to an [fmt::Write].
-/// This method is intended for implementing traits from [std::fmt].
+/// Encodes a bech32 payload without a checksum to a writer ([`fmt::Write`]).
+///
+/// This method is intended for implementing traits from [`std::fmt`].
 ///
 /// # Errors
-/// * If [check_hrp] returns an error for the given HRP.
-/// # Deviations from standard
-/// * No length limits are enforced for the data part
+///
+/// * If human-readable part (`hrp`) is invalid.
+/// * Deviations from standard.
+/// * No length limits are enforced for the data part.
 pub fn encode_without_checksum_to_fmt<T: AsRef<[u5]>>(
-    fmt: &mut fmt::Write,
+    fmt: &mut dyn fmt::Write,
     hrp: &str,
     data: T,
 ) -> Result<fmt::Result, Error> {
@@ -596,12 +594,12 @@ pub fn encode_without_checksum_to_fmt<T: AsRef<[u5]>>(
     Ok(Ok(()))
 }
 
-/// Used for encode/decode operations for the two variants of Bech32
+/// Used for encode/decode operations for the two variants of Bech32.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Variant {
-    /// The original Bech32 described in [BIP-0173](https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki)
+    /// The original Bech32 described in [BIP-0173](https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki).
     Bech32,
-    /// The improved Bech32m variant described in [BIP-0350](https://github.com/bitcoin/bips/blob/master/bip-0350.mediawiki)
+    /// The improved Bech32m variant described in [BIP-0350](https://github.com/bitcoin/bips/blob/master/bip-0350.mediawiki).
     Bech32m,
 }
 
@@ -609,7 +607,7 @@ const BECH32_CONST: u32 = 1;
 const BECH32M_CONST: u32 = 0x2bc8_30a3;
 
 impl Variant {
-    // Produce the variant based on the remainder of the polymod operation
+    /// Produces the variant based on the remainder of the polymod operation.
     fn from_remainder(c: u32) -> Option<Self> {
         match c {
             BECH32_CONST => Some(Variant::Bech32),
@@ -626,12 +624,13 @@ impl Variant {
     }
 }
 
-/// Encode a bech32 payload to string.
+/// Encodes a bech32 payload to string.
 ///
 /// # Errors
-/// * If [check_hrp] returns an error for the given HRP.
-/// # Deviations from standard
-/// * No length limits are enforced for the data part
+///
+/// * If human-readable part (`hrp`) is invalid.
+/// * Deviations from standard.
+/// * No length limits are enforced for the data part.
 #[cfg(feature = "alloc")]
 pub fn encode<T: AsRef<[u5]>>(hrp: &str, data: T, variant: Variant) -> Result<String, Error> {
     let mut buf = String::new();
@@ -639,12 +638,13 @@ pub fn encode<T: AsRef<[u5]>>(hrp: &str, data: T, variant: Variant) -> Result<St
     Ok(buf)
 }
 
-/// Encode a bech32 payload to string without the checksum.
+/// Encodes a bech32 payload to string without the checksum.
 ///
 /// # Errors
-/// * If [check_hrp] returns an error for the given HRP.
-/// # Deviations from standard
-/// * No length limits are enforced for the data part
+///
+/// * If human-readable part (`hrp`) is invalid.
+/// * Deviations from standard.
+/// * No length limits are enforced for the data part.
 #[cfg(feature = "alloc")]
 pub fn encode_without_checksum<T: AsRef<[u5]>>(hrp: &str, data: T) -> Result<String, Error> {
     let mut buf = String::new();
@@ -652,9 +652,11 @@ pub fn encode_without_checksum<T: AsRef<[u5]>>(hrp: &str, data: T) -> Result<Str
     Ok(buf)
 }
 
-/// Decode a bech32 string into the raw HRP and the data bytes.
+/// Decodes a bech32 string into the raw HRP and the data bytes.
 ///
-/// Returns the HRP in lowercase, the data with the checksum removed, and the encoding.
+/// # Returns
+///
+/// The human-readable part in lowercase, the data with the checksum removed, and the encoding.
 #[cfg(feature = "alloc")]
 pub fn decode(s: &str) -> Result<(String, Vec<u5>, Variant), Error> {
     let (hrp_lower, mut data) = split_and_decode(s)?;
@@ -674,13 +676,15 @@ pub fn decode(s: &str) -> Result<(String, Vec<u5>, Variant), Error> {
     }
 }
 
-/// Decode a bech32 string into the raw HRP and the data bytes, assuming no checksum.
+/// Decodes a bech32 string into the raw HRP and the data bytes, assuming no checksum.
 ///
-/// Returns the HRP in lowercase and the data.
+/// # Returns
+///
+/// The human-readable part in lowercase and the data.
 #[cfg(feature = "alloc")]
 pub fn decode_without_checksum(s: &str) -> Result<(String, Vec<u5>), Error> { split_and_decode(s) }
 
-/// Decode a bech32 string into the raw HRP and the `u5` data.
+/// Decodes a bech32 string into the raw HRP and the `u5` data.
 #[cfg(feature = "alloc")]
 fn split_and_decode(s: &str) -> Result<(String, Vec<u5>), Error> {
     // Split at separator and check for two pieces
@@ -856,7 +860,7 @@ fn polymod(values: &[u5]) -> u32 {
     chk
 }
 
-/// Human-readable part and data part separator
+/// Human-readable part and data part separator.
 const SEP: char = '1';
 
 /// Encoding character set. Maps data value -> char
@@ -939,7 +943,7 @@ impl From<TryFromIntError> for Error {
     fn from(e: TryFromIntError) -> Self { Error::TryFrom(e) }
 }
 
-/// Error return when TryFrom<T> fails for T -> u5 conversion.
+/// Error return when `TryFrom<T>` fails for T -> u5 conversion.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum TryFromIntError {
     /// Attempted to convert a negative value to a `u5`.
@@ -976,15 +980,17 @@ impl std::error::Error for TryFromIntError {
 //     }
 // }
 
-/// Convert between bit sizes
+/// Converts between bit sizes.
 ///
 /// # Errors
-/// * `Error::InvalidData` if any element of `data` is out of range
-/// * `Error::InvalidPadding` if `pad == false` and the padding bits are not `0`
+///
+/// * `Error::InvalidData` if any element of `data` is out of range.
+/// * `Error::InvalidPadding` if `pad == false` and the padding bits are not `0`.
 ///
 /// # Panics
+///
 /// Function will panic if attempting to convert `from` or `to` a bit size that
-/// is 0 or larger than 8 bits.
+/// is 0 or larger than 8 bits i.e., `from` and `to` must within range `1..=8`.
 ///
 /// # Examples
 ///
