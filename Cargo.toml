@@ -1,13 +1,13 @@
 [package]
 name = "bech32"
 version = "0.9.1"
-authors = ["Clark Moody", "The rust-bitcoin developers"]
+authors = ["Clark Moody", "Andrew Poelstra", "Tobin Harding", "The rust-bitcoin developers"]
 repository = "https://github.com/rust-bitcoin/rust-bech32"
 documentation = "https://docs.rs/bech32/"
-description = "Encodes and decodes the Bech32 format"
+description = "Encodes and decodes the Bech32 format and implements the bech32 and bech32m checksums"
 readme = "README.md"
-keywords = ["base32", "encoding", "bech32"]
-categories = ["encoding"]
+keywords = ["base32", "encoding", "bech32", "bech32m", "bitcoin", "cryptocurrency"]
+categories = ["encoding", "cryptography::cryptocurrencies"]
 license = "MIT"
 edition = "2018"
 
@@ -20,3 +20,6 @@ alloc = []
 version = "0.7.1"
 default-features = false
 optional = true
+
+[target.'cfg(mutate)'.dev-dependencies]
+mutagen = { git = "https://github.com/llogiq/mutagen" }

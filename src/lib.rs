@@ -55,6 +55,7 @@ use core::{fmt, mem};
 use std::borrow::Cow;
 
 mod error;
+pub mod primitives;
 
 #[cfg(feature = "arrayvec")]
 use arrayvec::{ArrayVec, CapacityError};
