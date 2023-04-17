@@ -469,14 +469,39 @@ impl<U: AsRef<[u8]>> CheckBase32<()> for U {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Case {
+/// Letter case.
+///
+/// From [BIP-173]: Uppercase/lowercase
+///
+/// > The lowercase form is used when determining a character's value for checksum purposes.
+/// >
+/// > Encoders MUST always output an all lowercase Bech32 string. If an uppercase version of the
+/// > encoding result is desired, (e.g.- for presentation purposes, or QR code use), then an
+/// > uppercasing procedure can be performed external to the encoding process.
+/// >
+/// > Decoders MUST NOT accept strings where some characters are uppercase and some are lowercase (such strings are referred to as mixed case strings).
+/// >
+/// > For presentation, lowercase is usually preferable, but inside QR codes uppercase SHOULD be
+/// > used, as those permit the use of alphanumeric mode, which is 45% more compact than the normal
+/// > byte mode.
+///
+/// [BIP173]: <https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki#user-content-Bech32>
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Case {
+    /// Uppercase letters.
     Upper,
+    /// Lowercase letters.
     Lower,
+    /// No letter case, i.e., all characters were digits.
     None,
 }
 
-/// Checks if the human-readable part (HRP) is valid.
+/// Checks if the human-readable part (HRP) is valid as specified by [BIP-173].
+///
+/// > The human-readable part, which is intended to convey the type of data, or anything else that
+/// > is relevant to the reader. This part MUST contain 1 to 83 US-ASCII characters, with each
+/// > character having a value in the range [33-126]. HRP validity may be further restricted by
+/// > specific applications.
 ///
 /// # Returns
 ///
@@ -486,8 +511,10 @@ enum Case {
 ///
 /// * **MixedCase**: If the HRP contains both uppercase and lowercase characters.
 /// * **InvalidChar**: If the HRP contains any non-ASCII characters (outside 33..=126).
-/// * **InvalidLength**: If the HRP is outside 1..83 characters long.
-fn check_hrp(hrp: &str) -> Result<Case, Error> {
+/// * **InvalidLength**: If the HRP is outside 1..=83 characters long.
+///
+/// [BIP-173]: <https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki#user-content-Segwit_address_format>
+pub fn check_hrp(hrp: &str) -> Result<Case, Error> {
     if hrp.is_empty() || hrp.len() > 83 {
         return Err(Error::InvalidLength);
     }
