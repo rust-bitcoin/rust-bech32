@@ -307,7 +307,7 @@ impl ops::DivAssign for Fe32 {
 }
 
 /// A galois field related error.
-#[derive(Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 #[non_exhaustive]
 pub enum Error {
     /// Tried to interpret an integer as a GF32 element but it could not be converted to an u8.

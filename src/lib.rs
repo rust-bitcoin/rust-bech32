@@ -59,78 +59,7 @@ pub mod primitives;
 
 #[cfg(feature = "arrayvec")]
 use arrayvec::{ArrayVec, CapacityError};
-
-/// Integer in the range `0..32`.
-#[derive(PartialEq, Eq, Debug, Copy, Clone, Default, PartialOrd, Ord, Hash)]
-#[allow(non_camel_case_types)]
-pub struct u5(u8);
-
-impl u5 {
-    /// Returns a copy of the underlying `u8` value.
-    pub fn to_u8(self) -> u8 { self.0 }
-
-    /// Gets a character representing this 5 bit value as defined in BIP173.
-    pub fn to_char(self) -> char { CHARSET[self.to_u8() as usize] }
-}
-
-impl From<u5> for u8 {
-    fn from(v: u5) -> u8 { v.0 }
-}
-
-macro_rules! impl_try_from_upper_bounded {
-    ($($ty:ident)+) => {
-        $(
-            impl TryFrom<$ty> for u5 {
-                type Error = TryFromIntError;
-
-                /// Tries to create the target number type from a source number type.
-                ///
-                /// # Errors
-                ///
-                /// Returns an error if `value` overflows a `u5`.
-                fn try_from(value: $ty) -> Result<Self, Self::Error> {
-                    if value > 31 {
-                        Err(TryFromIntError::PosOverflow)
-                    } else {
-                        let x = u8::try_from(value).expect("within range");
-                        Ok(u5(x))
-                    }
-                }
-            }
-        )+
-    }
-}
-macro_rules! impl_try_from_both_bounded {
-    ($($ty:ident)+) => {
-        $(
-            impl TryFrom<$ty> for u5 {
-                type Error = TryFromIntError;
-
-                /// Tries to create the target number type from a source number type.
-                ///
-                /// # Errors
-                ///
-                /// Returns an error if `value` is outside of the range of a `u5`.
-                fn try_from(value: $ty) -> Result<Self, Self::Error> {
-                    if value < 0 {
-                        Err(TryFromIntError::NegOverflow)
-                    } else if value > 31 {
-                        Err(TryFromIntError::PosOverflow)
-                    } else {
-                        let x = u8::try_from(value).expect("within range");
-                        Ok(u5(x))
-                    }
-                }
-            }
-        )+
-    }
-}
-impl_try_from_upper_bounded!(u8 u16 u32 u64 u128);
-impl_try_from_both_bounded!(i8 i16 i32 i64 i128);
-
-impl AsRef<u8> for u5 {
-    fn as_ref(&self) -> &u8 { &self.0 }
-}
+pub use primitives::gf32::Fe32 as u5;
 
 /// Interface to write `u5`s into a sink.
 pub trait WriteBase32 {
@@ -306,7 +235,7 @@ write_base_n! { WriteBase32, u5, write_u5 }
 write_base_n! { WriteBase256, u8, write_u8 }
 
 #[cfg(feature = "arrayvec")]
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 /// Combination of Errors for use with array vec
 pub enum ComboError {
     /// Error from this crate
@@ -712,13 +641,6 @@ fn split_and_decode(s: &str) -> Result<(String, Vec<u5>), Error> {
     let data = raw_data
         .chars()
         .map(|c| {
-            // Only check if c is in the ASCII range, all invalid ASCII
-            // characters have the value -1 in CHARSET_REV (which covers
-            // the whole ASCII range) and will be filtered out later.
-            if !c.is_ascii() {
-                return Err(Error::InvalidChar(c));
-            }
-
             if c.is_lowercase() {
                 match case {
                     Case::Upper => return Err(Error::MixedCase),
@@ -732,15 +654,7 @@ fn split_and_decode(s: &str) -> Result<(String, Vec<u5>), Error> {
                     Case::Upper => {}
                 }
             }
-
-            // c should be <128 since it is in the ASCII range, CHARSET_REV.len() == 128
-            let num_value = CHARSET_REV[c as usize];
-
-            if !(0..=31).contains(&num_value) {
-                return Err(Error::InvalidChar(c));
-            }
-
-            Ok(u5::try_from(num_value as u8).expect("range checked above, num_value <= 31"))
+            u5::from_char(c).map_err(Error::TryFrom)
         })
         .collect::<Result<Vec<u5>, Error>>()?;
 
@@ -788,28 +702,11 @@ where
 
     // Check data payload
     for c in raw_data.chars() {
-        // Only check if c is in the ASCII range, all invalid ASCII
-        // characters have the value -1 in CHARSET_REV (which covers
-        // the whole ASCII range) and will be filtered out later.
-        if !c.is_ascii() {
-            Err(Error::InvalidChar(c))?;
-        }
-
         match case {
             Case::Upper => Err(Error::MixedCase)?,
             Case::None | Case::Lower => {}
         }
-
-        // c should be <128 since it is in the ASCII range, CHARSET_REV.len() == 128
-        let num_value = CHARSET_REV[c as usize];
-
-        if !(0..32).contains(&num_value) {
-            Err(Error::InvalidChar(c))?;
-        }
-
-        data.write_u5(
-            u5::try_from(num_value as u8).expect("range checked above, num_value <= 31"),
-        )?;
+        data.write_u5(u5::from_char(c).map_err(Error::TryFrom)?)?;
     }
 
     // Ensure checksum
@@ -868,29 +765,11 @@ fn polymod(values: &[u5]) -> u32 {
 /// Human-readable part and data part separator.
 const SEP: char = '1';
 
-/// Encoding character set. Maps data value -> char
-const CHARSET: [char; 32] = [
-    'q', 'p', 'z', 'r', 'y', '9', 'x', '8', //  +0
-    'g', 'f', '2', 't', 'v', 'd', 'w', '0', //  +8
-    's', '3', 'j', 'n', '5', '4', 'k', 'h', // +16
-    'c', 'e', '6', 'm', 'u', 'a', '7', 'l', // +24
-];
-
-/// Reverse character set. Maps ASCII byte -> CHARSET index on [0,31]
-const CHARSET_REV: [i8; 128] = [
-    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-    15, -1, 10, 17, 21, 20, 26, 30, 7, 5, -1, -1, -1, -1, -1, -1, -1, 29, -1, 24, 13, 25, 9, 8, 23,
-    -1, 18, 22, 31, 27, 19, -1, 1, 0, 3, 16, 11, 28, 12, 14, 6, 4, 2, -1, -1, -1, -1, -1, -1, 29,
-    -1, 24, 13, 25, 9, 8, 23, -1, 18, 22, 31, 27, 19, -1, 1, 0, 3, 16, 11, 28, 12, 14, 6, 4, 2, -1,
-    -1, -1, -1, -1,
-];
-
 /// Generator coefficients
 const GEN: [u32; 5] = [0x3b6a_57b2, 0x2650_8e6d, 0x1ea1_19fa, 0x3d42_33dd, 0x2a14_62b3];
 
 /// Error types for Bech32 encoding / decoding.
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum Error {
     /// String does not contain the separator character.
     MissingSeparator,
@@ -907,7 +786,7 @@ pub enum Error {
     /// Attempted to convert a value which overflows a `u5`.
     Overflow,
     /// Conversion to u5 failed.
-    TryFrom(TryFromIntError),
+    TryFrom(primitives::gf32::Error),
 }
 
 impl From<Infallible> for Error {
@@ -944,8 +823,8 @@ impl std::error::Error for Error {
     }
 }
 
-impl From<TryFromIntError> for Error {
-    fn from(e: TryFromIntError) -> Self { Error::TryFrom(e) }
+impl From<primitives::gf32::Error> for Error {
+    fn from(e: primitives::gf32::Error) -> Self { Error::TryFrom(e) }
 }
 
 /// Error return when `TryFrom<T>` fails for T -> u5 conversion.
@@ -1132,7 +1011,7 @@ mod tests {
             (" 1nwldj5",
                 Error::InvalidChar(' ')),
             ("abc1\u{2192}axkwrx",
-                Error::InvalidChar('\u{2192}')),
+                Error::TryFrom(primitives::gf32::Error::InvalidChar('\u{2192}'))),
             ("an84characterslonghumanreadablepartthatcontainsthenumber1andtheexcludedcharactersbio1569pvx",
                 Error::InvalidLength),
             ("pzry9x0s0muk",
@@ -1140,13 +1019,13 @@ mod tests {
             ("1pzry9x0s0muk",
                 Error::InvalidLength),
             ("x1b4n0q5v",
-                Error::InvalidChar('b')),
+                Error::TryFrom(primitives::gf32::Error::InvalidChar('b'))),
             ("ABC1DEFGOH",
-                Error::InvalidChar('O')),
+                Error::TryFrom(primitives::gf32::Error::InvalidChar('O'))),
             ("li1dgmt3",
                 Error::InvalidLength),
             ("de1lg7wt\u{ff}",
-                Error::InvalidChar('\u{ff}')),
+                Error::TryFrom(primitives::gf32::Error::InvalidChar('\u{ff}'))),
             ("\u{20}1xj0phk",
                 Error::InvalidChar('\u{20}')),
             ("\u{7F}1g6xzxy",
@@ -1158,15 +1037,15 @@ mod tests {
             ("1qyrz8wqd2c9m",
                 Error::InvalidLength),
             ("y1b0jsk6g",
-                Error::InvalidChar('b')),
+                Error::TryFrom(primitives::gf32::Error::InvalidChar('b'))),
             ("lt1igcx5c0",
-                Error::InvalidChar('i')),
+                Error::TryFrom(primitives::gf32::Error::InvalidChar('i'))),
             ("in1muywd",
                 Error::InvalidLength),
             ("mm1crxm3i",
-                Error::InvalidChar('i')),
+                Error::TryFrom(primitives::gf32::Error::InvalidChar('i'))),
             ("au1s5cgom",
-                Error::InvalidChar('o')),
+                Error::TryFrom(primitives::gf32::Error::InvalidChar('o'))),
             ("M1VUXWEZ",
                 Error::InvalidChecksum),
             ("16plkw9",
@@ -1248,10 +1127,10 @@ mod tests {
         assert!([0u8, 1, 2, 30, 31, 255].check_base32_vec().is_err());
 
         assert!([1u8, 2, 3, 4].check_base32_vec().is_ok());
-        assert_eq!(
+        assert!(matches!(
             [30u8, 31, 35, 20].check_base32_vec(),
-            Err(Error::TryFrom(TryFromIntError::PosOverflow))
-        )
+            Err(Error::TryFrom(primitives::gf32::Error::InvalidByte(35)))
+        ));
     }
 
     #[test]
@@ -1277,22 +1156,6 @@ mod tests {
     #[cfg(feature = "alloc")]
     fn to_base32() {
         assert_eq!([0xffu8].to_base32(), [0x1f, 0x1c].check_base32_vec().unwrap());
-    }
-
-    #[test]
-    fn reverse_charset() {
-        fn get_char_value(c: char) -> i8 {
-            let charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
-            match charset.find(c.to_ascii_lowercase()) {
-                Some(x) => x as i8,
-                None => -1,
-            }
-        }
-
-        let expected_rev_charset =
-            (0u8..128).map(|i| get_char_value(i as char)).collect::<Vec<_>>();
-
-        assert_eq!(&(CHARSET_REV[..]), expected_rev_charset.as_slice());
     }
 
     #[test]
