@@ -17,6 +17,7 @@ use core::{fmt, num, ops};
 
 #[cfg(all(test, mutate))]
 use mutagen::mutate;
+use primitives::witness_version::{self, WitnessVersion};
 
 /// Logarithm table of each bech32 element, as a power of alpha = Z.
 ///
@@ -174,6 +175,8 @@ impl Fe32 {
         .copied()
     }
 
+    pub(crate) fn from_char_unchecked(c: u8) -> Fe32 { Fe32(CHARS_INV[usize::from(c)] as u8) }
+
     /// Creates a field element from a single bech32 character.
     pub fn from_char(c: char) -> Result<Fe32, Error> {
         // i8::try_from gets a value in the range 0..=127 since char is unsigned.
@@ -194,6 +197,16 @@ impl Fe32 {
     /// Converts the field element to a 5-bit u8, with bits representing the coefficients
     /// of the polynomial representation.
     pub fn to_u8(self) -> u8 { self.0 }
+
+    /// Creates a field element from a [`WitnessVersion`].
+    pub fn from_witness_version(witver: WitnessVersion) -> Self {
+        Fe32::try_from(witver.to_num()).expect("within range")
+    }
+
+    /// Converts the field element to a [`WitnessVersion`] value if valid.
+    pub fn to_witness_version(&self) -> Result<WitnessVersion, witness_version::ConversionError> {
+        WitnessVersion::try_from(self.to_u8())
+    }
 
     fn _add(self, other: Fe32) -> Fe32 { Fe32(self.0 ^ other.0) }
 

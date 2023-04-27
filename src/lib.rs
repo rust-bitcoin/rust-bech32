@@ -54,12 +54,15 @@ use core::{fmt, mem};
 #[cfg(any(feature = "std", all(feature = "alloc", test)))]
 use std::borrow::Cow;
 
-mod error;
+use internals::write_err;
+
 pub mod primitives;
+pub mod segwit;
 
 #[cfg(feature = "arrayvec")]
 use arrayvec::{ArrayVec, CapacityError};
-pub use primitives::gf32::Fe32 as u5;
+
+pub use crate::primitives::gf32::Fe32 as u5;
 
 /// Interface to write `u5`s into a sink.
 pub trait WriteBase32 {

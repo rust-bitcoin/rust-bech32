@@ -6,20 +6,21 @@ repository = "https://github.com/rust-bitcoin/rust-bech32"
 documentation = "https://docs.rs/bech32/"
 description = "Encodes and decodes the Bech32 format and implements the bech32 and bech32m checksums"
 readme = "README.md"
-keywords = ["base32", "encoding", "bech32", "bech32m", "bitcoin", "cryptocurrency"]
+keywords = ["encoding", "bech32", "finite field", "galois field", "bch code"]
 categories = ["encoding", "cryptography::cryptocurrencies"]
 license = "MIT"
 edition = "2018"
 
 [features]
 default = ["std"]
-std = ["alloc"]
-alloc = []
+std = ["alloc", "internals/std", "primitives/std"]
+alloc = ["internals/alloc", "primitives/alloc"]
 
-[dependencies.arrayvec]
-version = "0.7.1"
-default-features = false
-optional = true
+[dependencies]
+internals = { package = "bitcoin-internals", version = "0.1.0", default-features = false }
+primitives = { git = "https://github.com/tcharding/rust-bitcoin", branch = "04-27-primitives", package = "rust-bitcoin-primitives", version = "0.1.0", default-features = false }
+
+arrayvec = { version = "0.7.1", default-options = false, optional = true }
 
 [target.'cfg(mutate)'.dev-dependencies]
 mutagen = { git = "https://github.com/llogiq/mutagen" }
