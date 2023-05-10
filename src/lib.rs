@@ -17,11 +17,12 @@
     doc = "
 # Examples
 ```
-use bech32::{self, FromBase32, ToBase32, Variant};
-let encoded = bech32::encode(\"bech32\", vec![0x00, 0x01, 0x02].to_base32(), Variant::Bech32).unwrap();
+use bech32::{self, FromBase32, ToBase32, Variant, Hrp};
+let hrp = Hrp::parse(\"bech32\").expect(\"bech32 is valid\");
+let encoded = bech32::encode(hrp, vec![0x00, 0x01, 0x02].to_base32(), Variant::Bech32).unwrap();
 assert_eq!(encoded, \"bech321qqqsyrhqy2a\".to_string());
 let (hrp, data, variant) = bech32::decode(&encoded).unwrap();
-assert_eq!(hrp, \"bech32\");
+assert_eq!(hrp.to_string(), \"bech32\");
 assert_eq!(Vec::<u8>::from_base32(&data).unwrap(), vec![0x00, 0x01, 0x02]);
 assert_eq!(variant, Variant::Bech32);
 ```
@@ -46,13 +47,12 @@ extern crate alloc;
 extern crate core;
 
 #[cfg(all(feature = "alloc", not(feature = "std"), not(test)))]
-use alloc::borrow::Cow;
-#[cfg(all(feature = "alloc", not(feature = "std"), not(test)))]
 use alloc::{string::String, vec::Vec};
 use core::convert::{Infallible, TryFrom};
 use core::{fmt, mem};
-#[cfg(any(feature = "std", all(feature = "alloc", test)))]
-use std::borrow::Cow;
+
+use crate::primitives::hrp;
+pub use crate::primitives::hrp::Hrp;
 
 mod error;
 pub mod primitives;
@@ -113,21 +113,23 @@ impl<'a> Bech32Writer<'a> {
     /// This is a rather low-level API and doesn't check the HRP or data length for standard
     /// compliance.
     pub fn new(
-        hrp: &str,
+        hrp: Hrp,
         variant: Variant,
         fmt: &'a mut dyn fmt::Write,
     ) -> Result<Bech32Writer<'a>, fmt::Error> {
         let mut writer = Bech32Writer { formatter: fmt, chk: 1, variant };
 
-        writer.formatter.write_str(hrp)?;
+        for c in hrp.lowercase_char_iter() {
+            writer.formatter.write_char(c)?;
+        }
         writer.formatter.write_char(SEP)?;
 
         // expand HRP
-        for b in hrp.bytes() {
+        for b in hrp.lowercase_byte_iter() {
             writer.polymod_step(u5(b >> 5));
         }
         writer.polymod_step(u5(0));
-        for b in hrp.bytes() {
+        for b in hrp.lowercase_byte_iter() {
             writer.polymod_step(u5(b & 0x1f));
         }
 
@@ -235,7 +237,7 @@ write_base_n! { WriteBase32, u5, write_u5 }
 write_base_n! { WriteBase256, u8, write_u8 }
 
 #[cfg(feature = "arrayvec")]
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 /// Combination of Errors for use with array vec
 pub enum ComboError {
     /// Error from this crate
@@ -250,6 +252,10 @@ impl From<Error> for ComboError {
 #[cfg(feature = "arrayvec")]
 impl From<CapacityError> for ComboError {
     fn from(e: CapacityError) -> ComboError { ComboError::WriteError(e) }
+}
+#[cfg(feature = "arrayvec")]
+impl From<hrp::Error> for ComboError {
+    fn from(e: hrp::Error) -> ComboError { ComboError::Bech32Error(Error::Hrp(e)) }
 }
 
 #[cfg(feature = "arrayvec")]
@@ -399,78 +405,30 @@ impl<U: AsRef<[u8]>> CheckBase32<()> for U {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Case {
     Upper,
     Lower,
     None,
 }
 
-/// Checks if the human-readable part (HRP) is valid.
-///
-/// # Returns
-///
-/// The case of the HRP, if HRP is valid.
-///
-/// # Errors
-///
-/// * **MixedCase**: If the HRP contains both uppercase and lowercase characters.
-/// * **InvalidChar**: If the HRP contains any non-ASCII characters (outside 33..=126).
-/// * **InvalidLength**: If the HRP is outside 1..83 characters long.
-fn check_hrp(hrp: &str) -> Result<Case, Error> {
-    if hrp.is_empty() || hrp.len() > 83 {
-        return Err(Error::InvalidLength);
-    }
-
-    let mut has_lower: bool = false;
-    let mut has_upper: bool = false;
-    for b in hrp.bytes() {
-        // Valid subset of ASCII
-        if !(33..=126).contains(&b) {
-            return Err(Error::InvalidChar(b as char));
-        }
-
-        if b.is_ascii_lowercase() {
-            has_lower = true;
-        } else if b.is_ascii_uppercase() {
-            has_upper = true;
-        };
-
-        if has_lower && has_upper {
-            return Err(Error::MixedCase);
-        }
-    }
-
-    Ok(match (has_upper, has_lower) {
-        (true, false) => Case::Upper,
-        (false, true) => Case::Lower,
-        (false, false) => Case::None,
-        (true, true) => unreachable!(),
-    })
-}
-
-/// Encodes a bech32 payload to a writer ([`fmt::Write`]).
+/// Encodes a bech32 payload to a writer ([`fmt::Write`]) using lowercase.
 ///
 /// This method is intended for implementing traits from [`std::fmt`].
 ///
 /// # Errors
 ///
-/// * If human-readable part (`hrp`) is invalid.
 /// * Deviations from standard.
 /// * No length limits are enforced for the data part.
-#[cfg(feature = "alloc")]
 pub fn encode_to_fmt<T: AsRef<[u5]>>(
     fmt: &mut dyn fmt::Write,
-    hrp: &str,
+    hrp: Hrp,
     data: T,
     variant: Variant,
 ) -> Result<fmt::Result, Error> {
-    let hrp_lower = match check_hrp(hrp)? {
-        Case::Upper => Cow::Owned(hrp.to_lowercase()),
-        Case::Lower | Case::None => Cow::Borrowed(hrp),
-    };
-
-    encode_to_fmt_anycase(fmt, &hrp_lower, data, variant)
+    let mut hrp = hrp;
+    hrp.lowercase();
+    encode_to_fmt_anycase(fmt, hrp, data, variant)
 }
 
 /// Encode a bech32 payload to an [fmt::Write], but with any case.
@@ -479,7 +437,7 @@ pub fn encode_to_fmt<T: AsRef<[u5]>>(
 /// See `encode_to_fmt` for meaning of errors.
 pub fn encode_to_fmt_anycase<T: AsRef<[u5]>>(
     fmt: &mut dyn fmt::Write,
-    hrp: &str,
+    hrp: Hrp,
     data: T,
     variant: Variant,
 ) -> Result<fmt::Result, Error> {
@@ -500,22 +458,17 @@ pub fn encode_to_fmt_anycase<T: AsRef<[u5]>>(
 ///
 /// # Errors
 ///
-/// * If human-readable part (`hrp`) is invalid.
 /// * Deviations from standard.
 /// * No length limits are enforced for the data part.
 pub fn encode_without_checksum_to_fmt<T: AsRef<[u5]>>(
     fmt: &mut dyn fmt::Write,
-    hrp: &str,
+    hrp: Hrp,
     data: T,
 ) -> Result<fmt::Result, Error> {
-    #[cfg(feature = "alloc")]
-    let hrp = match check_hrp(hrp)? {
-        Case::Upper => Cow::Owned(hrp.to_lowercase()),
-        Case::Lower | Case::None => Cow::Borrowed(hrp),
-    };
-
-    if let Err(e) = fmt.write_str(&hrp) {
-        return Ok(Err(e));
+    for c in hrp.lowercase_char_iter() {
+        if let Err(e) = fmt.write_char(c) {
+            return Ok(Err(e));
+        }
     }
     if let Err(e) = fmt.write_char(SEP) {
         return Ok(Err(e));
@@ -562,11 +515,10 @@ impl Variant {
 ///
 /// # Errors
 ///
-/// * If human-readable part (`hrp`) is invalid.
 /// * Deviations from standard.
 /// * No length limits are enforced for the data part.
 #[cfg(feature = "alloc")]
-pub fn encode<T: AsRef<[u5]>>(hrp: &str, data: T, variant: Variant) -> Result<String, Error> {
+pub fn encode<T: AsRef<[u5]>>(hrp: Hrp, data: T, variant: Variant) -> Result<String, Error> {
     let mut buf = String::new();
     encode_to_fmt(&mut buf, hrp, data, variant)?.unwrap();
     Ok(buf)
@@ -576,11 +528,10 @@ pub fn encode<T: AsRef<[u5]>>(hrp: &str, data: T, variant: Variant) -> Result<St
 ///
 /// # Errors
 ///
-/// * If human-readable part (`hrp`) is invalid.
 /// * Deviations from standard.
 /// * No length limits are enforced for the data part.
 #[cfg(feature = "alloc")]
-pub fn encode_without_checksum<T: AsRef<[u5]>>(hrp: &str, data: T) -> Result<String, Error> {
+pub fn encode_without_checksum<T: AsRef<[u5]>>(hrp: Hrp, data: T) -> Result<String, Error> {
     let mut buf = String::new();
     encode_without_checksum_to_fmt(&mut buf, hrp, data)?.unwrap();
     Ok(buf)
@@ -592,14 +543,14 @@ pub fn encode_without_checksum<T: AsRef<[u5]>>(hrp: &str, data: T) -> Result<Str
 ///
 /// The human-readable part in lowercase, the data with the checksum removed, and the encoding.
 #[cfg(feature = "alloc")]
-pub fn decode(s: &str) -> Result<(String, Vec<u5>, Variant), Error> {
+pub fn decode(s: &str) -> Result<(Hrp, Vec<u5>, Variant), Error> {
     let (hrp_lower, mut data) = split_and_decode(s)?;
     if data.len() < CHECKSUM_LENGTH {
         return Err(Error::InvalidLength);
     }
 
     // Ensure checksum
-    match verify_checksum(hrp_lower.as_bytes(), &data) {
+    match verify_checksum(hrp_lower, &data) {
         Some(variant) => {
             // Remove checksum from data payload
             data.truncate(data.len() - CHECKSUM_LENGTH);
@@ -616,11 +567,11 @@ pub fn decode(s: &str) -> Result<(String, Vec<u5>, Variant), Error> {
 ///
 /// The human-readable part in lowercase and the data.
 #[cfg(feature = "alloc")]
-pub fn decode_without_checksum(s: &str) -> Result<(String, Vec<u5>), Error> { split_and_decode(s) }
+pub fn decode_without_checksum(s: &str) -> Result<(Hrp, Vec<u5>), Error> { split_and_decode(s) }
 
 /// Decodes a bech32 string into the raw HRP and the `u5` data.
 #[cfg(feature = "alloc")]
-fn split_and_decode(s: &str) -> Result<(String, Vec<u5>), Error> {
+fn split_and_decode(s: &str) -> Result<(Hrp, Vec<u5>), Error> {
     // Split at separator and check for two pieces
     let (raw_hrp, raw_data) = match s.rfind(SEP) {
         None => return Err(Error::MissingSeparator),
@@ -630,12 +581,7 @@ fn split_and_decode(s: &str) -> Result<(String, Vec<u5>), Error> {
         }
     };
 
-    let mut case = check_hrp(raw_hrp)?;
-    let hrp_lower = match case {
-        Case::Upper => raw_hrp.to_lowercase(),
-        // already lowercase
-        Case::Lower | Case::None => String::from(raw_hrp),
-    };
+    let (hrp, mut case) = Hrp::parse_and_case(raw_hrp)?;
 
     // Check data payload
     let data = raw_data
@@ -658,24 +604,25 @@ fn split_and_decode(s: &str) -> Result<(String, Vec<u5>), Error> {
         })
         .collect::<Result<Vec<u5>, Error>>()?;
 
-    Ok((hrp_lower, data))
+    Ok((hrp, data))
 }
 
 // TODO deduplicate some
 /// Decode a lowercase bech32 string into the raw HRP and the data bytes.
 ///
 /// Less flexible than [decode], but don't allocate.
-pub fn decode_lowercase<'a, 'b, E, R, S>(
-    s: &'a str,
+pub fn decode_lowercase<'b, E, R, S>(
+    s: &str,
     data: &'b mut R,
     scratch: &mut S,
-) -> Result<(&'a str, &'b [u5], Variant), E>
+) -> Result<(Hrp, &'b [u5], Variant), E>
 where
     R: WriteBase32 + AsRef<[u5]>,
     S: WriteBase32 + AsRef<[u5]>,
     E: From<R::Error>,
     E: From<S::Error>,
     E: From<Error>,
+    E: core::convert::From<primitives::hrp::Error>,
 {
     // Ensure overall length is within bounds
     if s.len() < 8 {
@@ -683,7 +630,7 @@ where
     }
 
     // Split at separator and check for two pieces
-    let (hrp_lower, raw_data) = match s.rfind(SEP) {
+    let (raw_hrp, raw_data) = match s.rfind(SEP) {
         None => Err(Error::MissingSeparator)?,
         Some(sep) => {
             let (hrp, data) = s.split_at(sep);
@@ -694,11 +641,7 @@ where
         Err(Error::InvalidLength)?;
     }
 
-    let case = match check_hrp(hrp_lower)? {
-        Case::Upper => Err(Error::MixedCase)?,
-        // already lowercase
-        Case::Lower | Case::None => Case::Lower,
-    };
+    let (hrp, case) = Hrp::parse_and_case(raw_hrp)?;
 
     // Check data payload
     for c in raw_data.chars() {
@@ -710,15 +653,15 @@ where
     }
 
     // Ensure checksum
-    let variant = verify_checksum_in(hrp_lower.as_bytes(), data.as_ref(), scratch)?
-        .ok_or(Error::MissingSeparator)?;
+    let variant =
+        verify_checksum_in(hrp, data.as_ref(), scratch)?.ok_or(Error::MissingSeparator)?;
 
     let dbl: usize = data.as_ref().len();
-    Ok((hrp_lower, &(*data).as_ref()[..dbl.saturating_sub(6)], variant))
+    Ok((hrp, &(*data).as_ref()[..dbl.saturating_sub(6)], variant))
 }
 
 #[cfg(feature = "alloc")]
-fn verify_checksum(hrp: &[u8], data: &[u5]) -> Option<Variant> {
+fn verify_checksum(hrp: Hrp, data: &[u5]) -> Option<Variant> {
     let mut v: Vec<u5> = Vec::new();
     match verify_checksum_in(hrp, data, &mut v) {
         Ok(v) => v,
@@ -726,7 +669,7 @@ fn verify_checksum(hrp: &[u8], data: &[u5]) -> Option<Variant> {
     }
 }
 
-fn verify_checksum_in<T>(hrp: &[u8], data: &[u5], v: &mut T) -> Result<Option<Variant>, T::Error>
+fn verify_checksum_in<T>(hrp: Hrp, data: &[u5], v: &mut T) -> Result<Option<Variant>, T::Error>
 where
     T: WriteBase32 + AsRef<[u5]>,
 {
@@ -735,13 +678,13 @@ where
     Ok(Variant::from_remainder(polymod(v.as_ref())))
 }
 
-fn hrp_expand_in<T: WriteBase32>(hrp: &[u8], v: &mut T) -> Result<(), T::Error> {
-    for b in hrp {
-        v.write_u5(u5::try_from(*b >> 5).expect("can't be out of range, max. 7"))?;
+fn hrp_expand_in<T: WriteBase32>(hrp: Hrp, v: &mut T) -> Result<(), T::Error> {
+    for b in hrp.lowercase_byte_iter() {
+        v.write_u5(u5::try_from(b >> 5).expect("can't be out of range, max. 7"))?;
     }
     v.write_u5(u5::try_from(0).unwrap())?;
-    for b in hrp {
-        v.write_u5(u5::try_from(*b & 0x1f).expect("can't be out of range, max. 31"))?;
+    for b in hrp.lowercase_byte_iter() {
+        v.write_u5(u5::try_from(b & 0x1f).expect("can't be out of range, max. 31"))?;
     }
     Ok(())
 }
@@ -769,7 +712,7 @@ const SEP: char = '1';
 const GEN: [u32; 5] = [0x3b6a_57b2, 0x2650_8e6d, 0x1ea1_19fa, 0x3d42_33dd, 0x2a14_62b3];
 
 /// Error types for Bech32 encoding / decoding.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Error {
     /// String does not contain the separator character.
     MissingSeparator,
@@ -787,10 +730,16 @@ pub enum Error {
     Overflow,
     /// Conversion to u5 failed.
     TryFrom(primitives::gf32::Error),
+    /// HRP parsing failed.
+    Hrp(hrp::Error),
 }
 
 impl From<Infallible> for Error {
     fn from(v: Infallible) -> Self { match v {} }
+}
+
+impl From<hrp::Error> for Error {
+    fn from(e: hrp::Error) -> Self { Error::Hrp(e) }
 }
 
 impl fmt::Display for Error {
@@ -806,6 +755,7 @@ impl fmt::Display for Error {
             MixedCase => write!(f, "mixed-case strings not allowed"),
             TryFrom(ref e) => write_err!(f, "conversion to u5 failed"; e),
             Overflow => write!(f, "attempted to convert a value which overflows a u5"),
+            Hrp(ref e) => write_err!(f, "HRP conversion failed"; e),
         }
     }
 }
@@ -817,6 +767,7 @@ impl std::error::Error for Error {
 
         match *self {
             TryFrom(ref e) => Some(e),
+            Hrp(ref e) => Some(e),
             MissingSeparator | InvalidChecksum | InvalidLength | InvalidChar(_)
             | InvalidPadding | MixedCase | Overflow => None,
         }
@@ -945,6 +896,9 @@ mod tests {
 
     use super::*;
 
+    #[cfg(feature = "alloc")]
+    fn hrp(s: &str) -> Hrp { Hrp::parse_unchecked(s) }
+
     trait TextExt {
         fn check_base32_vec(self) -> Result<Vec<u5>, Error>;
     }
@@ -961,7 +915,7 @@ mod tests {
             decode_lowercase::<Error, _, _>("bc1sw50qa3jx3s", &mut data_scratch, &mut scratch)
                 .unwrap();
         let data = [16, 14, 20, 15, 0].check_base32_vec().unwrap();
-        assert_eq!(decoded.0, "bc");
+        assert_eq!(decoded.0.to_string(), "bc");
         assert_eq!(decoded.1, data.as_slice());
     }
 
@@ -970,7 +924,8 @@ mod tests {
     fn getters() {
         let decoded = decode("BC1SW50QA3JX3S").unwrap();
         let data = [16, 14, 20, 15, 0].check_base32_vec().unwrap();
-        assert_eq!(&decoded.0, "bc");
+        assert_eq!(decoded.0, hrp("bc"));
+        assert_eq!(decoded.0.to_string(), "BC");
         assert_eq!(decoded.1, data.as_slice());
     }
 
@@ -996,7 +951,7 @@ mod tests {
         for s in strings {
             match decode(s) {
                 Ok((hrp, payload, variant)) => {
-                    let encoded = encode(&hrp, payload, variant).unwrap();
+                    let encoded = encode(hrp, payload, variant).unwrap();
                     assert_eq!(s.to_lowercase(), encoded.to_lowercase());
                 }
                 Err(e) => panic!("Did not decode: {:?} Reason: {:?}", s, e),
@@ -1009,15 +964,15 @@ mod tests {
     fn invalid_strings() {
         let pairs: Vec<(&str, Error)> = vec!(
             (" 1nwldj5",
-                Error::InvalidChar(' ')),
+                Error::Hrp(hrp::Error::InvalidAsciiByte(b' '))),
             ("abc1\u{2192}axkwrx",
                 Error::TryFrom(primitives::gf32::Error::InvalidChar('\u{2192}'))),
             ("an84characterslonghumanreadablepartthatcontainsthenumber1andtheexcludedcharactersbio1569pvx",
-                Error::InvalidLength),
+                Error::Hrp(hrp::Error::TooLong(84))),
             ("pzry9x0s0muk",
                 Error::MissingSeparator),
             ("1pzry9x0s0muk",
-                Error::InvalidLength),
+                Error::Hrp(hrp::Error::Empty)),
             ("x1b4n0q5v",
                 Error::TryFrom(primitives::gf32::Error::InvalidChar('b'))),
             ("ABC1DEFGOH",
@@ -1027,15 +982,15 @@ mod tests {
             ("de1lg7wt\u{ff}",
                 Error::TryFrom(primitives::gf32::Error::InvalidChar('\u{ff}'))),
             ("\u{20}1xj0phk",
-                Error::InvalidChar('\u{20}')),
+                Error::Hrp(hrp::Error::InvalidAsciiByte(b' '))), // u20 is space character
             ("\u{7F}1g6xzxy",
-                Error::InvalidChar('\u{7F}')),
+                Error::Hrp(hrp::Error::InvalidAsciiByte(0x7f))),
             ("an84characterslonghumanreadablepartthatcontainsthetheexcludedcharactersbioandnumber11d6pts4",
-                Error::InvalidLength),
+                Error::Hrp(hrp::Error::TooLong(84))),
             ("qyrz8wqd2c9m",
                 Error::MissingSeparator),
             ("1qyrz8wqd2c9m",
-                Error::InvalidLength),
+                Error::Hrp(hrp::Error::Empty)),
             ("y1b0jsk6g",
                 Error::TryFrom(primitives::gf32::Error::InvalidChar('b'))),
             ("lt1igcx5c0",
@@ -1049,9 +1004,9 @@ mod tests {
             ("M1VUXWEZ",
                 Error::InvalidChecksum),
             ("16plkw9",
-                Error::InvalidLength),
+                Error::Hrp(hrp::Error::Empty)),
             ("1p2gdwpf",
-                Error::InvalidLength),
+                Error::Hrp(hrp::Error::Empty)),
             ("bc1p2",
                 Error::InvalidLength),
         );
@@ -1136,10 +1091,7 @@ mod tests {
     #[test]
     #[cfg(feature = "alloc")]
     fn test_encode() {
-        assert_eq!(
-            encode("", vec![1u8, 2, 3, 4].check_base32_vec().unwrap(), Variant::Bech32),
-            Err(Error::InvalidLength)
-        );
+        assert_eq!(Hrp::parse(""), Err(hrp::Error::Empty));
     }
 
     #[test]
@@ -1161,7 +1113,7 @@ mod tests {
     #[test]
     #[cfg(feature = "alloc")]
     fn write_with_checksum() {
-        let hrp = "lnbc";
+        let hrp = hrp("lnbc");
         let data = "Hello World!".as_bytes().to_base32();
 
         let mut written_str = String::new();
@@ -1179,7 +1131,7 @@ mod tests {
     #[test]
     #[cfg(feature = "alloc")]
     fn write_without_checksum() {
-        let hrp = "lnbc";
+        let hrp = hrp("lnbc");
         let data = "Hello World!".as_bytes().to_base32();
 
         let mut written_str = String::new();
@@ -1196,7 +1148,7 @@ mod tests {
     #[test]
     #[cfg(feature = "alloc")]
     fn write_with_checksum_on_drop() {
-        let hrp = "lntb";
+        let hrp = hrp("lntb");
         let data = "Hello World!".as_bytes().to_base32();
 
         let mut written_str = String::new();
@@ -1213,7 +1165,7 @@ mod tests {
     #[test]
     #[cfg(feature = "alloc")]
     fn roundtrip_without_checksum() {
-        let hrp = "lnbc";
+        let hrp = hrp("lnbc");
         let data = "Hello World!".as_bytes().to_base32();
 
         let encoded = encode_without_checksum(hrp, data.clone()).expect("failed to encode");
@@ -1228,7 +1180,7 @@ mod tests {
     #[cfg(feature = "alloc")]
     fn test_hrp_case() {
         // Tests for issue with HRP case checking being ignored for encoding
-        let encoded_str = encode("HRP", [0x00, 0x00].to_base32(), Variant::Bech32).unwrap();
+        let encoded_str = encode(hrp("HRP"), [0x00, 0x00].to_base32(), Variant::Bech32).unwrap();
 
         assert_eq!(encoded_str, "hrp1qqqq40atq3");
     }
@@ -1251,7 +1203,8 @@ mod tests {
 
         [0x00u8, 0x01, 0x02].write_base32(&mut base32).unwrap();
 
-        encode_to_fmt_anycase(&mut encoded, "bech32", &base32, Variant::Bech32).unwrap().unwrap();
+        let bech32_hrp = Hrp::parse("bech32").expect("bech32 is valid");
+        encode_to_fmt_anycase(&mut encoded, bech32_hrp, &base32, Variant::Bech32).unwrap().unwrap();
         assert_eq!(&*encoded, "bech321qqqsyrhqy2a");
 
         println!("{}", encoded);
@@ -1262,7 +1215,7 @@ mod tests {
 
         let (hrp, data, variant) =
             decode_lowercase::<ComboError, _, _>(&encoded, &mut decoded, &mut scratch).unwrap();
-        assert_eq!(hrp, "bech32");
+        assert_eq!(hrp.to_string(), "bech32");
         let res = ArrayVec::<u8, 30>::from_base32(data).unwrap();
         assert_eq!(&res, [0x00, 0x01, 0x02].as_ref());
         assert_eq!(variant, Variant::Bech32);
@@ -1273,7 +1226,7 @@ mod tests {
     fn decode_bitcoin_bech32_address() {
         let addr = "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
         let (hrp, _data, variant) = crate::decode(addr).expect("address is well formed");
-        assert_eq!(hrp, "bc");
+        assert_eq!(hrp.to_string(), "bc");
         assert_eq!(variant, Variant::Bech32)
     }
 
@@ -1282,8 +1235,40 @@ mod tests {
     fn decode_bitcoin_bech32m_address() {
         let addr = "bc1p5d7rjq7g6rdk2yhzks9smlaqtedr4dekq08ge8ztwac72sfr9rusxg3297";
         let (hrp, _data, variant) = crate::decode(addr).expect("address is well formed");
-        assert_eq!(hrp, "bc");
+        assert_eq!(hrp.to_string(), "bc");
         assert_eq!(variant, Variant::Bech32m)
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn decode_all_digit_hrp_uppercase_data() {
+        let addr = "23451QAR0SRRR7XFKVY5L643LYDNW9RE59GTZZLKULZK";
+        let (hrp, data, variant) = crate::decode(addr).expect("address is well formed");
+        assert_eq!(hrp, Hrp::parse("2345").unwrap());
+        let hrp = Hrp::parse("2345").unwrap();
+        let s = crate::encode(hrp, data, variant).expect("failed to encode");
+        assert_eq!(s.to_uppercase(), addr);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn writer_lowercases_hrp_when_adding_to_checksum() {
+        let addr = "BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4";
+        let (_hrp, data, _variant) = crate::decode(addr).expect("failed to decode");
+        let data: Vec<u8> = FromBase32::from_base32(&data[1..]).expect("failed to convert u5s");
+
+        let mut writer = String::new();
+        let mut bech32_writer =
+            Bech32Writer::new(Hrp::parse("BC").unwrap(), Variant::Bech32, &mut writer)
+                .expect("failed to write hrp");
+        let version = u5::try_from(0).unwrap();
+
+        WriteBase32::write_u5(&mut bech32_writer, version).expect("failed to write version");
+        ToBase32::write_base32(&data, &mut bech32_writer).expect("failed to write data");
+
+        drop(bech32_writer);
+
+        assert_eq!(writer, addr.to_lowercase());
     }
 }
 
@@ -1318,7 +1303,7 @@ mod benches {
         let (hrp, data, variant) = crate::decode(&addr).expect("address is well formed");
 
         bh.iter(|| {
-            let s = crate::encode(&hrp, &data, variant).expect("failed to encode");
+            let s = crate::encode(hrp, &data, variant).expect("failed to encode");
             black_box(&s);
         });
     }
@@ -1332,7 +1317,7 @@ mod benches {
 
         bh.iter(|| {
             let res =
-                crate::encode_to_fmt(&mut buf, &hrp, &data, variant).expect("failed to encode");
+                crate::encode_to_fmt(&mut buf, hrp, &data, variant).expect("failed to encode");
             black_box(&res);
         });
     }
@@ -1344,7 +1329,7 @@ mod benches {
         let (hrp, data, variant) = crate::decode(&addr).expect("address is well formed");
 
         bh.iter(|| {
-            let s = crate::encode(&hrp, &data, variant).expect("failed to encode");
+            let s = crate::encode(hrp, &data, variant).expect("failed to encode");
             black_box(&s);
         });
     }
@@ -1358,7 +1343,7 @@ mod benches {
 
         bh.iter(|| {
             let res =
-                crate::encode_to_fmt(&mut buf, &hrp, &data, variant).expect("failed to encode");
+                crate::encode_to_fmt(&mut buf, hrp, &data, variant).expect("failed to encode");
             black_box(&res);
         });
     }

@@ -1,6 +1,9 @@
 extern crate bech32;
 
 use std::convert::TryFrom;
+use std::str;
+
+use bech32::Hrp;
 
 fn do_test(data: &[u8]) {
     if data.len() < 1 {
@@ -13,10 +16,6 @@ fn do_test(data: &[u8]) {
         return;
     }
 
-    let hrp = String::from_utf8_lossy(&data[1..hrp_end])
-        .to_lowercase()
-        .to_string();
-
     let dp = data[hrp_end..]
         .iter()
         .map(|b| bech32::u5::try_from(b % 32).unwrap())
@@ -28,11 +27,21 @@ fn do_test(data: &[u8]) {
         bech32::Variant::Bech32
     };
 
-    if let Ok(data_str) = bech32::encode(&hrp, &dp, variant).map(|b32| b32.to_string()) {
-        let decoded = bech32::decode(&data_str);
-        let b32 = decoded.expect("should be able to decode own encoding");
+    match str::from_utf8(&data[1..hrp_end]) {
+        Err(_) => return,
+        Ok(s) => {
+            match Hrp::parse(&s) {
+                Err(_) => return,
+                Ok(hrp) => {
+                    if let Ok(data_str) = bech32::encode(hrp, &dp, variant).map(|b32| b32.to_string()) {
+                        let decoded = bech32::decode(&data_str);
+                        let b32 = decoded.expect("should be able to decode own encoding");
 
-        assert_eq!(bech32::encode(&b32.0, &b32.1, b32.2).unwrap(), data_str);
+                        assert_eq!(bech32::encode(b32.0, &b32.1, b32.2).unwrap(), data_str);
+                    }
+                }
+            }
+        }
     }
 }
 

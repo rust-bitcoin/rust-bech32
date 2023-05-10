@@ -1,14 +1,13 @@
 extern crate bech32;
 
-fn do_test(data: &[u8]) {
-    let data_str = String::from_utf8_lossy(data);
-    let decoded = bech32::decode(&data_str);
-    let b32 = match decoded {
-        Ok(b32) => b32,
-        Err(_) => return,
-    };
+use bech32::Hrp;
 
-    assert_eq!(bech32::encode(b32.0, b32.1, b32.2).unwrap(), data_str);
+fn do_test(data: &[u8]) {
+    let s = String::from_utf8_lossy(data);
+
+    // Make sure parsing garbage doesn't make us crash (from_utf8_lossy should
+    // contain some garbage, perhaps even invalid chars).
+    let _ = Hrp::parse(&s);
 }
 
 #[cfg(feature = "afl")]
@@ -36,7 +35,7 @@ fn main() {
 mod tests {
     fn extend_vec_from_hex(hex: &str, out: &mut Vec<u8>) {
         let mut b = 0;
-        for (idx, c) in hex.as_bytes().iter().enumerate() {
+        for (idx, c) in hex.as_bytes().iter().filter(|&&c| c != b'\n').enumerate() {
             b <<= 4;
             match *c {
                 b'A'...b'F' => b |= c - b'A' + 10,
@@ -54,7 +53,7 @@ mod tests {
     #[test]
     fn duplicate_crash() {
         let mut a = Vec::new();
-        extend_vec_from_hex("00000000", &mut a);
+        extend_vec_from_hex("ff6c2d", &mut a);
         super::do_test(&a);
     }
 }
