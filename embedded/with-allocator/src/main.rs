@@ -11,7 +11,7 @@ use self::alloc::vec::Vec;
 use core::alloc::Layout;
 
 use alloc_cortex_m::CortexMHeap;
-use bech32::{self, FromBase32, ToBase32, Variant};
+use bech32::{self, FromBase32, ToBase32, Variant, Hrp};
 use cortex_m::asm;
 use cortex_m_rt::entry;
 use cortex_m_semihosting::{debug, hprintln};
@@ -26,8 +26,9 @@ fn main() -> ! {
     // Initialize the allocator BEFORE you use it
     unsafe { ALLOCATOR.init(cortex_m_rt::heap_start() as usize, HEAP_SIZE) }
 
+    let hrp = Hrp::parse("bech32").unwrap();
     let encoded = bech32::encode(
-        "bech32",
+        hrp,
         vec![0x00, 0x01, 0x02].to_base32(),
         Variant::Bech32,
     )
@@ -36,8 +37,8 @@ fn main() -> ! {
 
     hprintln!("{}", encoded).unwrap();
 
-    let (hrp, data, variant) = bech32::decode(&encoded).unwrap();
-    test(hrp == "bech32");
+    let (got_hrp, data, variant) = bech32::decode(&encoded).unwrap();
+    test(got_hrp == hrp);
     test(Vec::<u8>::from_base32(&data).unwrap() == vec![0x00, 0x01, 0x02]);
     test(variant == Variant::Bech32);
 
