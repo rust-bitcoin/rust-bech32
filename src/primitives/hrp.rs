@@ -46,9 +46,8 @@ impl Hrp {
 
     /// Parses the human-readable part (see [`Hrp::parse`] for full docs).
     ///
-    /// # Panics
-    ///
-    /// If the string is invalid as defined by BIP-173.
+    /// Does not check that `hrp` is valid according to BIP-173 but does check for valid ASCII
+    /// values, replacing any invalid characters with `X`.
     pub const fn parse_unchecked(hrp: &str) -> Self {
         let mut new = Hrp { buf: [0_u8; MAX_HRP_LEN], size: 0 };
         let hrp_bytes = hrp.as_bytes();
@@ -56,13 +55,13 @@ impl Hrp {
         let mut i = 0;
         // Funky code so we can be const.
         while i < hrp.len() {
-            let b = hrp_bytes[i];
+            let mut b = hrp_bytes[i];
             // Valid subset of ASCII
             if b < 33 || b > 126 {
-                panic!("invalid hrp");
+                b = b'X';
             }
 
-            new.buf[i] = hrp_bytes[i];
+            new.buf[i] = b;
             new.size += 1;
             i += 1;
         }

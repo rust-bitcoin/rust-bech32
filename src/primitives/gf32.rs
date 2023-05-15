@@ -411,8 +411,8 @@ mod tests {
 
     #[test]
     fn from_char() {
-        for c in CHARS_LOWER {
-            assert!(Fe32::from_char(c).is_ok())
+        for c in &CHARS_LOWER[..] {
+            assert!(Fe32::from_char(*c).is_ok())
         }
     }
 
@@ -426,8 +426,8 @@ mod tests {
 
     #[test]
     fn mul_zero() {
-        for c in CHARS_LOWER {
-            let fe = Fe32::from_char(c).unwrap();
+        for c in &CHARS_LOWER[..] {
+            let fe = Fe32::from_char(*c).unwrap();
             assert_eq!(fe._mul(Fe32::Q), Fe32::Q) // Fe32::Q == Fe32(0)
         }
     }
@@ -446,8 +446,8 @@ mod tests {
 
     #[test]
     fn mul_one() {
-        for c in CHARS_LOWER {
-            let fe = Fe32::from_char(c).unwrap();
+        for c in &CHARS_LOWER[..] {
+            let fe = Fe32::from_char(*c).unwrap();
             assert_eq!(fe * Fe32::P, fe) // Fe32::P == Fe32(1)
         }
     }

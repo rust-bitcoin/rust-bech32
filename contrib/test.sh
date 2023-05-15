@@ -49,8 +49,7 @@ if [ "${DO_FEATURE_MATRIX-false}" = true ]; then
     build_and_test "alloc"
     build_and_test "std alloc"
     # arrayvec breaks the MSRV
-    if [ $MSRV = false
-       ]; then
+    if [ $MSRV = false ]; then
         build_and_test "arrayvec"
         build_and_test "std arrayvec"
         build_and_test "alloc arrayvec"
