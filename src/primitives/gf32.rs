@@ -1,5 +1,3 @@
-// Written by the Andrew Poelstra and the rust-bitcoin developers.
-// (Replacing very similar code originally written by Clark Moody.)
 // SPDX-License-Identifier: MIT
 
 //! GF32 - Galois Field over 32 elements.

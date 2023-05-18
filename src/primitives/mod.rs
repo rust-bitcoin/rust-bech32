@@ -1,4 +1,3 @@
-// Written by the rust-bitcoin developers.
 // SPDX-License-Identifier: MIT
 
 //! Provides the internal nuts and bolts that enable bech32 encoding/decoding.
