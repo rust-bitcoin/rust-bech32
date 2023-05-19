@@ -51,8 +51,11 @@ use alloc::{string::String, vec::Vec};
 use core::convert::{Infallible, TryFrom};
 use core::{fmt, mem};
 
+pub use crate::primitives::checksum::Checksum;
+use crate::primitives::checksum::{self, PackedFe32};
 use crate::primitives::hrp;
 pub use crate::primitives::hrp::Hrp;
+pub use crate::primitives::{Bech32, Bech32m};
 
 mod error;
 pub mod primitives;
@@ -101,50 +104,26 @@ const CHECKSUM_LENGTH: usize = 6;
 
 /// Allocationless Bech32 writer that accumulates the checksum data internally and writes them out
 /// in the end.
-pub struct Bech32Writer<'a> {
+pub struct Bech32Writer<'a, Ck: Checksum> {
     formatter: &'a mut dyn fmt::Write,
-    chk: u32,
-    variant: Variant,
+    engine: checksum::Engine<Ck>,
 }
 
-impl<'a> Bech32Writer<'a> {
+impl<'a, Ck: Checksum> Bech32Writer<'a, Ck> {
     /// Creates a new writer that can write a bech32 string without allocating itself.
     ///
     /// This is a rather low-level API and doesn't check the HRP or data length for standard
     /// compliance.
-    pub fn new(
-        hrp: Hrp,
-        variant: Variant,
-        fmt: &'a mut dyn fmt::Write,
-    ) -> Result<Bech32Writer<'a>, fmt::Error> {
-        let mut writer = Bech32Writer { formatter: fmt, chk: 1, variant };
+    fn new(hrp: Hrp, fmt: &'a mut dyn fmt::Write) -> Result<Bech32Writer<'a, Ck>, fmt::Error> {
+        let mut engine = checksum::Engine::new();
+        engine.input_hrp(&hrp);
 
         for c in hrp.lowercase_char_iter() {
-            writer.formatter.write_char(c)?;
+            fmt.write_char(c)?;
         }
-        writer.formatter.write_char(SEP)?;
+        fmt.write_char(SEP)?;
 
-        // expand HRP
-        for b in hrp.lowercase_byte_iter() {
-            writer.polymod_step(u5(b >> 5));
-        }
-        writer.polymod_step(u5(0));
-        for b in hrp.lowercase_byte_iter() {
-            writer.polymod_step(u5(b & 0x1f));
-        }
-
-        Ok(writer)
-    }
-
-    fn polymod_step(&mut self, v: u5) {
-        let b = (self.chk >> 25) as u8;
-        self.chk = (self.chk & 0x01ff_ffff) << 5 ^ (u32::from(*v.as_ref()));
-
-        for (i, item) in GEN.iter().enumerate() {
-            if (b >> i) & 1 == 1 {
-                self.chk ^= item;
-            }
-        }
+        Ok(Bech32Writer { formatter: fmt, engine })
     }
 
     /// Writes out the checksum at the end.
@@ -158,31 +137,31 @@ impl<'a> Bech32Writer<'a> {
 
     /// Calculates and writes a checksum to `self`.
     fn write_checksum(&mut self) -> fmt::Result {
-        // Pad with 6 zeros
-        for _ in 0..CHECKSUM_LENGTH {
-            self.polymod_step(u5(0))
-        }
+        self.engine.input_target_residue();
 
-        let plm: u32 = self.chk ^ self.variant.constant();
+        let mut checksum_remaining = self::CHECKSUM_LENGTH;
+        while checksum_remaining > 0 {
+            checksum_remaining -= 1;
 
-        for p in 0..CHECKSUM_LENGTH {
-            self.formatter.write_char(u5(((plm >> (5 * (5 - p))) & 0x1f) as u8).to_char())?;
+            let fe = u5::try_from(self.engine.residue().unpack(checksum_remaining))
+                .expect("unpack returns valid field element");
+            self.formatter.write_char(fe.to_char())?;
         }
 
         Ok(())
     }
 }
 
-impl<'a> WriteBase32 for Bech32Writer<'a> {
+impl<'a, Ck: Checksum> WriteBase32 for Bech32Writer<'a, Ck> {
     type Error = fmt::Error;
 
     fn write_u5(&mut self, data: u5) -> fmt::Result {
-        self.polymod_step(data);
+        self.engine.input_fe(data);
         self.formatter.write_char(data.to_char())
     }
 }
 
-impl<'a> Drop for Bech32Writer<'a> {
+impl<'a, Ck: Checksum> Drop for Bech32Writer<'a, Ck> {
     fn drop(&mut self) {
         self.write_checksum().expect("Unhandled error writing the checksum on drop.")
     }
@@ -441,14 +420,31 @@ pub fn encode_to_fmt_anycase<T: AsRef<[u5]>>(
     data: T,
     variant: Variant,
 ) -> Result<fmt::Result, Error> {
-    match Bech32Writer::new(hrp, variant, fmt) {
-        Ok(mut writer) => {
-            Ok(writer.write(data.as_ref()).and_then(|_| {
-                // Finalize manually to avoid panic on drop if write fails
-                writer.finalize()
-            }))
+    match variant {
+        Variant::Bech32 => {
+            let res = Bech32Writer::<Bech32>::new(hrp, fmt);
+            match res {
+                Ok(mut writer) => {
+                    Ok(writer.write(data.as_ref()).and_then(|_| {
+                        // Finalize manually to avoid panic on drop if write fails
+                        writer.finalize()
+                    }))
+                }
+                Err(e) => Ok(Err(e)),
+            }
         }
-        Err(e) => Ok(Err(e)),
+        Variant::Bech32m => {
+            let res = Bech32Writer::<Bech32m>::new(hrp, fmt);
+            match res {
+                Ok(mut writer) => {
+                    Ok(writer.write(data.as_ref()).and_then(|_| {
+                        // Finalize manually to avoid panic on drop if write fails
+                        writer.finalize()
+                    }))
+                }
+                Err(e) => Ok(Err(e)),
+            }
+        }
     }
 }
 
@@ -500,13 +496,6 @@ impl Variant {
             BECH32_CONST => Some(Variant::Bech32),
             BECH32M_CONST => Some(Variant::Bech32m),
             _ => None,
-        }
-    }
-
-    fn constant(self) -> u32 {
-        match self {
-            Variant::Bech32 => BECH32_CONST,
-            Variant::Bech32m => BECH32M_CONST,
         }
     }
 }
@@ -1118,7 +1107,7 @@ mod tests {
 
         let mut written_str = String::new();
         {
-            let mut writer = Bech32Writer::new(hrp, Variant::Bech32, &mut written_str).unwrap();
+            let mut writer = Bech32Writer::<Bech32>::new(hrp, &mut written_str).unwrap();
             writer.write(&data).unwrap();
             writer.finalize().unwrap();
         }
@@ -1136,7 +1125,7 @@ mod tests {
 
         let mut written_str = String::new();
         {
-            let mut writer = Bech32Writer::new(hrp, Variant::Bech32, &mut written_str).unwrap();
+            let mut writer = Bech32Writer::<Bech32>::new(hrp, &mut written_str).unwrap();
             writer.write(&data).unwrap();
         }
 
@@ -1153,7 +1142,7 @@ mod tests {
 
         let mut written_str = String::new();
         {
-            let mut writer = Bech32Writer::new(hrp, Variant::Bech32, &mut written_str).unwrap();
+            let mut writer = Bech32Writer::<Bech32>::new(hrp, &mut written_str).unwrap();
             writer.write(&data).unwrap();
         }
 
@@ -1258,9 +1247,8 @@ mod tests {
         let data: Vec<u8> = FromBase32::from_base32(&data[1..]).expect("failed to convert u5s");
 
         let mut writer = String::new();
-        let mut bech32_writer =
-            Bech32Writer::new(Hrp::parse("BC").unwrap(), Variant::Bech32, &mut writer)
-                .expect("failed to write hrp");
+        let mut bech32_writer = Bech32Writer::<Bech32>::new(Hrp::parse("BC").unwrap(), &mut writer)
+            .expect("failed to write hrp");
         let version = u5::try_from(0).unwrap();
 
         WriteBase32::write_u5(&mut bech32_writer, version).expect("failed to write version");
