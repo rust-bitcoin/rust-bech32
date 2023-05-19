@@ -5,9 +5,6 @@
 set -eu
 set -x
 
-# "arrayvec" feature breaks the MSRV, its added manually in DO_FEATURE_MATRIX loop below.
-FEATURES="std alloc"
-
 # Some tests require certain toolchain types.
 NIGHTLY=false
 MSRV=false
@@ -52,8 +49,7 @@ if [ "${DO_FEATURE_MATRIX-false}" = true ]; then
     build_and_test "alloc"
     build_and_test "std alloc"
     # arrayvec breaks the MSRV
-    if [ $MSRV = false
-       ]; then
+    if [ $MSRV = false ]; then
         build_and_test "arrayvec"
         build_and_test "std arrayvec"
         build_and_test "alloc arrayvec"

@@ -32,6 +32,8 @@ jobs:
       - name: Checkout Toolchain
         uses: dtolnay/rust-toolchain@beta
       - name: Running test script
+        env:
+          DO_FEATURE_MATRIX: true
         run: ./contrib/test.sh
 
   Nightly:
@@ -62,6 +64,8 @@ jobs:
       - name: Checkout Toolchain
         uses: dtolnay/rust-toolchain@1.48.0
       - name: Running test script
+        env:
+          DO_FEATURE_MATRIX: true
         run: ./contrib/test.sh
 
   EmbeddedWithAlloc:
