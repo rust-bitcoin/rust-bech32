@@ -114,7 +114,7 @@ impl<'a, Ck: Checksum> Bech32Writer<'a, Ck> {
     ///
     /// This is a rather low-level API and doesn't check the HRP or data length for standard
     /// compliance.
-    fn new(hrp: Hrp, fmt: &'a mut dyn fmt::Write) -> Result<Bech32Writer<'a, Ck>, fmt::Error> {
+    pub fn new(hrp: Hrp, fmt: &'a mut dyn fmt::Write) -> Result<Bech32Writer<'a, Ck>, fmt::Error> {
         let mut engine = checksum::Engine::new();
         engine.input_hrp(&hrp);
 
