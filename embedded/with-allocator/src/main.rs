@@ -31,8 +31,7 @@ fn main() -> ! {
         hrp,
         vec![0x00, 0x01, 0x02].to_base32(),
         Variant::Bech32,
-    )
-    .unwrap();
+    );
     test(encoded == "bech321qqqsyrhqy2a".to_string());
 
     hprintln!("{}", encoded).unwrap();

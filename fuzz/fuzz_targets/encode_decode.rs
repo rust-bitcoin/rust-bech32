@@ -33,12 +33,11 @@ fn do_test(data: &[u8]) {
             match Hrp::parse(&s) {
                 Err(_) => return,
                 Ok(hrp) => {
-                    if let Ok(data_str) = bech32::encode(hrp, &dp, variant).map(|b32| b32.to_string()) {
-                        let decoded = bech32::decode(&data_str);
-                        let b32 = decoded.expect("should be able to decode own encoding");
+                    let encoded = bech32::encode(hrp, &dp, variant);
+                    let decoded = bech32::decode(&encoded);
+                    let b32 = decoded.expect("should be able to decode own encoding");
 
-                        assert_eq!(bech32::encode(b32.0, &b32.1, b32.2).unwrap(), data_str);
-                    }
+                    assert_eq!(bech32::encode(b32.0, &b32.1, b32.2), encoded);
                 }
             }
         }

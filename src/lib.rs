@@ -19,7 +19,7 @@
 ```
 use bech32::{self, FromBase32, ToBase32, Variant, Hrp};
 let hrp = Hrp::parse(\"bech32\").expect(\"bech32 is valid\");
-let encoded = bech32::encode(hrp, vec![0x00, 0x01, 0x02].to_base32(), Variant::Bech32).unwrap();
+let encoded = bech32::encode(hrp, vec![0x00, 0x01, 0x02].to_base32(), Variant::Bech32);
 assert_eq!(encoded, \"bech321qqqsyrhqy2a\".to_string());
 let (hrp, data, variant) = bech32::decode(&encoded).unwrap();
 assert_eq!(hrp.to_string(), \"bech32\");
@@ -398,13 +398,12 @@ enum Case {
 /// # Deviations from standard.
 ///
 /// * No length limits are enforced for the data part.
-// TODO: This function is now infallible except for write errors, fix the return value.
 pub fn encode_to_fmt<T: AsRef<[u5]>>(
     fmt: &mut dyn fmt::Write,
     hrp: Hrp,
     data: T,
     variant: Variant,
-) -> Result<fmt::Result, Error> {
+) -> fmt::Result {
     use crate::primitives::iter::Fe32IterExt;
 
     match variant {
@@ -417,9 +416,7 @@ pub fn encode_to_fmt<T: AsRef<[u5]>>(
                 .with_checksummed_hrp(&hrp)
                 .hrp_char(&hrp)
             {
-                if let Err(e) = fmt.write_char(c) {
-                    return Ok(Err(e));
-                }
+                fmt.write_char(c)?;
             },
         Variant::Bech32m =>
             for c in data
@@ -430,12 +427,10 @@ pub fn encode_to_fmt<T: AsRef<[u5]>>(
                 .with_checksummed_hrp(&hrp)
                 .hrp_char(&hrp)
             {
-                if let Err(e) = fmt.write_char(c) {
-                    return Ok(Err(e));
-                }
+                fmt.write_char(c)?;
             },
     }
-    Ok(Ok(()))
+    Ok(())
 }
 
 /// Encodes a bech32 payload without a checksum to a writer ([`fmt::Write`]).
@@ -497,10 +492,27 @@ impl Variant {
 /// * Deviations from standard.
 /// * No length limits are enforced for the data part.
 #[cfg(feature = "alloc")]
-pub fn encode<T: AsRef<[u5]>>(hrp: Hrp, data: T, variant: Variant) -> Result<String, Error> {
-    let mut buf = String::new();
-    encode_to_fmt(&mut buf, hrp, data, variant)?.unwrap();
-    Ok(buf)
+pub fn encode<T: AsRef<[u5]>>(hrp: Hrp, data: T, variant: Variant) -> String {
+    use crate::primitives::iter::Fe32IterExt;
+
+    match variant {
+        Variant::Bech32 => data
+            .as_ref()
+            .iter()
+            .copied()
+            .checksum::<Bech32>()
+            .with_checksummed_hrp(&hrp)
+            .hrp_char(&hrp)
+            .collect(),
+        Variant::Bech32m => data
+            .as_ref()
+            .iter()
+            .copied()
+            .checksum::<Bech32m>()
+            .with_checksummed_hrp(&hrp)
+            .hrp_char(&hrp)
+            .collect(),
+    }
 }
 
 /// Encodes a bech32 payload to string without the checksum.
@@ -930,7 +942,7 @@ mod tests {
         for s in strings {
             match decode(s) {
                 Ok((hrp, payload, variant)) => {
-                    let encoded = encode(hrp, payload, variant).unwrap();
+                    let encoded = encode(hrp, payload, variant);
                     assert_eq!(s.to_lowercase(), encoded.to_lowercase());
                 }
                 Err(e) => panic!("Did not decode: {:?} Reason: {:?}", s, e),
@@ -1102,7 +1114,7 @@ mod tests {
             writer.finalize().unwrap();
         }
 
-        let encoded_str = encode(hrp, data, Variant::Bech32).unwrap();
+        let encoded_str = encode(hrp, data, Variant::Bech32);
 
         assert_eq!(encoded_str, written_str);
     }
@@ -1136,7 +1148,7 @@ mod tests {
             writer.write(&data).unwrap();
         }
 
-        let encoded_str = encode(hrp, data, Variant::Bech32).unwrap();
+        let encoded_str = encode(hrp, data, Variant::Bech32);
 
         assert_eq!(encoded_str, written_str);
     }
@@ -1159,7 +1171,7 @@ mod tests {
     #[cfg(feature = "alloc")]
     fn test_hrp_case() {
         // Tests for issue with HRP case checking being ignored for encoding
-        let encoded_str = encode(hrp("HRP"), [0x00, 0x00].to_base32(), Variant::Bech32).unwrap();
+        let encoded_str = encode(hrp("HRP"), [0x00, 0x00].to_base32(), Variant::Bech32);
 
         assert_eq!(encoded_str, "hrp1qqqq40atq3");
     }
@@ -1183,7 +1195,7 @@ mod tests {
         [0x00u8, 0x01, 0x02].write_base32(&mut base32).unwrap();
 
         let bech32_hrp = Hrp::parse("bech32").expect("bech32 is valid");
-        encode_to_fmt(&mut encoded, bech32_hrp, &base32, Variant::Bech32).unwrap().unwrap();
+        encode_to_fmt(&mut encoded, bech32_hrp, &base32, Variant::Bech32).unwrap();
         assert_eq!(&*encoded, "bech321qqqsyrhqy2a");
 
         println!("{}", encoded);
@@ -1225,7 +1237,7 @@ mod tests {
         let (hrp, data, variant) = crate::decode(addr).expect("address is well formed");
         assert_eq!(hrp, Hrp::parse("2345").unwrap());
         let hrp = Hrp::parse("2345").unwrap();
-        let s = crate::encode(hrp, data, variant).expect("failed to encode");
+        let s = crate::encode(hrp, data, variant);
         assert_eq!(s.to_uppercase(), addr);
     }
 
@@ -1281,7 +1293,7 @@ mod benches {
         let (hrp, data, variant) = crate::decode(&addr).expect("address is well formed");
 
         bh.iter(|| {
-            let s = crate::encode(hrp, &data, variant).expect("failed to encode");
+            let s = crate::encode(hrp, &data, variant);
             black_box(&s);
         });
     }
@@ -1307,7 +1319,7 @@ mod benches {
         let (hrp, data, variant) = crate::decode(&addr).expect("address is well formed");
 
         bh.iter(|| {
-            let s = crate::encode(hrp, &data, variant).expect("failed to encode");
+            let s = crate::encode(hrp, &data, variant);
             black_box(&s);
         });
     }
