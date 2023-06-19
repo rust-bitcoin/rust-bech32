@@ -395,19 +395,47 @@ enum Case {
 ///
 /// This method is intended for implementing traits from [`std::fmt`].
 ///
-/// # Errors
+/// # Deviations from standard.
 ///
-/// * Deviations from standard.
 /// * No length limits are enforced for the data part.
+// TODO: This function is now infallible except for write errors, fix the return value.
 pub fn encode_to_fmt<T: AsRef<[u5]>>(
     fmt: &mut dyn fmt::Write,
     hrp: Hrp,
     data: T,
     variant: Variant,
 ) -> Result<fmt::Result, Error> {
-    let mut hrp = hrp;
-    hrp.lowercase();
-    encode_to_fmt_anycase(fmt, hrp, data, variant)
+    use crate::primitives::iter::Fe32IterExt;
+
+    match variant {
+        Variant::Bech32 =>
+            for c in data
+                .as_ref()
+                .iter()
+                .copied()
+                .checksum::<Bech32>()
+                .with_checksummed_hrp(&hrp)
+                .hrp_char(&hrp)
+            {
+                if let Err(e) = fmt.write_char(c) {
+                    return Ok(Err(e));
+                }
+            },
+        Variant::Bech32m =>
+            for c in data
+                .as_ref()
+                .iter()
+                .copied()
+                .checksum::<Bech32m>()
+                .with_checksummed_hrp(&hrp)
+                .hrp_char(&hrp)
+            {
+                if let Err(e) = fmt.write_char(c) {
+                    return Ok(Err(e));
+                }
+            },
+    }
+    Ok(Ok(()))
 }
 
 /// Encode a bech32 payload to an [fmt::Write], but with any case.

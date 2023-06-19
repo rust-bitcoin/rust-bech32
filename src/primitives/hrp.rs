@@ -114,16 +114,6 @@ impl Hrp {
         Ok((new, case))
     }
 
-    /// Lowercase the inner ASCII bytes of this HRP.
-    // This is a hack to support `encode_to_fmt`, we should remove this function.
-    pub(crate) fn lowercase(&mut self) {
-        for b in self.buf.iter_mut() {
-            if is_ascii_uppercase(*b) {
-                *b |= 32;
-            }
-        }
-    }
-
     /// Returns this human-readable part as a lowercase string.
     #[cfg(feature = "alloc")]
     pub fn to_lowercase(&self) -> String { self.lowercase_char_iter().collect() }
