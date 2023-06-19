@@ -438,44 +438,6 @@ pub fn encode_to_fmt<T: AsRef<[u5]>>(
     Ok(Ok(()))
 }
 
-/// Encode a bech32 payload to an [fmt::Write], but with any case.
-/// This method is intended for implementing traits from [core::fmt] without [std].
-///
-/// See `encode_to_fmt` for meaning of errors.
-pub fn encode_to_fmt_anycase<T: AsRef<[u5]>>(
-    fmt: &mut dyn fmt::Write,
-    hrp: Hrp,
-    data: T,
-    variant: Variant,
-) -> Result<fmt::Result, Error> {
-    match variant {
-        Variant::Bech32 => {
-            let res = Bech32Writer::<Bech32>::new(hrp, fmt);
-            match res {
-                Ok(mut writer) => {
-                    Ok(writer.write(data.as_ref()).and_then(|_| {
-                        // Finalize manually to avoid panic on drop if write fails
-                        writer.finalize()
-                    }))
-                }
-                Err(e) => Ok(Err(e)),
-            }
-        }
-        Variant::Bech32m => {
-            let res = Bech32Writer::<Bech32m>::new(hrp, fmt);
-            match res {
-                Ok(mut writer) => {
-                    Ok(writer.write(data.as_ref()).and_then(|_| {
-                        // Finalize manually to avoid panic on drop if write fails
-                        writer.finalize()
-                    }))
-                }
-                Err(e) => Ok(Err(e)),
-            }
-        }
-    }
-}
-
 /// Encodes a bech32 payload without a checksum to a writer ([`fmt::Write`]).
 ///
 /// This method is intended for implementing traits from [`std::fmt`].
@@ -1221,7 +1183,7 @@ mod tests {
         [0x00u8, 0x01, 0x02].write_base32(&mut base32).unwrap();
 
         let bech32_hrp = Hrp::parse("bech32").expect("bech32 is valid");
-        encode_to_fmt_anycase(&mut encoded, bech32_hrp, &base32, Variant::Bech32).unwrap().unwrap();
+        encode_to_fmt(&mut encoded, bech32_hrp, &base32, Variant::Bech32).unwrap().unwrap();
         assert_eq!(&*encoded, "bech321qqqsyrhqy2a");
 
         println!("{}", encoded);

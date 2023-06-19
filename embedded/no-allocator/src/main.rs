@@ -26,7 +26,7 @@ fn main() -> ! {
 
     let hrp = Hrp::parse("bech32").unwrap();
 
-    bech32::encode_to_fmt_anycase(&mut encoded, hrp, &base32, Variant::Bech32)
+    bech32::encode_to_fmt(&mut encoded, hrp, &base32, Variant::Bech32)
         .unwrap()
         .unwrap();
     test(&*encoded == "bech321qqqsyrhqy2a");
