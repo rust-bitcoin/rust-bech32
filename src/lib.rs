@@ -49,10 +49,9 @@ extern crate core;
 #[cfg(all(feature = "alloc", not(feature = "std"), not(test)))]
 use alloc::{string::String, vec::Vec};
 use core::convert::{Infallible, TryFrom};
-use core::{fmt, mem};
+use core::fmt;
 
 pub use crate::primitives::checksum::Checksum;
-use crate::primitives::checksum::{self, PackedFe32};
 use crate::primitives::hrp;
 pub use crate::primitives::hrp::Hrp;
 pub use crate::primitives::{Bech32, Bech32m};
@@ -100,72 +99,8 @@ pub trait WriteBase256 {
     fn write_u8(&mut self, data: u8) -> Result<(), Self::Error> { self.write(&[data]) }
 }
 
+#[cfg(feature = "alloc")]
 const CHECKSUM_LENGTH: usize = 6;
-
-/// Allocationless Bech32 writer that accumulates the checksum data internally and writes them out
-/// in the end.
-pub struct Bech32Writer<'a, Ck: Checksum> {
-    formatter: &'a mut dyn fmt::Write,
-    engine: checksum::Engine<Ck>,
-}
-
-impl<'a, Ck: Checksum> Bech32Writer<'a, Ck> {
-    /// Creates a new writer that can write a bech32 string without allocating itself.
-    ///
-    /// This is a rather low-level API and doesn't check the HRP or data length for standard
-    /// compliance.
-    pub fn new(hrp: Hrp, fmt: &'a mut dyn fmt::Write) -> Result<Bech32Writer<'a, Ck>, fmt::Error> {
-        let mut engine = checksum::Engine::new();
-        engine.input_hrp(&hrp);
-
-        for c in hrp.lowercase_char_iter() {
-            fmt.write_char(c)?;
-        }
-        fmt.write_char(SEP)?;
-
-        Ok(Bech32Writer { formatter: fmt, engine })
-    }
-
-    /// Writes out the checksum at the end.
-    ///
-    /// If this method isn't explicitly called this will happen on drop.
-    pub fn finalize(mut self) -> fmt::Result {
-        self.write_checksum()?;
-        mem::forget(self);
-        Ok(())
-    }
-
-    /// Calculates and writes a checksum to `self`.
-    fn write_checksum(&mut self) -> fmt::Result {
-        self.engine.input_target_residue();
-
-        let mut checksum_remaining = self::CHECKSUM_LENGTH;
-        while checksum_remaining > 0 {
-            checksum_remaining -= 1;
-
-            let fe = u5::try_from(self.engine.residue().unpack(checksum_remaining))
-                .expect("unpack returns valid field element");
-            self.formatter.write_char(fe.to_char())?;
-        }
-
-        Ok(())
-    }
-}
-
-impl<'a, Ck: Checksum> WriteBase32 for Bech32Writer<'a, Ck> {
-    type Error = fmt::Error;
-
-    fn write_u5(&mut self, data: u5) -> fmt::Result {
-        self.engine.input_fe(data);
-        self.formatter.write_char(data.to_char())
-    }
-}
-
-impl<'a, Ck: Checksum> Drop for Bech32Writer<'a, Ck> {
-    fn drop(&mut self) {
-        self.write_checksum().expect("Unhandled error writing the checksum on drop.")
-    }
-}
 
 /// Parses/converts base32 slice to `Self`.
 ///
@@ -1103,58 +1038,6 @@ mod tests {
 
     #[test]
     #[cfg(feature = "alloc")]
-    fn write_with_checksum() {
-        let hrp = hrp("lnbc");
-        let data = "Hello World!".as_bytes().to_base32();
-
-        let mut written_str = String::new();
-        {
-            let mut writer = Bech32Writer::<Bech32>::new(hrp, &mut written_str).unwrap();
-            writer.write(&data).unwrap();
-            writer.finalize().unwrap();
-        }
-
-        let encoded_str = encode(hrp, data, Variant::Bech32);
-
-        assert_eq!(encoded_str, written_str);
-    }
-
-    #[test]
-    #[cfg(feature = "alloc")]
-    fn write_without_checksum() {
-        let hrp = hrp("lnbc");
-        let data = "Hello World!".as_bytes().to_base32();
-
-        let mut written_str = String::new();
-        {
-            let mut writer = Bech32Writer::<Bech32>::new(hrp, &mut written_str).unwrap();
-            writer.write(&data).unwrap();
-        }
-
-        let encoded_str = encode_without_checksum(hrp, data).unwrap();
-
-        assert_eq!(encoded_str, written_str[..written_str.len() - CHECKSUM_LENGTH]);
-    }
-
-    #[test]
-    #[cfg(feature = "alloc")]
-    fn write_with_checksum_on_drop() {
-        let hrp = hrp("lntb");
-        let data = "Hello World!".as_bytes().to_base32();
-
-        let mut written_str = String::new();
-        {
-            let mut writer = Bech32Writer::<Bech32>::new(hrp, &mut written_str).unwrap();
-            writer.write(&data).unwrap();
-        }
-
-        let encoded_str = encode(hrp, data, Variant::Bech32);
-
-        assert_eq!(encoded_str, written_str);
-    }
-
-    #[test]
-    #[cfg(feature = "alloc")]
     fn roundtrip_without_checksum() {
         let hrp = hrp("lnbc");
         let data = "Hello World!".as_bytes().to_base32();
@@ -1239,26 +1122,6 @@ mod tests {
         let hrp = Hrp::parse("2345").unwrap();
         let s = crate::encode(hrp, data, variant);
         assert_eq!(s.to_uppercase(), addr);
-    }
-
-    #[test]
-    #[cfg(feature = "alloc")]
-    fn writer_lowercases_hrp_when_adding_to_checksum() {
-        let addr = "BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4";
-        let (_hrp, data, _variant) = crate::decode(addr).expect("failed to decode");
-        let data: Vec<u8> = FromBase32::from_base32(&data[1..]).expect("failed to convert u5s");
-
-        let mut writer = String::new();
-        let mut bech32_writer = Bech32Writer::<Bech32>::new(Hrp::parse("BC").unwrap(), &mut writer)
-            .expect("failed to write hrp");
-        let version = u5::try_from(0).unwrap();
-
-        WriteBase32::write_u5(&mut bech32_writer, version).expect("failed to write version");
-        ToBase32::write_base32(&data, &mut bech32_writer).expect("failed to write data");
-
-        drop(bech32_writer);
-
-        assert_eq!(writer, addr.to_lowercase());
     }
 }
 
