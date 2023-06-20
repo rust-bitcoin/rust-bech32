@@ -372,9 +372,8 @@ pub fn encode_to_fmt<T: AsRef<[u5]>>(
 ///
 /// This method is intended for implementing traits from [`std::fmt`].
 ///
-/// # Errors
+/// # Deviations from standard.
 ///
-/// * Deviations from standard.
 /// * No length limits are enforced for the data part.
 pub fn encode_without_checksum_to_fmt<T: AsRef<[u5]>>(
     fmt: &mut dyn fmt::Write,
@@ -422,9 +421,8 @@ impl Variant {
 
 /// Encodes a bech32 payload to string.
 ///
-/// # Errors
+/// # Deviations from standard.
 ///
-/// * Deviations from standard.
 /// * No length limits are enforced for the data part.
 #[cfg(feature = "alloc")]
 pub fn encode<T: AsRef<[u5]>>(hrp: Hrp, data: T, variant: Variant) -> String {
@@ -452,9 +450,8 @@ pub fn encode<T: AsRef<[u5]>>(hrp: Hrp, data: T, variant: Variant) -> String {
 
 /// Encodes a bech32 payload to string without the checksum.
 ///
-/// # Errors
+/// # Deviations from standard.
 ///
-/// * Deviations from standard.
 /// * No length limits are enforced for the data part.
 #[cfg(feature = "alloc")]
 pub fn encode_without_checksum<T: AsRef<[u5]>>(hrp: Hrp, data: T) -> Result<String, Error> {
