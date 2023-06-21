@@ -10,7 +10,8 @@
 use panic_halt as _;
 
 use arrayvec::{ArrayString, ArrayVec};
-use bech32::{self, u5, ComboError, FromBase32, ToBase32, Variant, Hrp};
+use bech32::{self, u5, ComboError, Variant, Hrp};
+use bech32::primitives::iter::{Fe32IterExt, ByteIterExt};
 use cortex_m_rt::entry;
 use cortex_m_semihosting::{debug, hprintln};
 
@@ -21,8 +22,9 @@ fn main() -> ! {
     let mut encoded = ArrayString::<30>::new();
 
     let mut base32 = ArrayVec::<u5, 30>::new();
-
-    [0x00u8, 0x01, 0x02].write_base32(&mut base32).unwrap();
+    for fe in [0x00u8, 0x01, 0x02].iter().copied().bytes_to_fes() {
+        base32.push(fe);
+    }
 
     let hrp = Hrp::parse("bech32").unwrap();
 
@@ -38,7 +40,12 @@ fn main() -> ! {
     let (got_hrp, data, variant) =
         bech32::decode_lowercase::<ComboError, _, _>(&encoded, &mut decoded, &mut scratch).unwrap();
     test(got_hrp == hrp);
-    let res = ArrayVec::<u8, 30>::from_base32(&data).unwrap();
+
+    let mut res = ArrayVec::<u8, 30>::new();
+    for byte in data.iter().copied().fes_to_bytes() {
+        res.push(byte);
+    }
+
     test(&res == [0x00, 0x01, 0x02].as_ref());
     test(variant == Variant::Bech32);
 

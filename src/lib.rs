@@ -84,17 +84,6 @@ pub trait WriteBase256 {
 #[cfg(feature = "alloc")]
 const CHECKSUM_LENGTH: usize = 6;
 
-/// Parses/converts base32 slice to `Self`.
-///
-/// This trait is the reciprocal of `ToBase32`.
-pub trait FromBase32: Sized {
-    /// The associated error which can be returned from parsing (e.g. because of bad padding).
-    type Error;
-
-    /// Converts a base32 slice to `Self`.
-    fn from_base32(b32: &[u5]) -> Result<Self, Self::Error>;
-}
-
 macro_rules! write_base_n {
     { $tr:ident, $ty:ident, $meth:ident } => {
         #[cfg(feature = "arrayvec")]
@@ -152,116 +141,6 @@ impl From<CapacityError> for ComboError {
 #[cfg(feature = "arrayvec")]
 impl From<hrp::Error> for ComboError {
     fn from(e: hrp::Error) -> ComboError { ComboError::Bech32Error(Error::Hrp(e)) }
-}
-
-#[cfg(feature = "arrayvec")]
-impl<const L: usize> FromBase32 for ArrayVec<u8, L> {
-    type Error = ComboError;
-
-    /// Convert base32 to base256, removes null-padding if present, returns
-    /// `Err(Error::InvalidPadding)` if padding bits are unequal `0`
-    fn from_base32(b32: &[u5]) -> Result<Self, Self::Error> {
-        let mut ret: ArrayVec<u8, L> = ArrayVec::new();
-        convert_bits_in::<ComboError, _, _>(b32, 5, 8, false, &mut ret)?;
-        Ok(ret)
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl FromBase32 for Vec<u8> {
-    type Error = Error;
-
-    /// Converts base32 (slice of u5s) to base256 (vector of u8s).
-    ///
-    /// Removes null-padding if present.
-    ///
-    /// # Errors
-    ///
-    /// Uses [`convert_bits`] to convert 5 bit values to 8 bit values, see that function for errors.
-    fn from_base32(b32: &[u5]) -> Result<Self, Self::Error> { convert_bits(b32, 5, 8, false) }
-}
-
-/// A trait for converting a value to a type `T` that represents a `u5` slice.
-///
-/// This trait is the reciprocal of `FromBase32`.
-pub trait ToBase32 {
-    /// Converts `Self` to a base32 vector.
-    #[cfg(feature = "alloc")]
-    fn to_base32(&self) -> Vec<u5> {
-        let mut vec = Vec::new();
-        self.write_base32(&mut vec).unwrap();
-        vec
-    }
-
-    /// Encodes `Self` as base32 and writes it to the supplied writer.
-    ///
-    /// Implementations should not allocate.
-    fn write_base32<W: WriteBase32>(&self, writer: &mut W)
-        -> Result<(), <W as WriteBase32>::Error>;
-}
-
-/// Interface to calculate the length of the base32 representation before actually serializing.
-pub trait Base32Len: ToBase32 {
-    /// Calculates the base32 serialized length.
-    fn base32_len(&self) -> usize;
-}
-
-impl<T: AsRef<[u8]> + ?Sized> ToBase32 for T {
-    fn write_base32<W: WriteBase32>(
-        &self,
-        writer: &mut W,
-    ) -> Result<(), <W as WriteBase32>::Error> {
-        // Amount of bits left over from last round, stored in buffer.
-        let mut buffer_bits = 0u32;
-        // Holds all unwritten bits left over from last round. The bits are stored beginning from
-        // the most significant bit. E.g. if buffer_bits=3, then the byte with bits a, b and c will
-        // look as follows: [a, b, c, 0, 0, 0, 0, 0]
-        let mut buffer: u8 = 0;
-
-        for &b in self.as_ref() {
-            // Write first u5 if we have to write two u5s this round. That only happens if the
-            // buffer holds too many bits, so we don't have to combine buffer bits with new bits
-            // from this rounds byte.
-            if buffer_bits >= 5 {
-                writer.write_u5(u5((buffer & 0b1111_1000) >> 3))?;
-                buffer <<= 5;
-                buffer_bits -= 5;
-            }
-
-            // Combine all bits from buffer with enough bits from this rounds byte so that they fill
-            // a u5. Save reamining bits from byte to buffer.
-            let from_buffer = buffer >> 3;
-            let from_byte = b >> (3 + buffer_bits); // buffer_bits <= 4
-
-            writer.write_u5(u5(from_buffer | from_byte))?;
-            buffer = b << (5 - buffer_bits);
-            buffer_bits += 3;
-        }
-
-        // There can be at most two u5s left in the buffer after processing all bytes, write them.
-        if buffer_bits >= 5 {
-            writer.write_u5(u5((buffer & 0b1111_1000) >> 3))?;
-            buffer <<= 5;
-            buffer_bits -= 5;
-        }
-
-        if buffer_bits != 0 {
-            writer.write_u5(u5(buffer >> 3))?;
-        }
-
-        Ok(())
-    }
-}
-
-impl<T: AsRef<[u8]> + ?Sized> Base32Len for T {
-    fn base32_len(&self) -> usize {
-        let bits = self.as_ref().len() * 8;
-        if bits % 5 == 0 {
-            bits / 5
-        } else {
-            bits / 5 + 1
-        }
-    }
 }
 
 /// A trait to convert between u8 arrays and u5 arrays without changing the content of the elements,
@@ -800,6 +679,7 @@ mod tests {
     use arrayvec::ArrayString;
 
     use super::*;
+    use crate::primitives::iter::{ByteIterExt, Fe32IterExt};
 
     #[cfg(feature = "alloc")]
     fn hrp(s: &str) -> Hrp { Hrp::parse_unchecked(s) }
@@ -1001,25 +881,9 @@ mod tests {
 
     #[test]
     #[cfg(feature = "alloc")]
-    fn from_base32() {
-        assert_eq!(Vec::from_base32(&[0x1f, 0x1c].check_base32_vec().unwrap()), Ok(vec![0xff]));
-        assert_eq!(
-            Vec::from_base32(&[0x1f, 0x1f].check_base32_vec().unwrap()),
-            Err(Error::InvalidPadding)
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "alloc")]
-    fn to_base32() {
-        assert_eq!([0xffu8].to_base32(), [0x1f, 0x1c].check_base32_vec().unwrap());
-    }
-
-    #[test]
-    #[cfg(feature = "alloc")]
     fn roundtrip_without_checksum() {
         let hrp = hrp("lnbc");
-        let data = "Hello World!".as_bytes().to_base32();
+        let data = "Hello World!".as_bytes().iter().copied().bytes_to_fes().collect::<Vec<u5>>();
 
         let encoded = encode_without_checksum(hrp, data.clone()).expect("failed to encode");
         let (decoded_hrp, decoded_data) =
@@ -1032,8 +896,9 @@ mod tests {
     #[test]
     #[cfg(feature = "alloc")]
     fn test_hrp_case() {
+        let fes = [0x00, 0x00].iter().copied().bytes_to_fes().collect::<Vec<u5>>();
         // Tests for issue with HRP case checking being ignored for encoding
-        let encoded_str = encode(hrp("HRP"), [0x00, 0x00].to_base32(), Variant::Bech32);
+        let encoded_str = encode(hrp("HRP"), fes, Variant::Bech32);
 
         assert_eq!(encoded_str, "hrp1qqqq40atq3");
     }
@@ -1053,8 +918,9 @@ mod tests {
         let mut encoded = ArrayString::<30>::new();
 
         let mut base32 = ArrayVec::<u5, 30>::new();
-
-        [0x00u8, 0x01, 0x02].write_base32(&mut base32).unwrap();
+        for fe in [0x00u8, 0x01, 0x02].iter().copied().bytes_to_fes() {
+            base32.push(fe);
+        }
 
         let bech32_hrp = Hrp::parse("bech32").expect("bech32 is valid");
         encode_to_fmt(&mut encoded, bech32_hrp, &base32, Variant::Bech32).unwrap();
@@ -1069,7 +935,10 @@ mod tests {
         let (hrp, data, variant) =
             decode_lowercase::<ComboError, _, _>(&encoded, &mut decoded, &mut scratch).unwrap();
         assert_eq!(hrp.to_string(), "bech32");
-        let res = ArrayVec::<u8, 30>::from_base32(data).unwrap();
+        let mut res = ArrayVec::<u8, 30>::new();
+        for byte in data.iter().copied().fes_to_bytes() {
+            res.push(byte);
+        }
         assert_eq!(&res, [0x00, 0x01, 0x02].as_ref());
         assert_eq!(variant, Variant::Bech32);
     }
