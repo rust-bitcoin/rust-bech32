@@ -183,6 +183,8 @@ impl Fe32 {
         Ok(Fe32(u5))
     }
 
+    pub(crate) fn from_char_unchecked(c: u8) -> Fe32 { Fe32(CHARS_INV[usize::from(c)] as u8) }
+
     /// Converts the field element to a lowercase bech32 character.
     pub fn to_char(self) -> char {
         // Indexing fine as we have self.0 in [0, 32) as an invariant.
