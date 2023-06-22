@@ -12,8 +12,6 @@
 //! [BIP-173]: <https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki>
 //! [BIP-350]: <https://github.com/bitcoin/bips/blob/master/bip-0350.mediawiki>
 
-#[cfg(all(feature = "alloc", not(feature = "std")))]
-use alloc::borrow::Cow;
 use core::convert::{Infallible, TryFrom};
 use core::marker::PhantomData;
 use core::{fmt, iter, slice, str};
@@ -47,11 +45,8 @@ impl<'s> Parsed<'s> {
         let sep_pos = check_characters(s)?;
         let (hrp, data) = s.split_at(sep_pos);
 
-        let p = Parsed {
-            hrp: Hrp::parse(hrp)?,
-            witness_version: None,
-            data_chk: data[1..].as_bytes(),
-        };
+        let p =
+            Parsed { hrp: Hrp::parse(hrp)?, witness_version: None, data_chk: data[1..].as_bytes() };
         Ok(p)
     }
 
@@ -75,20 +70,6 @@ impl<'s> Parsed<'s> {
         Ok((ret, witver))
     }
 
-    /// Helper function that sanity checks the length of an HRP string for a given checksum algorithm.
-    ///
-    /// Specifically, check that
-    ///     * the data is at least long enough to contain a checksum
-    ///     * that the length doesn't imply any "useless characters" where no bits are used
-    fn checksum_length_checks<Ck: Checksum>(&self) -> Result<(), Error> {
-        if self.data_chk.len() < Ck::CHECKSUM_LENGTH
-            || (self.data_chk.len() - Ck::CHECKSUM_LENGTH) * 5 % 8 > 4
-        {
-            return Err(Error::InvalidChecksumLength);
-        }
-        Ok(())
-    }
-
     /// Validates that the parsed string has a correct checksum.
     pub fn validate_checksum<Ck: Checksum>(&self) -> Result<(), Error>
     where
@@ -104,11 +85,36 @@ impl<'s> Parsed<'s> {
         for fe in self.data_chk.iter().map(|&b| Fe32::from_char_unchecked(b)) {
             checksum_eng.input_fe(fe);
         }
+
         if checksum_eng.residue() == &Ck::TARGET_RESIDUE {
             Ok(())
         } else {
             Err(Error::InvalidChecksum)
         }
+    }
+
+    /// Helper function that sanity checks the length of an HRP string for a given checksum algorithm.
+    ///
+    /// Specifically, check that
+    ///     * the data is at least long enough to contain a checksum
+    ///     * that the length doesn't imply any "useless characters" where no bits are used
+    fn checksum_length_checks<Ck: Checksum>(&self) -> Result<(), Error> {
+        let len = match self.witness_version {
+            Some(_) => self.data_chk.len() + 1,
+            None => self.data_chk.len(),
+        };
+
+        if len < Ck::CHECKSUM_LENGTH {
+            return Err(Error::InvalidChecksumLength);
+        }
+        // From BIP-173:
+        // > Re-arrange those bits into groups of 8 bits. Any incomplete group at the
+        // > end MUST be 4 bits or less, MUST be all zeroes, and is discarded.
+        if (len - Ck::CHECKSUM_LENGTH) * 5 % 8 > 4 {
+            return Err(Error::InvalidDataLength);
+        }
+
+        Ok(())
     }
 
     /// Iterate over the data encoded by the HRP string (excluding the HRP, witness
@@ -138,9 +144,7 @@ impl<'s> Parsed<'s> {
     pub fn witness_version(&self) -> Option<u8> { self.witness_version }
 
     /// Returns the human-readable part (in lowercase without allocation).
-    pub fn hrp(&self) -> Hrp {
-        self.hrp
-    }
+    pub fn hrp(&self) -> Hrp { self.hrp }
 }
 
 /// A character iterator over a parsed HRP string.
@@ -233,6 +237,8 @@ pub enum Error {
     InvalidDataEmpty,
     /// The checksum is not a valid length.
     InvalidChecksumLength,
+    /// The data is not a valid length.
+    InvalidDataLength,
     /// Some part of the string contains an invalid character.
     InvalidChar(char),
     /// The bit conversion failed due to a padding issue.
@@ -260,6 +266,7 @@ impl fmt::Display for Error {
             InvalidWitnessVersion(ref e) => write_err!(f, "witness version error"; e),
             InvalidDataEmpty => write!(f, "invalid data - payload is empty"),
             InvalidChecksumLength => write!(f, "the checksum is not a valid length"),
+            InvalidDataLength => write!(f, "the data is not a valid length"),
             InvalidChar(n) => write!(f, "invalid character (code={})", n),
             InvalidPadding => write!(f, "invalid padding"),
             MixedCase => write!(f, "mixed-case strings not allowed"),
@@ -278,6 +285,7 @@ impl std::error::Error for Error {
             MissingSeparator
             | MixedCase
             | InvalidChecksum
+            | InvalidDataLength
             | InvalidDataEmpty
             | InvalidChecksumLength
             | InvalidChar(_)
@@ -404,4 +412,21 @@ mod tests {
             Hrp::parse_unchecked("an83characterlonghumanreadablepartthatcontainsthenumber1andtheexcludedcharactersbio")
         );
     }
+
+    #[test]
+    fn exclude_strings_that_are_not_valid_bech32_length_0() {
+        // This is a real mainnet address so it must be valid.
+        // https://blockstream.info/address/bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq
+        let addr = "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
+        let parsed = Parsed::new(addr).expect("failed to parse address");
+
+        assert_eq!(Ok(()), parsed.validate_checksum::<crate::Bech32>())
+    }
+
+    // #[test]
+    // fn exclude_strings_that_are_not_valid_bech32_length_1() {
+    //     let addr = "23451QAR0SRRR7XFKVY5L643LYDNW9RE59GTZZLKULZK";
+    //     let parsed = Parsed::new(addr).expect("failed to parse address");
+    //     assert!(parsed.validate_checksum::<crate::Bech32>().is_err())
+    // }
 }
