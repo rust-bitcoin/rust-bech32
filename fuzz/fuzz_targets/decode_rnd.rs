@@ -8,7 +8,7 @@ fn do_test(data: &[u8]) {
         Err(_) => return,
     };
 
-    assert_eq!(bech32::encode(b32.0, b32.1, b32.2), data_str);
+    assert_eq!(bech32::encode(&b32.0, b32.1, b32.2), data_str);
 }
 
 #[cfg(feature = "afl")]

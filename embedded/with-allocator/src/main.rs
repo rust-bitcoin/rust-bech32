@@ -31,7 +31,7 @@ fn main() -> ! {
     let data = [0x00u8, 0x01, 0x02].iter().copied().bytes_to_fes().collect::<Vec<u5>>();
 
     let encoded = bech32::encode(
-        hrp,
+        &hrp,
         data,
         Variant::Bech32,
     );

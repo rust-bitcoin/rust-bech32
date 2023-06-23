@@ -11,10 +11,7 @@
 //! # Examples
 //!
 //! ```rust
-//! use bech32::primitives::iter::{ByteIterExt, Fe32IterExt};
-//! use bech32::primitives::gf32::Fe32;
-//! use bech32::primitives::hrp::Hrp;
-//! use bech32::primitives::Bech32;
+//! use bech32::{Bech32, ByteIterExt, Fe32IterExt, Fe32, Hrp};
 //!
 //! let witness_prog = [
 //!     0x75, 0x1e, 0x76, 0xe8, 0x19, 0x91, 0x96, 0xd4,
@@ -22,14 +19,12 @@
 //!     0xf1, 0x43, 0x3b, 0xd6,
 //! ];
 //! let hrp = Hrp::parse_unchecked("bc");
+//! let witness_version = Fe32::Q; // Witness version 0.
 //! let iterator = witness_prog
 //!     .iter()
-//!     .copied() // Iterate over bytes.
+//!     .copied()
 //!     .bytes_to_fes() // Convert bytes to field elements in-line.
-//!     .with_witness_v0() // Pre-pend witness version.
-//!     .checksum::<Bech32>() // Convert to a [`ChecksumIter`] (append a bech32 checksum).
-//!     .with_checksummed_hrp(&hrp) // Feed HRP into the checksum.
-//!     .hrp_char(&hrp); // Turn the fe stream into a char stream with HRP.
+//!     .char_iter::<Bech32>(&hrp, Some(witness_version));
 //! let hrpstring: String = iterator.collect();
 //! assert_eq!(hrpstring.to_uppercase(), "BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4");
 //! ```
@@ -111,7 +106,7 @@ fn bytes_len_to_fes_len(bytes: usize) -> usize {
 
 /// Extension trait for field element iterators
 pub trait Fe32IterExt: Sized + Iterator<Item = Fe32> {
-    /// Adapts the Fe32 iterator to output bytes instead.
+    /// Adapts the `Fe32` iterator to output bytes instead.
     ///
     /// If the total number of bits is not a multiple of 8, any trailing bits
     /// are simply dropped.
@@ -119,40 +114,16 @@ pub trait Fe32IterExt: Sized + Iterator<Item = Fe32> {
         FeToByteIter { last_fe: self.next(), bit_offset: 0, iter: self }
     }
 
-    /// Adapts the Fe32 iterator by prepending `Fe::32:Q` (witness version 0).
-    fn with_witness_v0(self) -> WitnessVersionIter<Self> { self.with_witness_version(Fe32::Q) }
-
-    /// Adapts the Fe32 iterator by prepending `Fe::32:P` (witness version 1).
-    fn with_witness_v1(self) -> WitnessVersionIter<Self> { self.with_witness_version(Fe32::P) }
-
-    /// Adapts the Fe32 iterator by prepending `fe` (witness version).
-    ///
-    /// Accepts any `Fe32`, does no checks on the validity of `witness_version`.
-    fn with_witness_version(self, witness_version: Fe32) -> WitnessVersionIter<Self> {
-        WitnessVersionIter { witness_version: Some(witness_version), iter: self }
-    }
-
-    /// Adapts the Fe32 iterator to append a checksum to the end of the data.
-    ///
-    /// Because the HRP of a bech32 string needs to be expanded before being
-    /// checksummed, this iterator is a little bit inconvenient to use on raw
-    /// data. The [`ChecksumIter::with_checksummed_hrp`] methods may be of use.
-    fn checksum<Ck: Checksum>(self) -> ChecksumIter<Self, Ck> {
-        ChecksumIter {
-            iter: self,
-            checksum_remaining: Ck::CHECKSUM_LENGTH,
-            checksum_engine: checksum::Engine::new(),
-        }
-    }
-
-    /// Adapts the Fe32 iterator to output characters using `hrp` for the human-readable part.
-    ///
-    /// Note, `hrp` is expected to be the same as that fed into the checksum engine with
-    /// `with_checksummed_hrp`.
-    fn hrp_char(self, hrp: &Hrp) -> HrpCharIter<'_, Self> {
-        HrpCharIter { hrp_iter: hrp.lowercase_char_iter(), fe_iter: self, hrp_done: false }
+    /// Adapts the `Fe32` iterator to output characters of the encoded bech32 string.
+    fn char_iter<Ck: Checksum>(
+        self,
+        hrp: &Hrp,
+        witness_version: Option<Fe32>,
+    ) -> CharIter<Self, Ck> {
+        CharIter::new(self, hrp, witness_version)
     }
 }
+
 impl<I> Fe32IterExt for I where I: Iterator<Item = Fe32> {}
 
 /// Iterator adaptor that converts GF32 elements to bytes. If the total number
@@ -215,143 +186,110 @@ where
     }
 }
 
-/// Iterator adaptor that just prepends a single character to a field element stream.
-///
-/// More ergonomic to use than `std::iter::once(fe).chain(iter)`.
-pub struct WitnessVersionIter<I>
-where
-    I: Iterator<Item = Fe32>,
-{
-    witness_version: Option<Fe32>,
-    iter: I,
-}
-
-impl<I> Iterator for WitnessVersionIter<I>
-where
-    I: Iterator<Item = Fe32>,
-{
-    type Item = Fe32;
-
-    fn next(&mut self) -> Option<Fe32> { self.witness_version.take().or_else(|| self.iter.next()) }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let (min, max) = self.iter.size_hint();
-        match self.witness_version {
-            None => (min, max),
-            Some(_) => (min + 1, max.map(|max| max + 1)),
-        }
-    }
-}
-
-/// Iterator adaptor for field-element-yielding iterator, which tacks a
-/// checksum onto the end of the yielded data.
-#[derive(Clone, PartialEq, Eq)]
-pub struct ChecksumIter<I, Ck>
+/// Iterator adaptor which takes a stream of field elements, converts it to characters prefixed by
+/// an HRP (and separator), and suffixed by the checksum i.e., converts the data in a stream of
+/// field elements into stream of characters representing the encoded bech32 string.
+pub struct CharIter<'hrp, I, Ck>
 where
     I: Iterator<Item = Fe32>,
     Ck: Checksum,
 {
-    iter: I,
+    /// `None` once the hrp has been yielded.
+    hrp_iter: Option<hrp::LowercaseCharIter<'hrp>>,
+    /// `None` once witness version has been yielded.
+    witness_version: Option<Fe32>,
+    /// Iterator over the data to be encoded.
+    fe_iter: I,
+    /// Number of characters of the checksum still to be yielded.
     checksum_remaining: usize,
+    /// The checksum engine.
     checksum_engine: checksum::Engine<Ck>,
 }
 
-impl<I, Ck> ChecksumIter<I, Ck>
+impl<'hrp, I, Ck> CharIter<'hrp, I, Ck>
 where
     I: Iterator<Item = Fe32>,
     Ck: Checksum,
 {
-    /// Helper function to input an HRP into the underlying checksum engine of the iterator.
-    ///
-    /// This function is infallible, but if you feed it a non-ASCII `hrp` it probably will
-    /// cause your checksum engine to produce useless results.
-    ///
-    /// Also, if you call this function after the iterator has already yielded a value then
-    /// you will get useless results.
-    pub fn with_checksummed_hrp(mut self, hrp: &Hrp) -> Self {
-        self.checksum_engine.input_hrp(hrp);
-        self
-    }
+    // Currently no checks done on validity of witness version.
+    fn new(fe_iter: I, hrp: &'hrp Hrp, witness_version: Option<Fe32>) -> Self {
+        let mut checksum_engine = checksum::Engine::new();
+        checksum_engine.input_hrp(hrp);
 
-    /// Helper function to input an extra field element into the underling
-    /// checksum engine of the iterator.
-    pub fn with_checksummed_fe(mut self, fe: Fe32) -> Self {
-        self.checksum_engine.input_fe(fe);
-        self
-    }
-}
-
-impl<I, Ck> Iterator for ChecksumIter<I, Ck>
-where
-    I: Iterator<Item = Fe32>,
-    Ck: Checksum,
-{
-    type Item = Fe32;
-
-    fn next(&mut self) -> Option<Fe32> {
-        match self.iter.next() {
-            Some(fe) => {
-                self.checksum_engine.input_fe(fe);
-                Some(fe)
-            }
-            None =>
-                if self.checksum_remaining == 0 {
-                    None
-                } else {
-                    if self.checksum_remaining == Ck::CHECKSUM_LENGTH {
-                        self.checksum_engine.input_target_residue();
-                    }
-                    self.checksum_remaining -= 1;
-                    Some(Fe32(self.checksum_engine.residue().unpack(self.checksum_remaining)))
-                },
+        Self {
+            hrp_iter: Some(hrp.lowercase_char_iter()),
+            witness_version,
+            fe_iter,
+            checksum_remaining: Ck::CHECKSUM_LENGTH,
+            checksum_engine,
         }
     }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let (min, max) = self.iter.size_hint();
-        (min + self.checksum_remaining, max.map(|max| max + self.checksum_remaining))
-    }
 }
 
-/// Iterator adaptor which takes a stream of field elements, converts it to characters prefixed by
-/// an HRP. If `fe_iter` is a checksummed iter, it is expected that the `hrp` strings are identical.
-pub struct HrpCharIter<'hrp, I>
+impl<'hrp, I, Ck> Iterator for CharIter<'hrp, I, Ck>
 where
     I: Iterator<Item = Fe32>,
-{
-    hrp_iter: hrp::LowercaseCharIter<'hrp>,
-    fe_iter: I,
-    hrp_done: bool,
-}
-
-impl<'hrp, I> Iterator for HrpCharIter<'hrp, I>
-where
-    I: Iterator<Item = Fe32>,
+    Ck: Checksum,
 {
     type Item = char;
 
     fn next(&mut self) -> Option<char> {
-        if !self.hrp_done {
-            match self.hrp_iter.next() {
+        if let Some(ref mut hrp_iter) = self.hrp_iter {
+            match hrp_iter.next() {
                 Some(c) => return Some(c),
                 None => {
-                    self.hrp_done = true;
+                    self.hrp_iter = None;
                     return Some('1');
                 }
             }
         }
-        self.fe_iter.next().map(Fe32::to_char)
+        if let Some(witness_version) = self.witness_version {
+            self.witness_version = None;
+            self.checksum_engine.input_fe(witness_version);
+            return Some(witness_version.to_char());
+        }
+
+        if let Some(fe) = self.fe_iter.next() {
+            self.checksum_engine.input_fe(fe);
+            return Some(fe.to_char());
+        }
+
+        if self.checksum_remaining == 0 {
+            None
+        } else {
+            if self.checksum_remaining == Ck::CHECKSUM_LENGTH {
+                self.checksum_engine.input_target_residue();
+            }
+            self.checksum_remaining -= 1;
+            Some(Fe32(self.checksum_engine.residue().unpack(self.checksum_remaining)).to_char())
+        }
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let (min, max) = self.fe_iter.size_hint();
-        let add = if !self.hrp_done {
-            self.hrp_iter.len() + 1 // hrp | SEP
-        } else {
-            0
+        let (mut min, mut max) = match &self.hrp_iter {
+            Some(iter) => {
+                let (mut min, mut max) = iter.size_hint();
+                min += 1;
+                max = max.map(|max| max + 1);
+                (min, max)
+            }
+            None => (0, Some(0)),
         };
 
-        (min + add, max.map(|max| max + add))
+        if self.witness_version.is_some() {
+            min += 1;
+            max = max.map(|max| max + 1);
+        }
+
+        let (fe_min, fe_max) = self.fe_iter.size_hint();
+        min += fe_min;
+        if let Some(fe_max) = fe_max {
+            max = max.map(|max| max + fe_max);
+        }
+        min += self.checksum_remaining;
+        max = max.map(|max| max + self.checksum_remaining);
+
+        (min, max)
     }
 }
 
@@ -393,22 +331,16 @@ mod tests {
         let iter = data.iter().copied().bytes_to_fes();
         assert_eq!(iter.size_hint().0, char_len);
 
-        let checksummed_len = char_len + 6;
-        let iter = iter.checksum::<crate::primitives::Bech32>();
-        assert_eq!(iter.size_hint().0, checksummed_len);
-
         let hrp = Hrp::parse_unchecked("bc");
-        // Does not add the hrp to the iterator, only adds it to the checksum engine.
-        let iter = iter.with_checksummed_hrp(&hrp);
+        let iter = iter.char_iter::<crate::Bech32>(&hrp, Some(Fe32::Q));
+
+        let checksummed_len = 2 + 1 + 1 + char_len + 6;
         assert_eq!(iter.size_hint().0, checksummed_len);
 
-        // Does not add the separator to the iterator, only adds it to the checksum engine.
-        let iter = iter.with_checksummed_fe(Fe32::Q);
-        assert_eq!(iter.size_hint().0, checksummed_len);
+        let encoded = iter.collect::<String>();
+        println!("{}", encoded);
 
-        let iter = iter.map(Fe32::to_char);
-        assert_eq!(iter.size_hint().0, checksummed_len);
-
-        assert!(iter.eq("w508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4".chars()));
+        assert_eq!(encoded, "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4");
+        //        assert!(iter.eq("bc1w508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4".chars()));
     }
 }

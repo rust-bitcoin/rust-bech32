@@ -34,8 +34,10 @@ use core::convert::{Infallible, TryFrom};
 use core::fmt;
 
 pub use crate::primitives::checksum::Checksum;
+pub use crate::primitives::gf32::Fe32;
 use crate::primitives::hrp;
 pub use crate::primitives::hrp::Hrp;
+pub use crate::primitives::iter::{ByteIterExt, Fe32IterExt};
 pub use crate::primitives::{Bech32, Bech32m};
 
 mod error;
@@ -196,33 +198,17 @@ enum Case {
 /// * No length limits are enforced for the data part.
 pub fn encode_to_fmt<T: AsRef<[u5]>>(
     fmt: &mut dyn fmt::Write,
-    hrp: Hrp,
+    hrp: &Hrp,
     data: T,
     variant: Variant,
 ) -> fmt::Result {
-    use crate::primitives::iter::Fe32IterExt;
-
     match variant {
         Variant::Bech32 =>
-            for c in data
-                .as_ref()
-                .iter()
-                .copied()
-                .checksum::<Bech32>()
-                .with_checksummed_hrp(&hrp)
-                .hrp_char(&hrp)
-            {
+            for c in data.as_ref().iter().copied().char_iter::<Bech32>(hrp, None) {
                 fmt.write_char(c)?;
             },
         Variant::Bech32m =>
-            for c in data
-                .as_ref()
-                .iter()
-                .copied()
-                .checksum::<Bech32m>()
-                .with_checksummed_hrp(&hrp)
-                .hrp_char(&hrp)
-            {
+            for c in data.as_ref().iter().copied().char_iter::<Bech32>(hrp, None) {
                 fmt.write_char(c)?;
             },
     }
@@ -286,26 +272,10 @@ impl Variant {
 ///
 /// * No length limits are enforced for the data part.
 #[cfg(feature = "alloc")]
-pub fn encode<T: AsRef<[u5]>>(hrp: Hrp, data: T, variant: Variant) -> String {
-    use crate::primitives::iter::Fe32IterExt;
-
+pub fn encode<T: AsRef<[u5]>>(hrp: &Hrp, data: T, variant: Variant) -> String {
     match variant {
-        Variant::Bech32 => data
-            .as_ref()
-            .iter()
-            .copied()
-            .checksum::<Bech32>()
-            .with_checksummed_hrp(&hrp)
-            .hrp_char(&hrp)
-            .collect(),
-        Variant::Bech32m => data
-            .as_ref()
-            .iter()
-            .copied()
-            .checksum::<Bech32m>()
-            .with_checksummed_hrp(&hrp)
-            .hrp_char(&hrp)
-            .collect(),
+        Variant::Bech32 => data.as_ref().iter().copied().char_iter::<Bech32>(hrp, None).collect(),
+        Variant::Bech32m => data.as_ref().iter().copied().char_iter::<Bech32m>(hrp, None).collect(),
     }
 }
 
@@ -679,7 +649,7 @@ mod tests {
     use arrayvec::ArrayString;
 
     use super::*;
-    use crate::primitives::iter::{ByteIterExt, Fe32IterExt};
+    use crate::primitives::iter::ByteIterExt;
 
     #[cfg(feature = "alloc")]
     fn hrp(s: &str) -> Hrp { Hrp::parse_unchecked(s) }
@@ -736,7 +706,7 @@ mod tests {
         for s in strings {
             match decode(s) {
                 Ok((hrp, payload, variant)) => {
-                    let encoded = encode(hrp, payload, variant);
+                    let encoded = encode(&hrp, payload, variant);
                     assert_eq!(s.to_lowercase(), encoded.to_lowercase());
                 }
                 Err(e) => panic!("Did not decode: {:?} Reason: {:?}", s, e),
@@ -898,7 +868,7 @@ mod tests {
     fn test_hrp_case() {
         let fes = [0x00, 0x00].iter().copied().bytes_to_fes().collect::<Vec<u5>>();
         // Tests for issue with HRP case checking being ignored for encoding
-        let encoded_str = encode(hrp("HRP"), fes, Variant::Bech32);
+        let encoded_str = encode(&hrp("HRP"), fes, Variant::Bech32);
 
         assert_eq!(encoded_str, "hrp1qqqq40atq3");
     }
@@ -923,7 +893,7 @@ mod tests {
         }
 
         let bech32_hrp = Hrp::parse("bech32").expect("bech32 is valid");
-        encode_to_fmt(&mut encoded, bech32_hrp, &base32, Variant::Bech32).unwrap();
+        encode_to_fmt(&mut encoded, &bech32_hrp, &base32, Variant::Bech32).unwrap();
         assert_eq!(&*encoded, "bech321qqqsyrhqy2a");
 
         println!("{}", encoded);
@@ -968,7 +938,7 @@ mod tests {
         let (hrp, data, variant) = crate::decode(addr).expect("address is well formed");
         assert_eq!(hrp, Hrp::parse("2345").unwrap());
         let hrp = Hrp::parse("2345").unwrap();
-        let s = crate::encode(hrp, data, variant);
+        let s = crate::encode(&hrp, data, variant);
         assert_eq!(s.to_uppercase(), addr);
     }
 }
@@ -1004,7 +974,7 @@ mod benches {
         let (hrp, data, variant) = crate::decode(&addr).expect("address is well formed");
 
         bh.iter(|| {
-            let s = crate::encode(hrp, &data, variant);
+            let s = crate::encode(&hrp, &data, variant);
             black_box(&s);
         });
     }
@@ -1018,7 +988,7 @@ mod benches {
 
         bh.iter(|| {
             let res =
-                crate::encode_to_fmt(&mut buf, hrp, &data, variant).expect("failed to encode");
+                crate::encode_to_fmt(&mut buf, &hrp, &data, variant).expect("failed to encode");
             black_box(&res);
         });
     }
@@ -1030,7 +1000,7 @@ mod benches {
         let (hrp, data, variant) = crate::decode(&addr).expect("address is well formed");
 
         bh.iter(|| {
-            let s = crate::encode(hrp, &data, variant);
+            let s = crate::encode(&hrp, &data, variant);
             black_box(&s);
         });
     }
@@ -1044,7 +1014,7 @@ mod benches {
 
         bh.iter(|| {
             let res =
-                crate::encode_to_fmt(&mut buf, hrp, &data, variant).expect("failed to encode");
+                crate::encode_to_fmt(&mut buf, &hrp, &data, variant).expect("failed to encode");
             black_box(&res);
         });
     }
