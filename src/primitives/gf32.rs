@@ -16,6 +16,8 @@ use core::{fmt, num, ops};
 #[cfg(all(test, mutate))]
 use mutagen::mutate;
 
+use crate::write_err;
+
 /// Logarithm table of each bech32 element, as a power of alpha = Z.
 ///
 /// Includes Q as 0 but this is false; you need to exclude Q because it has no discrete log. If we
@@ -317,12 +319,27 @@ pub enum Error {
 }
 
 impl fmt::Display for Error {
-    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result { todo!() }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Error::*;
+
+        match *self {
+            NotAByte(ref e) => write_err!(f, "invalid field element"; e),
+            InvalidByte(ref b) => write!(f, "invalid byte in field element: {:#04x}", b),
+            InvalidChar(ref c) => write!(f, "invalid char in field element: {}", c),
+        }
+    }
 }
 
 #[cfg(feature = "std")]
 impl std::error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> { todo!() }
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        use Error::*;
+
+        match *self {
+            NotAByte(ref e) => Some(e),
+            InvalidByte(_) | InvalidChar(_) => None,
+        }
+    }
 }
 
 impl From<num::TryFromIntError> for Error {
