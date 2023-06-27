@@ -3,18 +3,18 @@
 #![no_std]
 
 extern crate alloc;
+use core::alloc::Layout;
+
+use alloc_cortex_m::CortexMHeap;
+use bech32::{self, FromBase32, Hrp, ToBase32, Variant};
+use cortex_m::asm;
+use cortex_m_rt::entry;
+use cortex_m_semihosting::{debug, hprintln};
 use panic_halt as _;
 
 use self::alloc::string::ToString;
 use self::alloc::vec;
 use self::alloc::vec::Vec;
-use core::alloc::Layout;
-
-use alloc_cortex_m::CortexMHeap;
-use bech32::{self, FromBase32, ToBase32, Variant, Hrp};
-use cortex_m::asm;
-use cortex_m_rt::entry;
-use cortex_m_semihosting::{debug, hprintln};
 
 #[global_allocator]
 static ALLOCATOR: CortexMHeap = CortexMHeap::empty();
@@ -27,12 +27,7 @@ fn main() -> ! {
     unsafe { ALLOCATOR.init(cortex_m_rt::heap_start() as usize, HEAP_SIZE) }
 
     let hrp = Hrp::parse("bech32").unwrap();
-    let encoded = bech32::encode(
-        hrp,
-        vec![0x00, 0x01, 0x02].to_base32(),
-        Variant::Bech32,
-    )
-    .unwrap();
+    let encoded = bech32::encode(hrp, vec![0x00, 0x01, 0x02].to_base32(), Variant::Bech32).unwrap();
     test(encoded == "bech321qqqsyrhqy2a".to_string());
 
     hprintln!("{}", encoded).unwrap();
