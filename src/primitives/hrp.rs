@@ -207,7 +207,6 @@ pub struct ByteIter<'b> {
 impl<'b> Iterator for ByteIter<'b> {
     type Item = u8;
     fn next(&mut self) -> Option<u8> { self.iter.next().copied() }
-
     fn size_hint(&self) -> (usize, Option<usize>) { (self.len(), Some(self.len())) }
 }
 
@@ -231,7 +230,6 @@ pub struct CharIter<'b> {
 impl<'b> Iterator for CharIter<'b> {
     type Item = char;
     fn next(&mut self) -> Option<char> { self.iter.next().map(Into::into) }
-
     fn size_hint(&self) -> (usize, Option<usize>) { (self.len(), Some(self.len())) }
 }
 
@@ -255,7 +253,6 @@ impl<'b> Iterator for LowercaseByteIter<'b> {
     fn next(&mut self) -> Option<u8> {
         self.iter.next().map(|b| if is_ascii_uppercase(b) { b | 32 } else { b })
     }
-
     fn size_hint(&self) -> (usize, Option<usize>) { (self.len(), Some(self.len())) }
 }
 
@@ -279,7 +276,6 @@ pub struct LowercaseCharIter<'b> {
 impl<'b> Iterator for LowercaseCharIter<'b> {
     type Item = char;
     fn next(&mut self) -> Option<char> { self.iter.next().map(Into::into) }
-
     fn size_hint(&self) -> (usize, Option<usize>) { (self.len(), Some(self.len())) }
 }
 
