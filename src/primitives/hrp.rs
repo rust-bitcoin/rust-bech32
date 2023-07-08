@@ -210,9 +210,7 @@ impl<'b> Iterator for ByteIter<'b> {
     fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
 }
 
-impl<'b> ExactSizeIterator for ByteIter<'b> {
-    fn len(&self) -> usize { self.iter.len() }
-}
+impl<'b> ExactSizeIterator for ByteIter<'b> {}
 
 impl<'b> DoubleEndedIterator for ByteIter<'b> {
     fn next_back(&mut self) -> Option<Self::Item> { self.iter.next_back().copied() }
@@ -233,9 +231,7 @@ impl<'b> Iterator for CharIter<'b> {
     fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
 }
 
-impl<'b> ExactSizeIterator for CharIter<'b> {
-    fn len(&self) -> usize { self.iter.len() }
-}
+impl<'b> ExactSizeIterator for CharIter<'b> {}
 
 impl<'b> DoubleEndedIterator for CharIter<'b> {
     fn next_back(&mut self) -> Option<Self::Item> { self.iter.next_back().map(Into::into) }
@@ -256,9 +252,7 @@ impl<'b> Iterator for LowercaseByteIter<'b> {
     fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
 }
 
-impl<'b> ExactSizeIterator for LowercaseByteIter<'b> {
-    fn len(&self) -> usize { self.iter.len() }
-}
+impl<'b> ExactSizeIterator for LowercaseByteIter<'b> {}
 
 impl<'b> DoubleEndedIterator for LowercaseByteIter<'b> {
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -279,9 +273,7 @@ impl<'b> Iterator for LowercaseCharIter<'b> {
     fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
 }
 
-impl<'b> ExactSizeIterator for LowercaseCharIter<'b> {
-    fn len(&self) -> usize { self.iter.len() }
-}
+impl<'b> ExactSizeIterator for LowercaseCharIter<'b> {}
 
 impl<'b> DoubleEndedIterator for LowercaseCharIter<'b> {
     fn next_back(&mut self) -> Option<Self::Item> { self.iter.next_back().map(Into::into) }
