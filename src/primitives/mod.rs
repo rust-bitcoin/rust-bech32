@@ -5,6 +5,8 @@
 pub mod checksum;
 pub mod gf32;
 pub mod hrp;
+pub mod hrpstring;
+pub mod iter;
 
 use checksum::{Checksum, PackedNull};
 

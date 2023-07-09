@@ -40,20 +40,13 @@ if [ "${DO_FMT-false}" = true ]; then
     cargo fmt --check
 fi
 
-if [ "${DO_FEATURE_MATRIX-false}" = true ]; then
-    # No features
-    build_and_test ""
+# Defaults / sanity checks
+cargo build                     # This enables std and alloc
+cargo test
 
-    # Feature combos
-    build_and_test "std"
-    build_and_test "alloc"
-    build_and_test "std alloc"
-    # arrayvec breaks the MSRV
-    if [ $MSRV = false ]; then
-        build_and_test "arrayvec"
-        build_and_test "std arrayvec"
-        build_and_test "alloc arrayvec"
-    fi
+if [ "${DO_FEATURE_MATRIX-false}" = true ]; then
+    build_and_test ""           # No features
+    build_and_test "alloc"      # Just alloc
 fi
 
 # Build the docs if told to (this only works with the nightly toolchain)

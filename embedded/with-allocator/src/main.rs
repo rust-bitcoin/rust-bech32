@@ -1,3 +1,8 @@
+//! Test `no_std` build of `bech32` with an allocator.
+//!
+//! Build with: `cargo +nightly rustc -- -C link-arg=-nostartfiles`.
+
+#![feature(lang_items)]
 #![feature(alloc_error_handler)]
 #![no_main]
 #![no_std]
@@ -6,7 +11,7 @@ extern crate alloc;
 use core::alloc::Layout;
 
 use alloc_cortex_m::CortexMHeap;
-use bech32::{self, FromBase32, Hrp, ToBase32, Variant};
+use bech32::{u5, ByteIterExt, Hrp, Variant};
 use cortex_m::asm;
 use cortex_m_rt::entry;
 use cortex_m_semihosting::{debug, hprintln};
@@ -27,15 +32,21 @@ fn main() -> ! {
     unsafe { ALLOCATOR.init(cortex_m_rt::heap_start() as usize, HEAP_SIZE) }
 
     let hrp = Hrp::parse("bech32").unwrap();
-    let encoded = bech32::encode(hrp, vec![0x00, 0x01, 0x02].to_base32(), Variant::Bech32).unwrap();
+    let data_iter = [0x00u8, 0x01, 0x02].iter().copied().bytes_to_fes();
+
+    let data = data_iter.collect::<Vec<u5>>();
+    let encoded = bech32::encode(hrp, data, Variant::Bech32).expect("failed to encode");
+
     test(encoded == "bech321qqqsyrhqy2a".to_string());
 
     hprintln!("{}", encoded).unwrap();
 
-    let (got_hrp, data, variant) = bech32::decode(&encoded).unwrap();
-    test(got_hrp == hrp);
-    test(Vec::<u8>::from_base32(&data).unwrap() == vec![0x00, 0x01, 0x02]);
+    let (parsed, variant) = bech32::decode(&encoded).expect("failed to decode");
+
     test(variant == Variant::Bech32);
+    test(parsed.hrp() == hrp);
+    let data = parsed.byte_iter().collect::<Vec<u8>>();
+    test(&data == [0x00, 0x01, 0x02].as_ref());
 
     debug::exit(debug::EXIT_SUCCESS);
 
@@ -51,8 +62,12 @@ fn test(result: bool) {
 // define what happens in an Out Of Memory (OOM) condition
 #[alloc_error_handler]
 fn alloc_error(layout: Layout) -> ! {
-    hprintln!("{:?}", layout);
+    hprintln!("{:?}", layout).unwrap();
     asm::bkpt();
 
     loop {}
 }
+
+#[lang = "eh_personality"]
+#[no_mangle]
+pub extern "C" fn rust_eh_personality() {}

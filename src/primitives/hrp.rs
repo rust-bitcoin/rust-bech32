@@ -16,8 +16,6 @@ use core::fmt::{self, Write};
 use core::iter::FusedIterator;
 use core::slice;
 
-use crate::Case;
-
 /// Maximum length of the human-readable part, as defined by BIP-173.
 const MAX_HRP_LEN: usize = 83;
 
@@ -114,16 +112,6 @@ impl Hrp {
         Ok((new, case))
     }
 
-    /// Lowercase the inner ASCII bytes of this HRP.
-    // This is a hack to support `encode_to_fmt`, we should remove this function.
-    pub(crate) fn lowercase(&mut self) {
-        for b in self.buf.iter_mut() {
-            if is_ascii_uppercase(*b) {
-                *b |= 32;
-            }
-        }
-    }
-
     /// Returns this human-readable part as a lowercase string.
     #[cfg(feature = "alloc")]
     pub fn to_lowercase(&self) -> String { self.lowercase_char_iter().collect() }
@@ -157,6 +145,13 @@ impl Hrp {
 
     /// Always false, the human-readable part is guaranteed to be between 1-83 characters.
     pub fn is_empty(&self) -> bool { false }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Case {
+    Upper,
+    Lower,
+    None,
 }
 
 /// Displays the human-readable part.
@@ -384,7 +379,7 @@ mod tests {
             $(
                 #[test]
                 fn $test_name() {
-                    use crate::Case::*;
+                    use Case::*;
                     let (_, case) = Hrp::parse_and_case($hrp).expect("failed to parse hrp");
                     assert_eq!(case, $expected);
                 }

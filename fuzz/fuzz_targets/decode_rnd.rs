@@ -1,14 +1,19 @@
 extern crate bech32;
 
+use bech32::Fe32;
+
 fn do_test(data: &[u8]) {
     let data_str = String::from_utf8_lossy(data);
     let decoded = bech32::decode(&data_str);
-    let b32 = match decoded {
-        Ok(b32) => b32,
+    let (parsed, variant) = match decoded {
+        Ok((parsed, variant)) => (parsed, variant),
         Err(_) => return,
     };
 
-    assert_eq!(bech32::encode(b32.0, b32.1, b32.2).unwrap(), data_str);
+    let hrp = parsed.hrp();
+    let data = parsed.fe32_iter().collect::<Vec<Fe32>>();
+
+    assert_eq!(bech32::encode(hrp, data, variant).expect("failed to encode"), data_str);
 }
 
 #[cfg(feature = "afl")]

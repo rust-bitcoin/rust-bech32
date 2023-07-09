@@ -3,7 +3,7 @@ extern crate bech32;
 use std::convert::TryFrom;
 use std::str;
 
-use bech32::Hrp;
+use bech32::{Fe32, Hrp};
 
 fn do_test(data: &[u8]) {
     if data.len() < 1 {
@@ -33,12 +33,13 @@ fn do_test(data: &[u8]) {
             match Hrp::parse(&s) {
                 Err(_) => return,
                 Ok(hrp) => {
-                    if let Ok(data_str) = bech32::encode(hrp, &dp, variant).map(|b32| b32.to_string()) {
-                        let decoded = bech32::decode(&data_str);
-                        let b32 = decoded.expect("should be able to decode own encoding");
+                    let encoded = bech32::encode(hrp, &dp, variant).expect("failed to encode");
+                    let (parsed, variant) = bech32::decode(&encoded).expect("failed to decode");
 
-                        assert_eq!(bech32::encode(b32.0, &b32.1, b32.2).unwrap(), data_str);
-                    }
+                    let hrp = parsed.hrp();
+                    let data = parsed.fe32_iter().collect::<Vec<Fe32>>();
+
+                    assert_eq!(bech32::encode(hrp, data, variant).expect("failed to encode"), encoded);
                 }
             }
         }
