@@ -3,8 +3,11 @@
 //! Provides the internal nuts and bolts that enable bech32 encoding/decoding.
 
 pub mod checksum;
+pub mod decode;
+pub mod encode;
 pub mod gf32;
 pub mod hrp;
+pub mod iter;
 
 use checksum::{Checksum, PackedNull};
 

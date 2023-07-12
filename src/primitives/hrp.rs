@@ -21,6 +21,27 @@ use crate::Case;
 /// Maximum length of the human-readable part, as defined by BIP-173.
 const MAX_HRP_LEN: usize = 83;
 
+macro_rules! define_hrp_const {
+    ($name:ident, $size:literal, $zero:literal, $one:literal, $two:literal, $three:literal, $network:literal) => {
+/// "The human-readable part for the Bitcoin $network."
+        #[rustfmt::skip]
+        pub const $name: Hrp = Hrp { buf: [
+            $zero, $one, $two, $three,
+    0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ], size: $size };
+    };
+}
+define_hrp_const! {BC, 2, 98, 99, 0, 0, "network (mainnet)."}
+define_hrp_const! {TB, 2, 116, 98, 0, 0, "testnet networks (testnet, signet)."}
+define_hrp_const! {BCRT, 4, 98, 99, 114, 116, "regtest network."}
+
 /// The human-readable part (human readable prefix before the '1' separator).
 #[derive(Clone, Copy, Debug)]
 pub struct Hrp {
@@ -157,6 +178,27 @@ impl Hrp {
 
     /// Always false, the human-readable part is guaranteed to be between 1-83 characters.
     pub fn is_empty(&self) -> bool { false }
+
+    /// Returns `true` if this [`Hrp`] is valid according to the bips.
+    ///
+    /// [BIP-173] states that the HRP must be either "bc" or "tb".
+    ///
+    /// [BIP-173]: https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki#user-content-Segwit_address_format
+    pub fn is_valid_segwit(&self) -> bool {
+        self.is_valid_on_mainnet() || self.is_valid_on_testnet()
+    }
+
+    /// Returns `true` if this hrpstring is valid on the Bitcoin network i.e., HRP is "bc".
+    pub fn is_valid_on_mainnet(&self) -> bool { *self == self::BC }
+
+    /// Returns `true` if this hrpstring is valid on the Bitcoin testnet network i.e., HRP is "tb".
+    pub fn is_valid_on_testnet(&self) -> bool { *self == self::TB }
+
+    /// Returns `true` if this hrpstring is valid on the Bitcoin signet network i.e., HRP is "tb".
+    pub fn is_valid_on_signet(&self) -> bool { *self == self::TB }
+
+    /// Returns `true` if this hrpstring is valid on the Bitcoin regtest network i.e., HRP is "bcrt".
+    pub fn is_valid_on_regtest(&self) -> bool { *self == self::BC }
 }
 
 /// Displays the human-readable part.
@@ -458,5 +500,14 @@ mod tests {
         char_3, "ABC123", 6;
         char_4, "abc123def", 9;
         char_5, "ABC123DEF", 9;
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn hrp_consts() {
+        use crate::primitives::hrp::{BC, BCRT, TB};
+        assert_eq!(BC, Hrp::parse_unchecked("bc"));
+        assert_eq!(TB, Hrp::parse_unchecked("tb"));
+        assert_eq!(BCRT, Hrp::parse_unchecked("bcrt"));
     }
 }

@@ -97,12 +97,8 @@ impl<Ck: Checksum> Engine<Ck> {
 
     /// Feeds `hrp` into the checksum engine.
     pub fn input_hrp(&mut self, hrp: &Hrp) {
-        for b in hrp.lowercase_byte_iter() {
-            self.input_fe(Fe32(b >> 5));
-        }
-        self.input_fe(Fe32::Q);
-        for b in hrp.lowercase_byte_iter() {
-            self.input_fe(Fe32(b & 0x1f));
+        for fe in HrpFe32Iter::new(hrp) {
+            self.input_fe(fe)
         }
     }
 
@@ -200,3 +196,63 @@ macro_rules! impl_packed_fe32 {
 impl_packed_fe32!(u32);
 impl_packed_fe32!(u64);
 impl_packed_fe32!(u128);
+
+/// Iterator that yields the field elements that are input into a checksum algorithm for an [`Hrp`].
+pub struct HrpFe32Iter<'hrp> {
+    /// `None` once the hrp high fes have been yielded.
+    high_iter: Option<crate::hrp::LowercaseByteIter<'hrp>>,
+    /// `None` once the hrp low fes have been yielded.
+    low_iter: Option<crate::hrp::LowercaseByteIter<'hrp>>,
+}
+
+impl<'hrp> HrpFe32Iter<'hrp> {
+    /// Creates an iterator that yields the field elements of `hrp` as they are input into the
+    /// checksum algorithm.
+    pub fn new(hrp: &'hrp Hrp) -> Self {
+        let high_iter = hrp.lowercase_byte_iter();
+        let low_iter = hrp.lowercase_byte_iter();
+
+        Self { high_iter: Some(high_iter), low_iter: Some(low_iter) }
+    }
+}
+
+impl<'hrp> Iterator for HrpFe32Iter<'hrp> {
+    type Item = Fe32;
+    fn next(&mut self) -> Option<Fe32> {
+        if let Some(ref mut high_iter) = &mut self.high_iter {
+            match high_iter.next() {
+                Some(high) => return Some(Fe32(high >> 5)),
+                None => {
+                    self.high_iter = None;
+                    return Some(Fe32::Q);
+                }
+            }
+        }
+        if let Some(ref mut low_iter) = &mut self.low_iter {
+            match low_iter.next() {
+                Some(low) => return Some(Fe32(low & 0x1f)),
+                None => self.low_iter = None,
+            }
+        }
+        None
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let high = match &self.high_iter {
+            Some(high_iter) => {
+                let (min, max) = high_iter.size_hint();
+                (min + 1, max.map(|max| max + 1)) // +1 for the extra Q
+            }
+            None => (0, Some(0)),
+        };
+        let low = match &self.low_iter {
+            Some(low_iter) => low_iter.size_hint(),
+            None => (0, Some(0)),
+        };
+
+        let min = high.0 + 1 + low.0;
+        let max = high.1.zip(low.1).map(|(high, low)| high + 1 + low);
+
+        (min, max)
+    }
+}

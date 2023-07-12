@@ -35,8 +35,10 @@ use core::{fmt, mem};
 
 pub use crate::primitives::checksum::Checksum;
 use crate::primitives::checksum::{self, PackedFe32};
+pub use crate::primitives::gf32::Fe32;
 use crate::primitives::hrp;
 pub use crate::primitives::hrp::Hrp;
+pub use crate::primitives::iter::{ByteIterExt, Fe32IterExt};
 pub use crate::primitives::{Bech32, Bech32m};
 
 mod error;
