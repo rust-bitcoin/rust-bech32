@@ -1,12 +1,4 @@
-// Written by the Rust Bitcoin developers.
 // SPDX-License-Identifier: CC0-1.0
-
-// TODO: We can get this from `bitcoin-internals` crate once that is released.
-
-//! # Error
-//!
-//! Error handling macros and helpers.
-//!
 
 /// Formats error.
 ///

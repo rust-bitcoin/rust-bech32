@@ -11,24 +11,6 @@
 //!
 //! The original description in [BIP-0173](https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki)
 //! has more details. See also [BIP-0350](https://github.com/bitcoin/bips/blob/master/bip-0350.mediawiki).
-//!
-#![cfg_attr(
-    feature = "std",
-    doc = "
-# Examples
-```
-use bech32::{self, FromBase32, ToBase32, Variant, Hrp};
-let hrp = Hrp::parse(\"bech32\").expect(\"bech32 is valid\");
-let encoded = bech32::encode(hrp, vec![0x00, 0x01, 0x02].to_base32(), Variant::Bech32).unwrap();
-assert_eq!(encoded, \"bech321qqqsyrhqy2a\".to_string());
-let (hrp, data, variant) = bech32::decode(&encoded).unwrap();
-assert_eq!(hrp.to_string(), \"bech32\");
-assert_eq!(Vec::<u8>::from_base32(&data).unwrap(), vec![0x00, 0x01, 0x02]);
-assert_eq!(variant, Variant::Bech32);
-```
-"
-)]
-//!
 
 #![cfg_attr(all(not(feature = "std"), not(test)), no_std)]
 // Experimental features we need.
@@ -452,9 +434,8 @@ pub fn encode_to_fmt_anycase<T: AsRef<[u5]>>(
 ///
 /// This method is intended for implementing traits from [`std::fmt`].
 ///
-/// # Errors
+/// # Deviations from standard.
 ///
-/// * Deviations from standard.
 /// * No length limits are enforced for the data part.
 pub fn encode_without_checksum_to_fmt<T: AsRef<[u5]>>(
     fmt: &mut dyn fmt::Write,
@@ -502,9 +483,8 @@ impl Variant {
 
 /// Encodes a bech32 payload to string.
 ///
-/// # Errors
+/// # Deviations from standard.
 ///
-/// * Deviations from standard.
 /// * No length limits are enforced for the data part.
 #[cfg(feature = "alloc")]
 pub fn encode<T: AsRef<[u5]>>(hrp: Hrp, data: T, variant: Variant) -> Result<String, Error> {
@@ -515,9 +495,8 @@ pub fn encode<T: AsRef<[u5]>>(hrp: Hrp, data: T, variant: Variant) -> Result<Str
 
 /// Encodes a bech32 payload to string without the checksum.
 ///
-/// # Errors
+/// # Deviations from standard.
 ///
-/// * Deviations from standard.
 /// * No length limits are enforced for the data part.
 #[cfg(feature = "alloc")]
 pub fn encode_without_checksum<T: AsRef<[u5]>>(hrp: Hrp, data: T) -> Result<String, Error> {

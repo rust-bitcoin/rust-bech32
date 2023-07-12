@@ -7,12 +7,11 @@
 #![no_main]
 #![no_std]
 
-use panic_halt as _;
-
 use arrayvec::{ArrayString, ArrayVec};
-use bech32::{self, u5, ComboError, FromBase32, ToBase32, Variant, Hrp};
+use bech32::{self, u5, ComboError, FromBase32, Hrp, ToBase32, Variant};
 use cortex_m_rt::entry;
 use cortex_m_semihosting::{debug, hprintln};
+use panic_halt as _;
 
 // Note: `#[global_allocator]` is NOT set.
 
@@ -26,9 +25,7 @@ fn main() -> ! {
 
     let hrp = Hrp::parse("bech32").unwrap();
 
-    bech32::encode_to_fmt_anycase(&mut encoded, hrp, &base32, Variant::Bech32)
-        .unwrap()
-        .unwrap();
+    bech32::encode_to_fmt_anycase(&mut encoded, hrp, &base32, Variant::Bech32).unwrap().unwrap();
     test(&*encoded == "bech321qqqsyrhqy2a");
 
     hprintln!("{}", encoded).unwrap();
