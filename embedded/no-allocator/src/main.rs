@@ -1,6 +1,6 @@
 //! Test `no_std` build of `bech32`.
 //!
-//! Build with: `cargo rustc -- -C link-arg=-nostartfiles`.
+//! Build with: `cargo +nightly rustc -- -C link-arg=-nostartfiles`.
 //!
 
 #![feature(alloc_error_handler)]
