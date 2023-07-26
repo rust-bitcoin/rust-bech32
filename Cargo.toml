@@ -16,10 +16,5 @@ default = ["std"]
 std = ["alloc"]
 alloc = []
 
-[dependencies.arrayvec]
-version = "0.7.1"
-default-features = false
-optional = true
-
 [target.'cfg(mutate)'.dev-dependencies]
 mutagen = { git = "https://github.com/llogiq/mutagen" }

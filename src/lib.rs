@@ -44,8 +44,6 @@ pub use crate::primitives::{Bech32, Bech32m};
 mod error;
 pub mod primitives;
 
-#[cfg(feature = "arrayvec")]
-use arrayvec::{ArrayVec, CapacityError};
 pub use primitives::gf32::Fe32 as u5;
 
 /// Interface to write `u5`s into a sink.
@@ -164,21 +162,6 @@ pub trait FromBase32: Sized {
 
 macro_rules! write_base_n {
     { $tr:ident, $ty:ident, $meth:ident } => {
-        #[cfg(feature = "arrayvec")]
-        impl<const L: usize> $tr for ArrayVec<$ty, L> {
-            type Error = CapacityError;
-
-            fn write(&mut self, data: &[$ty]) -> Result<(), Self::Error> {
-                self.try_extend_from_slice(data)?;
-                Ok(())
-            }
-
-            fn $meth(&mut self, data: $ty) -> Result<(), Self::Error> {
-                self.push(data);
-                Ok(())
-            }
-        }
-
         #[cfg(feature = "alloc")]
         impl $tr for Vec<$ty> {
             type Error = Infallible;
@@ -198,41 +181,6 @@ macro_rules! write_base_n {
 
 write_base_n! { WriteBase32, u5, write_u5 }
 write_base_n! { WriteBase256, u8, write_u8 }
-
-#[cfg(feature = "arrayvec")]
-#[derive(Clone, Debug, PartialEq, Eq)]
-/// Combination of Errors for use with array vec
-pub enum ComboError {
-    /// Error from this crate
-    Bech32Error(Error),
-    /// Error from `arrayvec`.
-    WriteError(CapacityError),
-}
-#[cfg(feature = "arrayvec")]
-impl From<Error> for ComboError {
-    fn from(e: Error) -> ComboError { ComboError::Bech32Error(e) }
-}
-#[cfg(feature = "arrayvec")]
-impl From<CapacityError> for ComboError {
-    fn from(e: CapacityError) -> ComboError { ComboError::WriteError(e) }
-}
-#[cfg(feature = "arrayvec")]
-impl From<hrp::Error> for ComboError {
-    fn from(e: hrp::Error) -> ComboError { ComboError::Bech32Error(Error::Hrp(e)) }
-}
-
-#[cfg(feature = "arrayvec")]
-impl<const L: usize> FromBase32 for ArrayVec<u8, L> {
-    type Error = ComboError;
-
-    /// Convert base32 to base256, removes null-padding if present, returns
-    /// `Err(Error::InvalidPadding)` if padding bits are unequal `0`
-    fn from_base32(b32: &[u5]) -> Result<Self, Self::Error> {
-        let mut ret: ArrayVec<u8, L> = ArrayVec::new();
-        convert_bits_in::<ComboError, _, _>(b32, 5, 8, false, &mut ret)?;
-        Ok(ret)
-    }
-}
 
 #[cfg(feature = "alloc")]
 impl FromBase32 for Vec<u8> {
@@ -861,9 +809,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "arrayvec")]
-    use arrayvec::ArrayString;
-
     use super::*;
 
     #[cfg(feature = "alloc")]
@@ -1162,33 +1107,6 @@ mod tests {
         assert!(u5::try_from(32_u32).is_err());
         assert!(u5::try_from(32_u64).is_err());
         assert!(u5::try_from(32_u128).is_err());
-    }
-
-    #[test]
-    #[cfg(feature = "arrayvec")]
-    fn test_arrayvec() {
-        let mut encoded = ArrayString::<30>::new();
-
-        let mut base32 = ArrayVec::<u5, 30>::new();
-
-        [0x00u8, 0x01, 0x02].write_base32(&mut base32).unwrap();
-
-        let bech32_hrp = Hrp::parse("bech32").expect("bech32 is valid");
-        encode_to_fmt_anycase(&mut encoded, bech32_hrp, &base32, Variant::Bech32).unwrap().unwrap();
-        assert_eq!(&*encoded, "bech321qqqsyrhqy2a");
-
-        println!("{}", encoded);
-
-        let mut decoded = ArrayVec::<u5, 30>::new();
-
-        let mut scratch = ArrayVec::<u5, 30>::new();
-
-        let (hrp, data, variant) =
-            decode_lowercase::<ComboError, _, _>(&encoded, &mut decoded, &mut scratch).unwrap();
-        assert_eq!(hrp.to_string(), "bech32");
-        let res = ArrayVec::<u8, 30>::from_base32(data).unwrap();
-        assert_eq!(&res, [0x00, 0x01, 0x02].as_ref());
-        assert_eq!(variant, Variant::Bech32);
     }
 
     #[test]
