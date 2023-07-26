@@ -1,6 +1,8 @@
-# unreleased (0.10.0)
+# 0.10.0-alpha
 
-- [Implement `std::error::Error::source` for error type](https://github.com/rust-bitcoin/rust-bech32/pull/72)
+This release introduces a new `primitives` module that is basically a new implementation of the
+whole crate. We also add a `segwit` module but we have not yet settled on the exact new API in
+`lib.rs`, hence the `alpha` release.
 
 # 0.9.1
 
