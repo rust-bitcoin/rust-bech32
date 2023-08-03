@@ -55,6 +55,19 @@ macro_rules! check_valid_address_roundtrip {
         $(
             #[test]
             fn $test_name() {
+                // We cannot use encode/decode for all test vectors because according to BIP-173 the
+                // bech32 checksum algorithm can be used with any witness version, and this is
+                // tested by the test vectors. However when BIP-350 came into effect only witness
+                // version 0 uses bech32 (and this is enforced by encode/decode).
+                if let Ok((hrp, bech32::Fe32::Q, program)) = bech32::segwit::decode($addr) {
+                    let encoded = bech32::segwit::encode_v0(&hrp, &program).expect("failed to encode address");
+                    // The bips specifically say that encoder should output lowercase characters so we uppercase manually.
+                    if encoded != $addr {
+                        let got = encoded.to_uppercase();
+                        assert_eq!(got, $addr)
+                    }
+                }
+
                 let hrpstring = SegwitHrpstring::new_bech32($addr).expect("valid address");
                 let hrp = hrpstring.hrp();
                 let witness_version = hrpstring.witness_version();

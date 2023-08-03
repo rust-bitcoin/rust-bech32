@@ -43,6 +43,7 @@ pub use crate::primitives::{Bech32, Bech32m};
 
 mod error;
 pub mod primitives;
+pub mod segwit;
 
 #[cfg(feature = "arrayvec")]
 use arrayvec::{ArrayVec, CapacityError};

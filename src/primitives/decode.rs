@@ -78,6 +78,7 @@ use crate::primitives::checksum::{self, Checksum};
 use crate::primitives::gf32::Fe32;
 use crate::primitives::hrp::{self, Hrp};
 use crate::primitives::iter::{Fe32IterExt, FesToBytes};
+use crate::primitives::segwit::{self, WitnessLengthError};
 use crate::{write_err, Bech32, Bech32m};
 
 /// Separator between the hrp and payload (as defined by BIP-173).
@@ -264,7 +265,7 @@ impl<'s> CheckedHrpstring<'s> {
         self.data = &self.data[1..]; // Remove the witness version byte from data.
 
         self.validate_padding()?;
-        self.validate_witness_length(witness_version)?;
+        self.validate_witness_program_length(witness_version)?;
 
         Ok(SegwitHrpstring { hrp: self.hrp(), witness_version, data: self.data })
     }
@@ -309,21 +310,11 @@ impl<'s> CheckedHrpstring<'s> {
     /// Validates the segwit witness length rules.
     ///
     /// Must be called after the witness version byte is removed from the data.
-    #[allow(clippy::manual_range_contains)] // For witness length range check.
-    fn validate_witness_length(&self, witness_version: Fe32) -> Result<(), WitnessLengthError> {
-        use WitnessLengthError::*;
-
-        let witness_len = self.byte_iter().len();
-        if witness_len < 2 {
-            return Err(TooShort);
-        }
-        if witness_len > 40 {
-            return Err(TooLong);
-        }
-        if witness_version == Fe32::Q && witness_len != 20 && witness_len != 32 {
-            return Err(InvalidSegwitV0);
-        }
-        Ok(())
+    fn validate_witness_program_length(
+        &self,
+        witness_version: Fe32,
+    ) -> Result<(), WitnessLengthError> {
+        segwit::validate_witness_program_length(self.byte_iter().len(), witness_version)
     }
 }
 
@@ -742,41 +733,6 @@ impl std::error::Error for ChecksumError {
 
         match *self {
             InvalidChecksum | InvalidChecksumLength => None,
-        }
-    }
-}
-
-/// Witness program invalid because of incorrect length.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum WitnessLengthError {
-    /// The witness data is too short.
-    TooShort,
-    /// The witness data is too long.
-    TooLong,
-    /// The segwit v0 witness is not 20 or 32 bytes long.
-    InvalidSegwitV0,
-}
-
-impl fmt::Display for WitnessLengthError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use WitnessLengthError::*;
-
-        match *self {
-            TooShort => write!(f, "witness program is less than 2 bytes long"),
-            TooLong => write!(f, "witness program is more than 40 bytes long"),
-            InvalidSegwitV0 => write!(f, "the segwit v0 witness is not 20 or 32 bytes long"),
-        }
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for WitnessLengthError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        use WitnessLengthError::*;
-
-        match *self {
-            TooShort | TooLong | InvalidSegwitV0 => None,
         }
     }
 }
