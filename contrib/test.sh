@@ -48,12 +48,6 @@ if [ "${DO_FEATURE_MATRIX-false}" = true ]; then
     build_and_test "std"
     build_and_test "alloc"
     build_and_test "std alloc"
-    # arrayvec breaks the MSRV
-    if [ $MSRV = false ]; then
-        build_and_test "arrayvec"
-        build_and_test "std arrayvec"
-        build_and_test "alloc arrayvec"
-    fi
 fi
 
 # Build the docs if told to (this only works with the nightly toolchain)

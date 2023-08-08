@@ -1,6 +1,6 @@
 //! Test `no_std` build of `bech32`.
 //!
-//! Build with: `cargo rustc -- -C link-arg=-nostartfiles`.
+//! Build with: `cargo +nightly rustc -- -C link-arg=-nostartfiles`.
 //!
 
 #![feature(alloc_error_handler)]
@@ -8,7 +8,8 @@
 #![no_std]
 
 use arrayvec::{ArrayString, ArrayVec};
-use bech32::{self, u5, ComboError, FromBase32, Hrp, ToBase32, Variant};
+use bech32::{self, u5, Hrp, Variant, ByteIterExt, Bech32};
+use bech32::primitives::decode::CheckedHrpstring;
 use cortex_m_rt::entry;
 use cortex_m_semihosting::{debug, hprintln};
 use panic_halt as _;
@@ -19,9 +20,7 @@ use panic_halt as _;
 fn main() -> ! {
     let mut encoded = ArrayString::<30>::new();
 
-    let mut base32 = ArrayVec::<u5, 30>::new();
-
-    [0x00u8, 0x01, 0x02].write_base32(&mut base32).unwrap();
+    let base32 = [0x00u8, 0x01, 0x02].iter().copied().bytes_to_fes().collect::<ArrayVec<u5, 30>>();
 
     let hrp = Hrp::parse("bech32").unwrap();
 
@@ -30,16 +29,11 @@ fn main() -> ! {
 
     hprintln!("{}", encoded).unwrap();
 
-    let mut decoded = ArrayVec::<u5, 30>::new();
+    let unchecked = CheckedHrpstring::new::<Bech32>(&encoded).unwrap();
 
-    let mut scratch = ArrayVec::<u5, 30>::new();
-
-    let (got_hrp, data, variant) =
-        bech32::decode_lowercase::<ComboError, _, _>(&encoded, &mut decoded, &mut scratch).unwrap();
-    test(got_hrp == hrp);
-    let res = ArrayVec::<u8, 30>::from_base32(&data).unwrap();
+    test(unchecked.hrp() == hrp);
+    let res = unchecked.byte_iter().collect::<ArrayVec<u8, 30>>();
     test(&res == [0x00, 0x01, 0x02].as_ref());
-    test(variant == Variant::Bech32);
 
     debug::exit(debug::EXIT_SUCCESS);
 
