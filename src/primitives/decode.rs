@@ -122,6 +122,7 @@ impl<'s> UncheckedHrpstring<'s> {
     /// Parses an bech32 encode string and constructs a [`UncheckedHrpstring`] object.
     ///
     /// Checks for valid ASCII values, does not validate the checksum.
+    #[inline]
     pub fn new(s: &'s str) -> Result<Self, UncheckedHrpstringError> {
         let sep_pos = check_characters(s)?;
         let (hrp, data) = s.split_at(sep_pos);
@@ -135,9 +136,11 @@ impl<'s> UncheckedHrpstring<'s> {
     }
 
     /// Returns the human-readable part.
+    #[inline]
     pub fn hrp(&self) -> Hrp { self.hrp }
 
     /// Validates that data has a valid checksum for the `Ck` algorithm and returns a [`CheckedHrpstring`].
+    #[inline]
     pub fn validate_and_remove_checksum<Ck: Checksum>(
         self,
     ) -> Result<CheckedHrpstring<'s>, ChecksumError> {
@@ -151,12 +154,14 @@ impl<'s> UncheckedHrpstring<'s> {
     /// This is useful if you do not know which checksum algorithm was used and wish to validate
     /// against multiple algorithms consecutively. If this function returns `true` then call
     /// `remove_checksum` to get a [`CheckedHrpstring`].
+    #[inline]
     pub fn has_valid_checksum<Ck: Checksum>(&self) -> bool {
         self.validate_checksum::<Ck>().is_ok()
     }
 
     /// Validates that data has a valid checksum for the `Ck` algorithm (this may mean an empty
     /// checksum if `NoChecksum` is used).
+    #[inline]
     pub fn validate_checksum<Ck: Checksum>(&self) -> Result<(), ChecksumError> {
         use ChecksumError::*;
 
@@ -193,6 +198,7 @@ impl<'s> UncheckedHrpstring<'s> {
     /// # Panics
     ///
     /// May panic if data is not valid.
+    #[inline]
     pub fn remove_checksum<Ck: Checksum>(self) -> CheckedHrpstring<'s> {
         let data_len = self.data.len() - Ck::CHECKSUM_LENGTH;
 
@@ -237,6 +243,7 @@ impl<'s> CheckedHrpstring<'s> {
     /// If you are validating the checksum multiple times consider using [`UncheckedHrpstring`].
     ///
     /// This is equivalent to `UncheckedHrpstring::new().validate_and_remove_checksum::<CK>()`.
+    #[inline]
     pub fn new<Ck: Checksum>(s: &'s str) -> Result<Self, CheckedHrpstringError> {
         let unchecked = UncheckedHrpstring::new(s)?;
         let checked = unchecked.validate_and_remove_checksum::<Ck>()?;
@@ -244,17 +251,20 @@ impl<'s> CheckedHrpstring<'s> {
     }
 
     /// Returns the human-readable part.
+    #[inline]
     pub fn hrp(&self) -> Hrp { self.hrp }
 
     /// Returns an iterator that yields the data part of the parsed bech32 encoded string.
     ///
     /// Converts the ASCII bytes representing field elements to the respective field elements, then
     /// converts the stream of field elements to a stream of bytes.
+    #[inline]
     pub fn byte_iter(&self) -> ByteIter {
         ByteIter { iter: AsciiToFe32Iter { iter: self.data.iter().copied() }.fes_to_bytes() }
     }
 
     /// Converts this type to a [`SegwitHrpstring`] after validating the witness and HRP.
+    #[inline]
     pub fn validate_segwit(mut self) -> Result<SegwitHrpstring<'s>, SegwitHrpstringError> {
         if self.data.is_empty() {
             return Err(SegwitHrpstringError::MissingWitnessVersion);
@@ -362,6 +372,7 @@ impl<'s> SegwitHrpstring<'s> {
     ///
     /// NOTE: We do not enforce any restrictions on the HRP, use [`SegwitHrpstring::has_valid_hrp`]
     /// to get strict BIP conformance (also [`Hrp::is_valid_on_mainnet`] and friends).
+    #[inline]
     pub fn new(s: &'s str) -> Result<Self, SegwitHrpstringError> {
         let unchecked = UncheckedHrpstring::new(s)?;
 
@@ -391,6 +402,7 @@ impl<'s> SegwitHrpstring<'s> {
     ///
     /// [BIP-173]: https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki
     /// [BIP-350]: https://github.com/bitcoin/bips/blob/master/bip-0350.mediawiki
+    #[inline]
     pub fn new_bech32(s: &'s str) -> Result<Self, SegwitHrpstringError> {
         let unchecked = UncheckedHrpstring::new(s)?;
 
@@ -409,12 +421,15 @@ impl<'s> SegwitHrpstring<'s> {
     /// BIP-173 requires that the HRP is "bc" or "tb" but software in the Bitcoin ecosystem uses
     /// other HRPs, specifically "bcrt" for regtest addresses. We provide this function in order to
     /// be BIP-173 compliant but their are no restrictions on the HRP of [`SegwitHrpstring`].
+    #[inline]
     pub fn has_valid_hrp(&self) -> bool { self.hrp().is_valid_segwit() }
 
     /// Returns the human-readable part.
+    #[inline]
     pub fn hrp(&self) -> Hrp { self.hrp }
 
     /// Returns the witness version.
+    #[inline]
     pub fn witness_version(&self) -> Fe32 { self.witness_version }
 
     /// Returns an iterator that yields the data part, excluding the witness version, of the parsed
@@ -424,6 +439,7 @@ impl<'s> SegwitHrpstring<'s> {
     /// converts the stream of field elements to a stream of bytes.
     ///
     /// Use `self.witness_version()` to get the witness version.
+    #[inline]
     pub fn byte_iter(&self) -> ByteIter {
         ByteIter { iter: AsciiToFe32Iter { iter: self.data.iter().copied() }.fes_to_bytes() }
     }
@@ -472,11 +488,14 @@ pub struct ByteIter<'s> {
 
 impl<'s> Iterator for ByteIter<'s> {
     type Item = u8;
+    #[inline]
     fn next(&mut self) -> Option<u8> { self.iter.next() }
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
 }
 
 impl<'s> ExactSizeIterator for ByteIter<'s> {
+    #[inline]
     fn len(&self) -> usize { self.iter.len() }
 }
 
@@ -487,7 +506,9 @@ pub struct Fe32Iter<'s> {
 
 impl<'s> Iterator for Fe32Iter<'s> {
     type Item = Fe32;
+    #[inline]
     fn next(&mut self) -> Option<Fe32> { self.iter.next() }
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
 }
 
@@ -507,7 +528,9 @@ where
     I: Iterator<Item = u8>,
 {
     type Item = Fe32;
+    #[inline]
     fn next(&mut self) -> Option<Fe32> { self.iter.next().map(Fe32::from_char_unchecked) }
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         // Each ASCII character is an fe32 so iterators are the same size.
         self.iter.size_hint()
@@ -518,6 +541,7 @@ impl<I> ExactSizeIterator for AsciiToFe32Iter<I>
 where
     I: Iterator<Item = u8> + ExactSizeIterator,
 {
+    #[inline]
     fn len(&self) -> usize { self.iter.len() }
 }
 
