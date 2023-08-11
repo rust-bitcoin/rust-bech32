@@ -65,6 +65,7 @@ const CHARS_INV: [i8; 128] = [
 
 /// An element in GF(32), the finite field containing elements `[0,31]` inclusive.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[repr(transparent)]
 pub struct Fe32(pub(crate) u8);
 
 impl Fe32 {
