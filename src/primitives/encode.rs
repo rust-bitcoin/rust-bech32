@@ -90,6 +90,7 @@ where
     Ck: Checksum,
 {
     /// Constructs a new bech32 encoder.
+    #[inline]
     pub fn new(data: I, hrp: &'hrp Hrp) -> Self {
         Self { data, hrp, witness_version: None, marker: PhantomData::<Ck> }
     }
@@ -97,12 +98,14 @@ where
     /// Adds `witness_version` to the encoder (as first byte of encoded data).
     ///
     /// Note, caller to guarantee that witness version is within valid range (0-16).
+    #[inline]
     pub fn with_witness_version(mut self, witness_version: Fe32) -> Self {
         self.witness_version = Some(witness_version);
         self
     }
 
     /// Returns an iterator that yields the bech32 encoded address as field ASCII characters.
+    #[inline]
     pub fn chars(self) -> CharIter<'hrp, I, Ck> {
         let witver_iter = WitnessVersionIter::new(self.witness_version, self.data);
         CharIter::new(self.hrp, witver_iter)
@@ -111,6 +114,7 @@ where
     /// Returns an iterator that yields the field elements that go into the checksum, as well as the checksum at the end.
     ///
     /// Each field element yielded has been input into the checksum algorithm (including the HRP as it is fed into the algorithm).
+    #[inline]
     pub fn fes(self) -> Fe32Iter<'hrp, I, Ck> {
         let witver_iter = WitnessVersionIter::new(self.witness_version, self.data);
         Fe32Iter::new(self.hrp, witver_iter)
@@ -133,6 +137,7 @@ where
     I: Iterator<Item = Fe32>,
 {
     /// Creates a [`WitnessVersionIter`].
+    #[inline]
     pub fn new(witness_version: Option<Fe32>, iter: I) -> Self { Self { witness_version, iter } }
 }
 
@@ -142,8 +147,10 @@ where
 {
     type Item = Fe32;
 
+    #[inline]
     fn next(&mut self) -> Option<Fe32> { self.witness_version.take().or_else(|| self.iter.next()) }
 
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let (min, max) = self.iter.size_hint();
         match self.witness_version {
@@ -174,6 +181,7 @@ where
     Ck: Checksum,
 {
     /// Adapts the `Fe32Iter` iterator to yield characters representing the bech32 encoding.
+    #[inline]
     pub fn new(hrp: &'hrp Hrp, data: WitnessVersionIter<I>) -> Self {
         let checksummed = Checksummed::new_hrp(hrp, data);
         Self { hrp_iter: Some(hrp.lowercase_char_iter()), checksummed }
@@ -187,6 +195,7 @@ where
 {
     type Item = char;
 
+    #[inline]
     fn next(&mut self) -> Option<char> {
         if let Some(ref mut hrp_iter) = self.hrp_iter {
             match hrp_iter.next() {
@@ -201,6 +210,7 @@ where
         self.checksummed.next().map(|fe| fe.to_char())
     }
 
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         match &self.hrp_iter {
             // We have yielded the hrp and separator already.
@@ -245,6 +255,7 @@ where
     Ck: Checksum,
 {
     /// Creates a [`Fe32Iter`] which yields all the field elements which go into the checksum algorithm.
+    #[inline]
     pub fn new(hrp: &'hrp Hrp, data: WitnessVersionIter<I>) -> Self {
         let hrp_iter = HrpFe32Iter::new(hrp);
         let checksummed = Checksummed::new_hrp(hrp, data);
@@ -258,6 +269,7 @@ where
     Ck: Checksum,
 {
     type Item = Fe32;
+    #[inline]
     fn next(&mut self) -> Option<Fe32> {
         if let Some(ref mut hrp_iter) = &mut self.hrp_iter {
             match hrp_iter.next() {
@@ -268,6 +280,7 @@ where
         self.checksummed.next()
     }
 
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let hrp = match &self.hrp_iter {
             Some(hrp_iter) => hrp_iter.size_hint(),

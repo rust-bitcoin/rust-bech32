@@ -38,6 +38,7 @@ pub trait ByteIterExt: Sized + Iterator<Item = u8> {
     /// Adapts the byte iterator to output GF32 field elements instead.
     ///
     /// If the total number of bits is not a multiple of 5 we pad with 0s
+    #[inline]
     fn bytes_to_fes(mut self) -> BytesToFes<Self> {
         BytesToFes { last_byte: self.next(), bit_offset: 0, iter: self }
     }
@@ -51,11 +52,13 @@ pub trait Fe32IterExt: Sized + Iterator<Item = Fe32> {
     ///
     /// If the total number of bits is not a multiple of 8, any trailing bits
     /// are simply dropped.
+    #[inline]
     fn fes_to_bytes(mut self) -> FesToBytes<Self> {
         FesToBytes { last_fe: self.next(), bit_offset: 0, iter: self }
     }
 
     /// Adapts the Fe32 iterator to encode the field elements into a bech32 address.
+    #[inline]
     fn with_checksum<Ck: Checksum>(self, hrp: &Hrp) -> Encoder<Self, Ck> { Encoder::new(self, hrp) }
 }
 
@@ -77,6 +80,7 @@ where
 {
     type Item = Fe32;
 
+    #[inline]
     fn next(&mut self) -> Option<Fe32> {
         use core::cmp::Ordering::*;
 
@@ -104,6 +108,7 @@ where
         }
     }
 
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let (min, max) = self.iter.size_hint();
         let (min, max) = match self.last_byte {
@@ -129,6 +134,7 @@ impl<I> ExactSizeIterator for BytesToFes<I>
 where
     I: Iterator<Item = u8> + ExactSizeIterator,
 {
+    #[inline]
     fn len(&self) -> usize {
         let len = match self.last_byte {
             Some(_) => self.iter.len() + 1,
@@ -188,6 +194,7 @@ where
         }
     }
 
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         // If the total number of bits is not a multiple of 8, any trailing bits are dropped.
         let fes_len_to_bytes_len = |n| n * 5 / 8;
@@ -207,6 +214,7 @@ impl<I> ExactSizeIterator for FesToBytes<I>
 where
     I: Iterator<Item = Fe32> + ExactSizeIterator,
 {
+    #[inline]
     fn len(&self) -> usize {
         let len = match self.last_fe {
             Some(_) => self.iter.len() + 1,
@@ -236,6 +244,7 @@ where
 {
     /// Creates a new checksummed iterator which adapts a data iterator of field elements by
     /// appending a checksum.
+    #[inline]
     pub fn new(data: I) -> Checksummed<I, Ck> {
         Checksummed {
             iter: data,
@@ -246,6 +255,7 @@ where
 
     /// Creates a new checksummed iterator which adapts a data iterator of field elements by
     /// first inputting the [`Hrp`] and then appending a checksum.
+    #[inline]
     pub fn new_hrp(hrp: &Hrp, data: I) -> Checksummed<I, Ck> {
         let mut ret = Self::new(data);
         ret.checksum_engine.input_hrp(hrp);
@@ -260,6 +270,7 @@ where
 {
     type Item = Fe32;
 
+    #[inline]
     fn next(&mut self) -> Option<Fe32> {
         match self.iter.next() {
             Some(fe) => {
@@ -279,6 +290,7 @@ where
         }
     }
 
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let add = self.checksum_remaining;
         let (min, max) = self.iter.size_hint();

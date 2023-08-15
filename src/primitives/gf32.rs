@@ -136,6 +136,7 @@ impl Fe32 {
     pub const L: Fe32 = Fe32(31);
 
     /// Iterator over all field elements, in alphabetical order.
+    #[inline]
     pub fn iter_alpha() -> impl Iterator<Item = Fe32> {
         [
             Fe32::A,
@@ -176,6 +177,7 @@ impl Fe32 {
     }
 
     /// Creates a field element from a single bech32 character.
+    #[inline]
     pub fn from_char(c: char) -> Result<Fe32, Error> {
         // i8::try_from gets a value in the range 0..=127 since char is unsigned.
         let byte = i8::try_from(u32::from(c)).map_err(|_| Error::InvalidChar(c))?;
@@ -189,6 +191,7 @@ impl Fe32 {
     pub(crate) fn from_char_unchecked(c: u8) -> Fe32 { Fe32(CHARS_INV[usize::from(c)] as u8) }
 
     /// Converts the field element to a lowercase bech32 character.
+    #[inline]
     pub fn to_char(self) -> char {
         // Indexing fine as we have self.0 in [0, 32) as an invariant.
         CHARS_LOWER[usize::from(self.0)]
@@ -196,6 +199,7 @@ impl Fe32 {
 
     /// Converts the field element to a 5-bit u8, with bits representing the coefficients
     /// of the polynomial representation.
+    #[inline]
     pub fn to_u8(self) -> u8 { self.0 }
 
     fn _add(self, other: Fe32) -> Fe32 { Fe32(self.0 ^ other.0) }
@@ -233,6 +237,7 @@ impl fmt::Display for Fe32 {
 }
 
 impl From<Fe32> for u8 {
+    #[inline]
     fn from(v: Fe32) -> u8 { v.0 }
 }
 
@@ -247,6 +252,7 @@ macro_rules! impl_try_from {
                 /// # Errors
                 ///
                 /// Returns an error if `value` is outside of the range of an `Fe32`.
+                #[inline]
                 fn try_from(value: $ty) -> Result<Self, Self::Error> {
                     let byte = u8::try_from(value)?;
                     if byte > 31 {
@@ -261,6 +267,7 @@ macro_rules! impl_try_from {
 impl_try_from!(u8 u16 u32 u64 u128 i8 i16 i32 i64 i128);
 
 impl AsRef<u8> for Fe32 {
+    #[inline]
     fn as_ref(&self) -> &u8 { &self.0 }
 }
 
@@ -269,21 +276,25 @@ macro_rules! impl_op_matrix {
     ($op:ident, $op_fn:ident, $call_fn:ident) => {
         impl ops::$op<Fe32> for Fe32 {
             type Output = Fe32;
+            #[inline]
             fn $op_fn(self, other: Fe32) -> Fe32 { self.$call_fn(other) }
         }
 
         impl ops::$op<Fe32> for &Fe32 {
             type Output = Fe32;
+            #[inline]
             fn $op_fn(self, other: Fe32) -> Fe32 { self.$call_fn(other) }
         }
 
         impl ops::$op<&Fe32> for Fe32 {
             type Output = Fe32;
+            #[inline]
             fn $op_fn(self, other: &Fe32) -> Fe32 { self.$call_fn(*other) }
         }
 
         impl ops::$op<&Fe32> for &Fe32 {
             type Output = Fe32;
+            #[inline]
             fn $op_fn(self, other: &Fe32) -> Fe32 { self.$call_fn(*other) }
         }
     };
@@ -294,18 +305,22 @@ impl_op_matrix!(Mul, mul, _mul);
 impl_op_matrix!(Div, div, _div);
 
 impl ops::AddAssign for Fe32 {
+    #[inline]
     fn add_assign(&mut self, other: Fe32) { *self = *self + other; }
 }
 
 impl ops::SubAssign for Fe32 {
+    #[inline]
     fn sub_assign(&mut self, other: Fe32) { *self = *self - other; }
 }
 
 impl ops::MulAssign for Fe32 {
+    #[inline]
     fn mul_assign(&mut self, other: Fe32) { *self = *self * other; }
 }
 
 impl ops::DivAssign for Fe32 {
+    #[inline]
     fn div_assign(&mut self, other: Fe32) { *self = *self / other; }
 }
 

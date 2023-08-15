@@ -93,9 +93,11 @@ impl<Ck: Checksum> Default for Engine<Ck> {
 
 impl<Ck: Checksum> Engine<Ck> {
     /// Constructs a new checksum engine with no data input.
+    #[inline]
     pub fn new() -> Self { Engine { residue: Ck::MidstateRepr::ONE } }
 
     /// Feeds `hrp` into the checksum engine.
+    #[inline]
     pub fn input_hrp(&mut self, hrp: &Hrp) {
         for fe in HrpFe32Iter::new(hrp) {
             self.input_fe(fe)
@@ -105,6 +107,7 @@ impl<Ck: Checksum> Engine<Ck> {
     /// Adds a single gf32 element to the checksum engine.
     ///
     /// This is where the actual checksum computation magic happens.
+    #[inline]
     pub fn input_fe(&mut self, e: Fe32) {
         let xn = self.residue.mul_by_x_then_add(Ck::CHECKSUM_LENGTH, e.into());
         for i in 0..5 {
@@ -120,6 +123,7 @@ impl<Ck: Checksum> Engine<Ck> {
     /// string, then computing the actual residue, and then replacing the
     /// target with the actual. This method lets us compute the actual residue
     /// without doing any string concatenations.
+    #[inline]
     pub fn input_target_residue(&mut self) {
         for i in 0..Ck::CHECKSUM_LENGTH {
             self.input_fe(Fe32(Ck::TARGET_RESIDUE.unpack(Ck::CHECKSUM_LENGTH - i - 1)));
@@ -127,6 +131,7 @@ impl<Ck: Checksum> Engine<Ck> {
     }
 
     /// Returns for the current checksum residue.
+    #[inline]
     pub fn residue(&self) -> &Ck::MidstateRepr { &self.residue }
 }
 
@@ -161,12 +166,15 @@ pub struct PackedNull;
 
 impl ops::BitXor<PackedNull> for PackedNull {
     type Output = PackedNull;
+    #[inline]
     fn bitxor(self, _: PackedNull) -> PackedNull { PackedNull }
 }
 
 impl PackedFe32 for PackedNull {
     const ONE: Self = PackedNull;
+    #[inline]
     fn unpack(&self, _: usize) -> u8 { 0 }
+    #[inline]
     fn mul_by_x_then_add(&mut self, _: usize, _: u8) -> u8 { 0 }
 }
 
@@ -175,11 +183,13 @@ macro_rules! impl_packed_fe32 {
         impl PackedFe32 for $ty {
             const ONE: Self = 1;
 
+            #[inline]
             fn unpack(&self, n: usize) -> u8 {
                 debug_assert!(n < Self::WIDTH);
                 (*self >> (n * 5)) as u8 & 0x1f
             }
 
+            #[inline]
             fn mul_by_x_then_add(&mut self, degree: usize, add: u8) -> u8 {
                 debug_assert!(degree > 0);
                 debug_assert!(degree <= Self::WIDTH);
@@ -208,6 +218,7 @@ pub struct HrpFe32Iter<'hrp> {
 impl<'hrp> HrpFe32Iter<'hrp> {
     /// Creates an iterator that yields the field elements of `hrp` as they are input into the
     /// checksum algorithm.
+    #[inline]
     pub fn new(hrp: &'hrp Hrp) -> Self {
         let high_iter = hrp.lowercase_byte_iter();
         let low_iter = hrp.lowercase_byte_iter();
@@ -218,6 +229,7 @@ impl<'hrp> HrpFe32Iter<'hrp> {
 
 impl<'hrp> Iterator for HrpFe32Iter<'hrp> {
     type Item = Fe32;
+    #[inline]
     fn next(&mut self) -> Option<Fe32> {
         if let Some(ref mut high_iter) = &mut self.high_iter {
             match high_iter.next() {
@@ -237,6 +249,7 @@ impl<'hrp> Iterator for HrpFe32Iter<'hrp> {
         None
     }
 
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let high = match &self.high_iter {
             Some(high_iter) => {

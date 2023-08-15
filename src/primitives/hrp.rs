@@ -63,6 +63,7 @@ impl Hrp {
     /// > specific applications.
     ///
     /// [BIP-173]: <https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki>
+    #[inline]
     pub fn parse(hrp: &str) -> Result<Self, Error> { Ok(Self::parse_and_case(hrp)?.0) }
 
     /// Parses the human-readable part (see [`Hrp::parse`] for full docs).
@@ -147,26 +148,31 @@ impl Hrp {
 
     /// Returns this human-readable part as a lowercase string.
     #[cfg(feature = "alloc")]
+    #[inline]
     pub fn to_lowercase(&self) -> String { self.lowercase_char_iter().collect() }
 
     /// Creates a byte iterator over the ASCII byte values (ASCII characters) of this HRP.
     ///
     /// If an uppercase HRP was parsed during object construction then this iterator will yield
     /// uppercase ASCII `char`s. For lowercase bytes see [`Self::lowercase_byte_iter`]
+    #[inline]
     pub fn byte_iter(&self) -> ByteIter { ByteIter { iter: self.buf[..self.size].iter() } }
 
     /// Creates a character iterator over the ASCII characters of this HRP.
     ///
     /// If an uppercase HRP was parsed during object construction then this iterator will yield
     /// uppercase ASCII `char`s. For lowercase bytes see [`Self::lowercase_char_iter`].
+    #[inline]
     pub fn char_iter(&self) -> CharIter { CharIter { iter: self.byte_iter() } }
 
     /// Creates a lowercase iterator over the byte values (ASCII characters) of this HRP.
+    #[inline]
     pub fn lowercase_byte_iter(&self) -> LowercaseByteIter {
         LowercaseByteIter { iter: self.byte_iter() }
     }
 
     /// Creates a lowercase character iterator over the ASCII characters of this HRP.
+    #[inline]
     pub fn lowercase_char_iter(&self) -> LowercaseCharIter {
         LowercaseCharIter { iter: self.lowercase_byte_iter() }
     }
@@ -174,9 +180,11 @@ impl Hrp {
     /// Returns the length (number of characters) of the human-readable part.
     ///
     /// Guaranteed to be between 1 and 83 inclusive.
+    #[inline]
     pub fn len(&self) -> usize { self.size }
 
     /// Always false, the human-readable part is guaranteed to be between 1-83 characters.
+    #[inline]
     pub fn is_empty(&self) -> bool { false }
 
     /// Returns `true` if this [`Hrp`] is valid according to the bips.
@@ -184,20 +192,25 @@ impl Hrp {
     /// [BIP-173] states that the HRP must be either "bc" or "tb".
     ///
     /// [BIP-173]: https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki#user-content-Segwit_address_format
+    #[inline]
     pub fn is_valid_segwit(&self) -> bool {
         self.is_valid_on_mainnet() || self.is_valid_on_testnet()
     }
 
     /// Returns `true` if this hrpstring is valid on the Bitcoin network i.e., HRP is "bc".
+    #[inline]
     pub fn is_valid_on_mainnet(&self) -> bool { *self == self::BC }
 
     /// Returns `true` if this hrpstring is valid on the Bitcoin testnet network i.e., HRP is "tb".
+    #[inline]
     pub fn is_valid_on_testnet(&self) -> bool { *self == self::TB }
 
     /// Returns `true` if this hrpstring is valid on the Bitcoin signet network i.e., HRP is "tb".
+    #[inline]
     pub fn is_valid_on_signet(&self) -> bool { *self == self::TB }
 
     /// Returns `true` if this hrpstring is valid on the Bitcoin regtest network i.e., HRP is "bcrt".
+    #[inline]
     pub fn is_valid_on_regtest(&self) -> bool { *self == self::BC }
 }
 
@@ -216,6 +229,7 @@ impl fmt::Display for Hrp {
 
 /// Case insensitive comparison.
 impl Ord for Hrp {
+    #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
         self.lowercase_byte_iter().cmp(other.lowercase_byte_iter())
     }
@@ -223,11 +237,13 @@ impl Ord for Hrp {
 
 /// Case insensitive comparison.
 impl PartialOrd for Hrp {
+    #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
 }
 
 /// Case insensitive comparison.
 impl PartialEq for Hrp {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.lowercase_byte_iter().eq(other.lowercase_byte_iter())
     }
@@ -236,6 +252,7 @@ impl PartialEq for Hrp {
 impl Eq for Hrp {}
 
 impl core::hash::Hash for Hrp {
+    #[inline]
     fn hash<H: core::hash::Hasher>(&self, h: &mut H) { self.buf.hash(h) }
 }
 
@@ -248,15 +265,19 @@ pub struct ByteIter<'b> {
 
 impl<'b> Iterator for ByteIter<'b> {
     type Item = u8;
+    #[inline]
     fn next(&mut self) -> Option<u8> { self.iter.next().copied() }
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
 }
 
 impl<'b> ExactSizeIterator for ByteIter<'b> {
+    #[inline]
     fn len(&self) -> usize { self.iter.len() }
 }
 
 impl<'b> DoubleEndedIterator for ByteIter<'b> {
+    #[inline]
     fn next_back(&mut self) -> Option<Self::Item> { self.iter.next_back().copied() }
 }
 
@@ -271,15 +292,19 @@ pub struct CharIter<'b> {
 
 impl<'b> Iterator for CharIter<'b> {
     type Item = char;
+    #[inline]
     fn next(&mut self) -> Option<char> { self.iter.next().map(Into::into) }
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
 }
 
 impl<'b> ExactSizeIterator for CharIter<'b> {
+    #[inline]
     fn len(&self) -> usize { self.iter.len() }
 }
 
 impl<'b> DoubleEndedIterator for CharIter<'b> {
+    #[inline]
     fn next_back(&mut self) -> Option<Self::Item> { self.iter.next_back().map(Into::into) }
 }
 
@@ -292,17 +317,21 @@ pub struct LowercaseByteIter<'b> {
 
 impl<'b> Iterator for LowercaseByteIter<'b> {
     type Item = u8;
+    #[inline]
     fn next(&mut self) -> Option<u8> {
         self.iter.next().map(|b| if is_ascii_uppercase(b) { b | 32 } else { b })
     }
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
 }
 
 impl<'b> ExactSizeIterator for LowercaseByteIter<'b> {
+    #[inline]
     fn len(&self) -> usize { self.iter.len() }
 }
 
 impl<'b> DoubleEndedIterator for LowercaseByteIter<'b> {
+    #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         self.iter.next_back().map(|b| if is_ascii_uppercase(b) { b | 32 } else { b })
     }
@@ -317,15 +346,19 @@ pub struct LowercaseCharIter<'b> {
 
 impl<'b> Iterator for LowercaseCharIter<'b> {
     type Item = char;
+    #[inline]
     fn next(&mut self) -> Option<char> { self.iter.next().map(Into::into) }
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
 }
 
 impl<'b> ExactSizeIterator for LowercaseCharIter<'b> {
+    #[inline]
     fn len(&self) -> usize { self.iter.len() }
 }
 
 impl<'b> DoubleEndedIterator for LowercaseCharIter<'b> {
+    #[inline]
     fn next_back(&mut self) -> Option<Self::Item> { self.iter.next_back().map(Into::into) }
 }
 
