@@ -27,7 +27,7 @@
 //! let _ = segwit::encode_v0(&hrp::TB, &witness_prog);
 //!
 //! // If you have the witness version already you can use:
-//! # let witness_version = Fe32::Q;
+//! # let witness_version = segwit::VERSION_0;
 //! let _ = segwit::encode(&hrp::BC, witness_version, &witness_prog);
 //!
 //! // Decode a Bitcoin bech32 segwit address.
@@ -50,9 +50,8 @@ use crate::primitives::decode::{SegwitHrpstring, SegwitHrpstringError};
 use crate::primitives::gf32::Fe32;
 use crate::primitives::hrp::Hrp;
 use crate::primitives::iter::{ByteIterExt, Fe32IterExt};
-#[cfg(feature = "alloc")]
-use crate::primitives::segwit;
-use crate::primitives::segwit::{InvalidWitnessVersionError, WitnessLengthError};
+use crate::primitives::segwit::{self, InvalidWitnessVersionError, WitnessLengthError};
+pub use crate::primitives::segwit::{VERSION_0, VERSION_1};
 use crate::primitives::{Bech32, Bech32m};
 use crate::write_err;
 
@@ -102,13 +101,13 @@ pub fn encode(
 /// Encodes a segwit version 0 address.
 #[cfg(feature = "alloc")]
 pub fn encode_v0(hrp: &Hrp, witness_program: &[u8]) -> Result<String, EncodeError> {
-    encode(hrp, Fe32::Q, witness_program)
+    encode(hrp, VERSION_0, witness_program)
 }
 
 /// Encodes a segwit version 1 address.
 #[cfg(feature = "alloc")]
 pub fn encode_v1(hrp: &Hrp, witness_program: &[u8]) -> Result<String, EncodeError> {
-    encode(hrp, Fe32::P, witness_program)
+    encode(hrp, VERSION_1, witness_program)
 }
 
 /// Encodes a segwit address to a writer ([`fmt::Write`]) using lowercase characters.
@@ -123,8 +122,8 @@ pub fn encode_to_fmt_unchecked<W: fmt::Write>(
 ) -> fmt::Result {
     let iter = witness_program.iter().copied().bytes_to_fes();
     match witness_version {
-        Fe32::Q => {
-            for c in iter.with_checksum::<Bech32>(hrp).with_witness_version(Fe32::Q).chars() {
+        VERSION_0 => {
+            for c in iter.with_checksum::<Bech32>(hrp).with_witness_version(VERSION_0).chars() {
                 fmt.write_char(c)?;
             }
         }
@@ -151,8 +150,8 @@ pub fn encode_to_fmt_unchecked_uppercase<W: fmt::Write>(
 ) -> fmt::Result {
     let iter = witness_program.iter().copied().bytes_to_fes();
     match witness_version {
-        Fe32::Q => {
-            for c in iter.with_checksum::<Bech32>(hrp).with_witness_version(Fe32::Q).chars() {
+        VERSION_0 => {
+            for c in iter.with_checksum::<Bech32>(hrp).with_witness_version(VERSION_0).chars() {
                 fmt.write_char(c.to_ascii_uppercase())?;
             }
         }
@@ -247,7 +246,7 @@ mod tests {
     fn encode_to_fmt_lowercase() {
         let program = witness_program();
         let mut address = String::new();
-        encode_to_fmt_unchecked(&mut address, &hrp::BC, Fe32::Q, &program)
+        encode_to_fmt_unchecked(&mut address, &hrp::BC, VERSION_0, &program)
             .expect("failed to encode address to QR code");
 
         let want = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
@@ -258,7 +257,7 @@ mod tests {
     fn encode_to_fmt_uppercase() {
         let program = witness_program();
         let mut address = String::new();
-        encode_to_fmt_unchecked_uppercase(&mut address, &hrp::BC, Fe32::Q, &program)
+        encode_to_fmt_unchecked_uppercase(&mut address, &hrp::BC, VERSION_0, &program)
             .expect("failed to encode address to QR code");
 
         let want = "BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4";

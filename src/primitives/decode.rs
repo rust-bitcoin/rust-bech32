@@ -35,6 +35,7 @@
 //! ```
 //! use bech32::{Bech32, Bech32m, Fe32, Hrp};
 //! use bech32::primitives::decode::{CheckedHrpstring, SegwitHrpstring, UncheckedHrpstring};
+//! use bech32::segwit::VERSION_1;
 //!
 //! // An arbitrary HRP and a string of valid bech32 characters.
 //! let s = "abcd143hj65vxw49rts6kcw35u6r6tgzguyr03vvveeewjqpn05efzq444444";
@@ -66,7 +67,7 @@
 //! let segwit = SegwitHrpstring::new(address).expect("valid segwit address");
 //! let _encoded_data = segwit.byte_iter();
 //! assert_eq!(segwit.hrp(), Hrp::parse("bc").unwrap());
-//! assert_eq!(segwit.witness_version(), Fe32::P);
+//! assert_eq!(segwit.witness_version(), VERSION_1);
 //! ```
 //!
 //! [BIP-173]: <https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki>
@@ -78,7 +79,7 @@ use crate::primitives::checksum::{self, Checksum};
 use crate::primitives::gf32::Fe32;
 use crate::primitives::hrp::{self, Hrp};
 use crate::primitives::iter::{Fe32IterExt, FesToBytes};
-use crate::primitives::segwit::{self, WitnessLengthError};
+use crate::primitives::segwit::{self, WitnessLengthError, VERSION_0};
 use crate::{write_err, Bech32, Bech32m};
 
 /// Separator between the hrp and payload (as defined by BIP-173).
@@ -363,7 +364,7 @@ impl<'s> SegwitHrpstring<'s> {
         }
 
         let checked: CheckedHrpstring<'s> = match witness_version {
-            Fe32::Q => unchecked.validate_and_remove_checksum::<Bech32>()?,
+            VERSION_0 => unchecked.validate_and_remove_checksum::<Bech32>()?,
             _ => unchecked.validate_and_remove_checksum::<Bech32m>()?,
         };
 

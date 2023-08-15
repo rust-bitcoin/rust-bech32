@@ -9,6 +9,11 @@ use core::fmt;
 
 use crate::primitives::gf32::Fe32;
 
+/// The field element representing segwit version 0.
+pub const VERSION_0: Fe32 = Fe32::Q;
+/// The field element representing segwit version 1 (taproot).
+pub const VERSION_1: Fe32 = Fe32::P;
+
 /// Returns true if given field element represents a valid segwit version.
 pub fn is_valid_witness_version(witness_version: Fe32) -> bool {
     validate_witness_version(witness_version).is_ok()
@@ -41,7 +46,7 @@ pub fn validate_witness_program_length(
     if length > 40 {
         return Err(TooLong);
     }
-    if version == Fe32::Q && length != 20 && length != 32 {
+    if version == VERSION_0 && length != 20 && length != 32 {
         return Err(InvalidSegwitV0);
     }
     Ok(())
