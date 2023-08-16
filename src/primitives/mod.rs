@@ -8,6 +8,7 @@ pub mod encode;
 pub mod gf32;
 pub mod hrp;
 pub mod iter;
+pub mod segwit;
 
 use checksum::{Checksum, PackedNull};
 

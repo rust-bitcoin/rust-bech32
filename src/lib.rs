@@ -43,6 +43,7 @@ pub use crate::primitives::{Bech32, Bech32m};
 
 mod error;
 pub mod primitives;
+pub mod segwit;
 
 pub use primitives::gf32::Fe32 as u5;
 
