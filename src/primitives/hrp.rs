@@ -211,7 +211,7 @@ impl Hrp {
 
     /// Returns `true` if this hrpstring is valid on the Bitcoin regtest network i.e., HRP is "bcrt".
     #[inline]
-    pub fn is_valid_on_regtest(&self) -> bool { *self == self::BC }
+    pub fn is_valid_on_regtest(&self) -> bool { *self == self::BCRT }
 }
 
 /// Displays the human-readable part.
