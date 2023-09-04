@@ -1,14 +1,14 @@
 extern crate bech32;
 
+use bech32::primitives::decode::{CheckedHrpstring, SegwitHrpstring, UncheckedHrpstring};
+use bech32::Bech32m;
+
+// Checks that we do not crash if passed random data while decoding.
 fn do_test(data: &[u8]) {
     let data_str = String::from_utf8_lossy(data);
-    let decoded = bech32::decode(&data_str);
-    let b32 = match decoded {
-        Ok(b32) => b32,
-        Err(_) => return,
-    };
-
-    assert_eq!(bech32::encode(b32.0, b32.1, b32.2).unwrap(), data_str);
+    let _ = UncheckedHrpstring::new(&data_str);
+    let _ = CheckedHrpstring::new::<Bech32m>(&data_str);
+    let _ = SegwitHrpstring::new(&data_str);
 }
 
 #[cfg(feature = "afl")]
@@ -54,7 +54,7 @@ mod tests {
     #[test]
     fn duplicate_crash() {
         let mut a = Vec::new();
-        extend_vec_from_hex("00000000", &mut a);
+        extend_vec_from_hex("39313131", &mut a);
         super::do_test(&a);
     }
 }
