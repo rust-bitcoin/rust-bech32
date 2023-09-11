@@ -65,6 +65,7 @@ use crate::write_err;
 /// let (_hrp, _witness_version, _witness_program) = segwit::decode(address).expect("failed to decode address");
 /// ```
 #[cfg(feature = "alloc")]
+#[inline]
 pub fn decode(s: &str) -> Result<(Hrp, Fe32, Vec<u8>), SegwitHrpstringError> {
     let segwit = SegwitHrpstring::new(s)?;
     Ok((segwit.hrp(), segwit.witness_version(), segwit.byte_iter().collect::<Vec<u8>>()))
@@ -85,6 +86,7 @@ pub fn decode(s: &str) -> Result<(Hrp, Fe32, Vec<u8>), SegwitHrpstringError> {
 /// [BIP-173]: <https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki>
 /// [BIP-350]: <https://github.com/bitcoin/bips/blob/master/bip-0350.mediawiki>
 #[cfg(feature = "alloc")]
+#[inline]
 pub fn encode(
     hrp: &Hrp,
     witness_version: Fe32,
@@ -100,12 +102,14 @@ pub fn encode(
 
 /// Encodes a segwit version 0 address.
 #[cfg(feature = "alloc")]
+#[inline]
 pub fn encode_v0(hrp: &Hrp, witness_program: &[u8]) -> Result<String, EncodeError> {
     encode(hrp, VERSION_0, witness_program)
 }
 
 /// Encodes a segwit version 1 address.
 #[cfg(feature = "alloc")]
+#[inline]
 pub fn encode_v1(hrp: &Hrp, witness_program: &[u8]) -> Result<String, EncodeError> {
     encode(hrp, VERSION_1, witness_program)
 }
@@ -114,6 +118,7 @@ pub fn encode_v1(hrp: &Hrp, witness_program: &[u8]) -> Result<String, EncodeErro
 ///
 /// Does not check the validity of the witness version and witness program lengths (see
 /// the [`crate::primitives::segwit`] module for validation functions).
+#[inline]
 pub fn encode_to_fmt_unchecked<W: fmt::Write>(
     fmt: &mut W,
     hrp: &Hrp,
@@ -142,6 +147,7 @@ pub fn encode_to_fmt_unchecked<W: fmt::Write>(
 ///
 /// Does not check the validity of the witness version and witness program lengths (see
 /// the [`crate::primitives::segwit`] module for validation functions).
+#[inline]
 pub fn encode_to_fmt_unchecked_uppercase<W: fmt::Write>(
     fmt: &mut W,
     hrp: &Hrp,
