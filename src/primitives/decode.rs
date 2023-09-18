@@ -368,6 +368,10 @@ impl<'s> SegwitHrpstring<'s> {
     pub fn new(s: &'s str) -> Result<Self, SegwitHrpstringError> {
         let unchecked = UncheckedHrpstring::new(s)?;
 
+        if unchecked.data.is_empty() {
+            return Err(SegwitHrpstringError::MissingWitnessVersion);
+        }
+
         // Unwrap ok since check_characters (in `Self::new`) checked the bech32-ness of this char.
         let witness_version = Fe32::from_char(unchecked.data[0].into()).unwrap();
         if witness_version.to_u8() > 16 {
