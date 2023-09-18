@@ -947,4 +947,26 @@ mod tests {
             assert!(CheckedHrpstring::new::<Bech32>(valid).is_ok())
         }
     }
+
+    macro_rules! check_invalid_segwit_addresses {
+        ($($test_name:ident, $reason:literal, $address:literal);* $(;)?) => {
+            $(
+                #[test]
+                fn $test_name() {
+                    let res = SegwitHrpstring::new($address);
+                    if res.is_ok() {
+                        panic!("{} sting should not be valid: {}", $address, $reason);
+                    }
+                }
+            )*
+        }
+    }
+    check_invalid_segwit_addresses! {
+        invalid_segwit_address_0, "missing hrp", "1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
+        invalid_segwit_address_1, "missing data-checksum", "91111";
+        invalid_segwit_address_2, "invalid witness version", "bc14r0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
+        invalid_segwit_address_3, "invalid checksum length", "bc1q5mdq";
+        invalid_segwit_address_4, "missing data", "bc1qwf5mdq";
+        invalid_segwit_address_5, "invalid program length", "bc14r0srrr7xfkvy5l643lydnw9rewf5mdq";
+    }
 }
