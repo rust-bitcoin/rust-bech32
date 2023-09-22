@@ -33,6 +33,7 @@ use alloc::{string::String, vec::Vec};
 use core::convert::{Infallible, TryFrom};
 use core::{fmt, mem};
 
+use crate::error::write_err;
 pub use crate::primitives::checksum::Checksum;
 use crate::primitives::checksum::{self, PackedFe32};
 pub use crate::primitives::gf32::Fe32;

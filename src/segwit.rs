@@ -45,6 +45,7 @@
 use alloc::{string::String, vec::Vec};
 use core::fmt;
 
+use crate::error::write_err;
 #[cfg(feature = "alloc")]
 use crate::primitives::decode::{SegwitHrpstring, SegwitHrpstringError};
 use crate::primitives::gf32::Fe32;
@@ -53,7 +54,6 @@ use crate::primitives::iter::{ByteIterExt, Fe32IterExt};
 use crate::primitives::segwit::{self, InvalidWitnessVersionError, WitnessLengthError};
 pub use crate::primitives::segwit::{VERSION_0, VERSION_1};
 use crate::primitives::{Bech32, Bech32m};
-use crate::write_err;
 
 /// Decodes a segwit address.
 ///
