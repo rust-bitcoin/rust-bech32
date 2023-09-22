@@ -16,7 +16,7 @@ use core::{fmt, num, ops};
 #[cfg(all(test, mutate))]
 use mutagen::mutate;
 
-use crate::write_err;
+use crate::error::write_err;
 
 /// Logarithm table of each bech32 element, as a power of alpha = Z.
 ///

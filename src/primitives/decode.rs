@@ -75,12 +75,13 @@
 
 use core::{fmt, iter, slice, str};
 
+use crate::error::write_err;
 use crate::primitives::checksum::{self, Checksum};
 use crate::primitives::gf32::Fe32;
 use crate::primitives::hrp::{self, Hrp};
 use crate::primitives::iter::{Fe32IterExt, FesToBytes};
 use crate::primitives::segwit::{self, WitnessLengthError, VERSION_0};
-use crate::{write_err, Bech32, Bech32m};
+use crate::{Bech32, Bech32m};
 
 /// Separator between the hrp and payload (as defined by BIP-173).
 const SEP: char = '1';
