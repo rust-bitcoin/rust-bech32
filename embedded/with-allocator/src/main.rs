@@ -6,15 +6,13 @@ extern crate alloc;
 use core::alloc::Layout;
 
 use alloc_cortex_m::CortexMHeap;
-use bech32::{self, FromBase32, Hrp, ToBase32, Variant};
+use bech32::{Bech32m, Hrp};
 use cortex_m::asm;
 use cortex_m_rt::entry;
 use cortex_m_semihosting::{debug, hprintln};
 use panic_halt as _;
 
 use self::alloc::string::ToString;
-use self::alloc::vec;
-use self::alloc::vec::Vec;
 
 #[global_allocator]
 static ALLOCATOR: CortexMHeap = CortexMHeap::empty();
@@ -26,16 +24,18 @@ fn main() -> ! {
     // Initialize the allocator BEFORE you use it
     unsafe { ALLOCATOR.init(cortex_m_rt::heap_start() as usize, HEAP_SIZE) }
 
-    let hrp = Hrp::parse("bech32").unwrap();
-    let encoded = bech32::encode(hrp, vec![0x00, 0x01, 0x02].to_base32(), Variant::Bech32).unwrap();
-    test(encoded == "bech321qqqsyrhqy2a".to_string());
+    let data = [0x00u8, 0x01, 0x02];
+    let hrp = Hrp::parse("bech32").expect("failed to parse hrp");
+
+    let encoded = bech32::encode::<Bech32m>(hrp, &data).expect("failed to encode");
+    test(encoded == "bech321qqqsyktsg0l".to_string());
 
     hprintln!("{}", encoded).unwrap();
 
-    let (got_hrp, data, variant) = bech32::decode(&encoded).unwrap();
+    let (got_hrp, got_data) = bech32::decode(&encoded).expect("failed to decode");
+
     test(got_hrp == hrp);
-    test(Vec::<u8>::from_base32(&data).unwrap() == vec![0x00, 0x01, 0x02]);
-    test(variant == Variant::Bech32);
+    test(&got_data == &data);
 
     debug::exit(debug::EXIT_SUCCESS);
 
@@ -51,7 +51,7 @@ fn test(result: bool) {
 // define what happens in an Out Of Memory (OOM) condition
 #[alloc_error_handler]
 fn alloc_error(layout: Layout) -> ! {
-    hprintln!("{:?}", layout);
+    hprintln!("{:?}", layout).unwrap();
     asm::bkpt();
 
     loop {}

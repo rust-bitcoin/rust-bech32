@@ -16,31 +16,43 @@ use core::fmt::{self, Write};
 use core::iter::FusedIterator;
 use core::slice;
 
-use crate::Case;
-
 /// Maximum length of the human-readable part, as defined by BIP-173.
 const MAX_HRP_LEN: usize = 83;
 
+// Defines HRP constants for the different bitcoin networks.
+// You can also access these at `crate::hrp::BC` etc.
+#[rustfmt::skip]
 macro_rules! define_hrp_const {
-    ($name:ident, $size:literal, $zero:literal, $one:literal, $two:literal, $three:literal, $network:literal) => {
-/// "The human-readable part for the Bitcoin $network."
-        #[rustfmt::skip]
+    (
+        #[$doc:meta]
+        pub const $name:ident $size:literal $v:expr;
+    ) => {
+        #[$doc]
         pub const $name: Hrp = Hrp { buf: [
-            $zero, $one, $two, $three,
-    0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            $v[0], $v[1], $v[2], $v[3],
+            0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         ], size: $size };
     };
 }
-define_hrp_const! {BC, 2, 98, 99, 0, 0, "network (mainnet)."}
-define_hrp_const! {TB, 2, 116, 98, 0, 0, "testnet networks (testnet, signet)."}
-define_hrp_const! {BCRT, 4, 98, 99, 114, 116, "regtest network."}
+define_hrp_const! {
+    /// The human-readable part used by the Bitcoin mainnet network.
+    pub const BC 2 [98, 99, 0, 0];
+}
+define_hrp_const! {
+    /// The human-readable part used by the Bitcoin testnet networks (testnet, signet).
+    pub const TB 2 [116, 98, 0, 0];
+}
+define_hrp_const! {
+    /// The human-readable part used when running a Bitcoin regtest network.
+    pub const BCRT 4 [98, 99, 114, 116];
+}
 
 /// The human-readable part (human readable prefix before the '1' separator).
 #[derive(Clone, Copy, Debug)]
@@ -63,35 +75,7 @@ impl Hrp {
     /// > specific applications.
     ///
     /// [BIP-173]: <https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki>
-    #[inline]
-    pub fn parse(hrp: &str) -> Result<Self, Error> { Ok(Self::parse_and_case(hrp)?.0) }
-
-    /// Parses the human-readable part (see [`Hrp::parse`] for full docs).
-    ///
-    /// Does not check that `hrp` is valid according to BIP-173 but does check for valid ASCII
-    /// values, replacing any invalid characters with `X`.
-    pub const fn parse_unchecked(hrp: &str) -> Self {
-        let mut new = Hrp { buf: [0_u8; MAX_HRP_LEN], size: 0 };
-        let hrp_bytes = hrp.as_bytes();
-
-        let mut i = 0;
-        // Funky code so we can be const.
-        while i < hrp.len() {
-            let mut b = hrp_bytes[i];
-            // Valid subset of ASCII
-            if b < 33 || b > 126 {
-                b = b'X';
-            }
-
-            new.buf[i] = b;
-            new.size += 1;
-            i += 1;
-        }
-        new
-    }
-
-    /// Returns the case as well as the parsed `Hrp`.
-    pub(crate) fn parse_and_case(hrp: &str) -> Result<(Self, Case), Error> {
+    pub fn parse(hrp: &str) -> Result<Self, Error> {
         use Error::*;
 
         let mut new = Hrp { buf: [0_u8; MAX_HRP_LEN], size: 0 };
@@ -117,8 +101,14 @@ impl Hrp {
             }
 
             if b.is_ascii_lowercase() {
+                if has_upper {
+                    return Err(MixedCase);
+                }
                 has_lower = true;
             } else if b.is_ascii_uppercase() {
+                if has_lower {
+                    return Err(MixedCase);
+                }
                 has_upper = true;
             };
 
@@ -126,24 +116,31 @@ impl Hrp {
             new.size += 1;
         }
 
-        let case = match (has_lower, has_upper) {
-            (true, false) => Case::Lower,
-            (false, true) => Case::Upper,
-            (false, false) => Case::None,
-            (true, true) => return Err(MixedCase),
-        };
-
-        Ok((new, case))
+        Ok(new)
     }
 
-    /// Lowercase the inner ASCII bytes of this HRP.
-    // This is a hack to support `encode_to_fmt`, we should remove this function.
-    pub(crate) fn lowercase(&mut self) {
-        for b in self.buf.iter_mut() {
-            if is_ascii_uppercase(*b) {
-                *b |= 32;
+    /// Parses the human-readable part (see [`Hrp::parse`] for full docs).
+    ///
+    /// Does not check that `hrp` is valid according to BIP-173 but does check for valid ASCII
+    /// values, replacing any invalid characters with `X`.
+    pub const fn parse_unchecked(hrp: &str) -> Self {
+        let mut new = Hrp { buf: [0_u8; MAX_HRP_LEN], size: 0 };
+        let hrp_bytes = hrp.as_bytes();
+
+        let mut i = 0;
+        // Funky code so we can be const.
+        while i < hrp.len() {
+            let mut b = hrp_bytes[i];
+            // Valid subset of ASCII
+            if b < 33 || b > 126 {
+                b = b'X';
             }
+
+            new.buf[i] = b;
+            new.size += 1;
+            i += 1;
         }
+        new
     }
 
     /// Returns this human-readable part as a lowercase string.
@@ -448,31 +445,6 @@ mod tests {
         parse_err_1, "has-value-out-of-range-∈∈∈∈∈∈∈∈";
         parse_err_2, "toolongtoolongtoolongtoolongtoolongtoolongtoolongtoolongtoolongtoolongtoolongtoolongtoolongtoolong";
         parse_err_3, "has spaces in it";
-    }
-
-    macro_rules! check_case {
-        ($($test_name:ident, $hrp:literal, $expected:ident);* $(;)?) => {
-            $(
-                #[test]
-                fn $test_name() {
-                    use crate::Case::*;
-                    let (_, case) = Hrp::parse_and_case($hrp).expect("failed to parse hrp");
-                    assert_eq!(case, $expected);
-                }
-            )*
-        }
-    }
-    check_case! {
-        case_0, "a", Lower;
-        case_1, "A", Upper;
-        case_2, "ab", Lower;
-        case_3, "AB", Upper;
-        case_4, "ab2", Lower;
-        case_5, "AB2", Upper;
-        case_6, "3ab2", Lower;
-        case_7, "3AB2", Upper;
-        case_8, "2", None;
-        case_9, "23456", None;
     }
 
     macro_rules! check_iter {

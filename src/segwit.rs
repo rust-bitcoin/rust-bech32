@@ -11,8 +11,7 @@
 //!
 //! ```
 //! # #[cfg(feature = "alloc")] {
-//! use bech32::primitives::hrp::{self, Hrp};
-//! use bech32::{Fe32, segwit};
+//! use bech32::{hrp, segwit, Fe32, Hrp};
 //!
 //! let witness_prog = [
 //!     0x75, 0x1e, 0x76, 0xe8, 0x19, 0x91, 0x96, 0xd4,
@@ -51,7 +50,10 @@ use crate::primitives::decode::{SegwitHrpstring, SegwitHrpstringError};
 use crate::primitives::gf32::Fe32;
 use crate::primitives::hrp::Hrp;
 use crate::primitives::iter::{ByteIterExt, Fe32IterExt};
-use crate::primitives::segwit::{self, InvalidWitnessVersionError, WitnessLengthError};
+#[cfg(feature = "alloc")]
+use crate::primitives::segwit;
+use crate::primitives::segwit::{InvalidWitnessVersionError, WitnessLengthError};
+#[doc(inline)]
 pub use crate::primitives::segwit::{VERSION_0, VERSION_1};
 use crate::primitives::{Bech32, Bech32m};
 
@@ -66,7 +68,7 @@ use crate::primitives::{Bech32, Bech32m};
 /// ```
 #[cfg(feature = "alloc")]
 #[inline]
-pub fn decode(s: &str) -> Result<(Hrp, Fe32, Vec<u8>), SegwitHrpstringError> {
+pub fn decode(s: &str) -> Result<(Hrp, Fe32, Vec<u8>), DecodeError> {
     let segwit = SegwitHrpstring::new(s)?;
     Ok((segwit.hrp(), segwit.witness_version(), segwit.byte_iter().collect::<Vec<u8>>()))
 }
@@ -125,6 +127,19 @@ pub fn encode_to_fmt_unchecked<W: fmt::Write>(
     witness_version: Fe32,
     witness_program: &[u8],
 ) -> fmt::Result {
+    encode_lower_to_fmt_unchecked(fmt, hrp, witness_version, witness_program)
+}
+
+/// Encodes a segwit address to a writer ([`fmt::Write`]) using lowercase characters.
+///
+/// Does not check the validity of the witness version and witness program lengths (see
+/// the [`crate::primitives::segwit`] module for validation functions).
+pub fn encode_lower_to_fmt_unchecked<W: fmt::Write>(
+    fmt: &mut W,
+    hrp: &Hrp,
+    witness_version: Fe32,
+    witness_program: &[u8],
+) -> fmt::Result {
     let iter = witness_program.iter().copied().bytes_to_fes();
     match witness_version {
         VERSION_0 => {
@@ -148,7 +163,7 @@ pub fn encode_to_fmt_unchecked<W: fmt::Write>(
 /// Does not check the validity of the witness version and witness program lengths (see
 /// the [`crate::primitives::segwit`] module for validation functions).
 #[inline]
-pub fn encode_to_fmt_unchecked_uppercase<W: fmt::Write>(
+pub fn encode_upper_to_fmt_unchecked<W: fmt::Write>(
     fmt: &mut W,
     hrp: &Hrp,
     witness_version: Fe32,
@@ -169,6 +184,146 @@ pub fn encode_to_fmt_unchecked_uppercase<W: fmt::Write>(
     }
 
     Ok(())
+}
+
+/// Encodes a segwit address to a writer ([`std::io::Write`]) using lowercase characters.
+///
+/// Does not check the validity of the witness version and witness program lengths (see
+/// the [`crate::primitives::segwit`] module for validation functions).
+#[cfg(feature = "std")]
+#[inline]
+pub fn encode_to_writer_unchecked<W: std::io::Write>(
+    w: &mut W,
+    hrp: &Hrp,
+    witness_version: Fe32,
+    witness_program: &[u8],
+) -> std::io::Result<()> {
+    encode_lower_to_writer_unchecked(w, hrp, witness_version, witness_program)
+}
+
+/// Encodes a segwit address to a writer ([`std::io::Write`]) using lowercase characters.
+///
+/// Does not check the validity of the witness version and witness program lengths (see
+/// the [`crate::primitives::segwit`] module for validation functions).
+#[cfg(feature = "std")]
+#[inline]
+pub fn encode_lower_to_writer_unchecked<W: std::io::Write>(
+    w: &mut W,
+    hrp: &Hrp,
+    witness_version: Fe32,
+    witness_program: &[u8],
+) -> std::io::Result<()> {
+    let iter = witness_program.iter().copied().bytes_to_fes();
+    match witness_version {
+        VERSION_0 => {
+            for c in iter.with_checksum::<Bech32>(hrp).with_witness_version(VERSION_0).chars() {
+                w.write_all(&[c.to_ascii_lowercase() as u8])?;
+            }
+        }
+        version => {
+            for c in iter.with_checksum::<Bech32m>(hrp).with_witness_version(version).chars() {
+                w.write_all(&[c.to_ascii_lowercase() as u8])?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Encodes a segwit address to a [`std::io::Write`] writer using uppercase characters.
+///
+/// This is provided for use when creating QR codes.
+///
+/// Does not check the validity of the witness version and witness program lengths (see
+/// the [`crate::primitives::segwit`] module for validation functions).
+#[cfg(feature = "std")]
+#[inline]
+pub fn encode_upper_to_writer_unchecked<W: std::io::Write>(
+    w: &mut W,
+    hrp: &Hrp,
+    witness_version: Fe32,
+    witness_program: &[u8],
+) -> std::io::Result<()> {
+    let iter = witness_program.iter().copied().bytes_to_fes();
+    match witness_version {
+        VERSION_0 => {
+            for c in iter.with_checksum::<Bech32>(hrp).with_witness_version(VERSION_0).chars() {
+                w.write_all(&[c.to_ascii_uppercase() as u8])?;
+            }
+        }
+        version => {
+            for c in iter.with_checksum::<Bech32m>(hrp).with_witness_version(version).chars() {
+                w.write_all(&[c.to_ascii_uppercase() as u8])?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// An error while decoding a segwit address.
+#[cfg(feature = "alloc")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DecodeError(pub SegwitHrpstringError);
+
+#[cfg(feature = "alloc")]
+impl fmt::Display for DecodeError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write_err!(f, "decoding segwit address failed"; self.0)
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for DecodeError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> { Some(&self.0) }
+}
+
+#[cfg(feature = "alloc")]
+impl From<SegwitHrpstringError> for DecodeError {
+    fn from(e: SegwitHrpstringError) -> Self { Self(e) }
+}
+
+/// An error while decoding a segwit address from a reader.
+#[cfg(feature = "std")]
+#[derive(Debug)]
+pub enum DecodeFromReaderError {
+    /// Read error.
+    Read(std::io::Error),
+    /// Decode error.
+    Decode(DecodeError),
+}
+
+#[cfg(feature = "std")]
+impl fmt::Display for DecodeFromReaderError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use DecodeFromReaderError::*;
+
+        match *self {
+            Read(ref e) => write_err!(f, "read failed"; e),
+            Decode(ref e) => write_err!(f, "decoding failed"; e),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for DecodeFromReaderError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        use DecodeFromReaderError::*;
+
+        match *self {
+            Read(ref e) => Some(e),
+            Decode(ref e) => Some(e),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl From<std::io::Error> for DecodeFromReaderError {
+    fn from(e: std::io::Error) -> Self { Self::Read(e) }
+}
+
+#[cfg(feature = "std")]
+impl From<DecodeError> for DecodeFromReaderError {
+    fn from(e: DecodeError) -> Self { Self::Decode(e) }
 }
 
 /// An error while constructing a [`SegwitHrpstring`] type.
@@ -249,7 +404,7 @@ mod tests {
     }
 
     #[test]
-    fn encode_to_fmt_lowercase() {
+    fn encode_lower_to_fmt() {
         let program = witness_program();
         let mut address = String::new();
         encode_to_fmt_unchecked(&mut address, &hrp::BC, VERSION_0, &program)
@@ -260,12 +415,38 @@ mod tests {
     }
 
     #[test]
-    fn encode_to_fmt_uppercase() {
+    fn encode_upper_to_fmt() {
         let program = witness_program();
         let mut address = String::new();
-        encode_to_fmt_unchecked_uppercase(&mut address, &hrp::BC, VERSION_0, &program)
+        encode_upper_to_fmt_unchecked(&mut address, &hrp::BC, VERSION_0, &program)
             .expect("failed to encode address to QR code");
 
+        let want = "BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4";
+        assert_eq!(address, want);
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn encode_lower_to_writer() {
+        let program = witness_program();
+        let mut buf = Vec::new();
+        encode_lower_to_writer_unchecked(&mut buf, &hrp::BC, VERSION_0, &program)
+            .expect("failed to encode");
+
+        let address = std::str::from_utf8(&buf).expect("ascii is valid utf8");
+        let want = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
+        assert_eq!(address, want);
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn encode_upper_to_writer() {
+        let program = witness_program();
+        let mut buf = Vec::new();
+        encode_upper_to_writer_unchecked(&mut buf, &hrp::BC, VERSION_0, &program)
+            .expect("failed to encode");
+
+        let address = std::str::from_utf8(&buf).expect("ascii is valid utf8");
         let want = "BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4";
         assert_eq!(address, want);
     }

@@ -210,9 +210,9 @@ impl_packed_fe32!(u128);
 /// Iterator that yields the field elements that are input into a checksum algorithm for an [`Hrp`].
 pub struct HrpFe32Iter<'hrp> {
     /// `None` once the hrp high fes have been yielded.
-    high_iter: Option<crate::hrp::LowercaseByteIter<'hrp>>,
+    high_iter: Option<crate::primitives::hrp::LowercaseByteIter<'hrp>>,
     /// `None` once the hrp low fes have been yielded.
-    low_iter: Option<crate::hrp::LowercaseByteIter<'hrp>>,
+    low_iter: Option<crate::primitives::hrp::LowercaseByteIter<'hrp>>,
 }
 
 impl<'hrp> HrpFe32Iter<'hrp> {

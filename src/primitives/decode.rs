@@ -222,11 +222,12 @@ impl<'s> UncheckedHrpstring<'s> {
 /// # Examples
 ///
 /// ```
-/// use bech32::{Bech32, primitives::decode::CheckedHrpstring};
+/// use bech32::{Bech32m, primitives::decode::CheckedHrpstring};
 ///
 /// // Parse a general checksummed bech32 encoded string.
-/// let s = "abcd14g08d6qejxtdg4y5r3zarvary0c5xw7kxugcx9";
-/// let checked = CheckedHrpstring::new::<Bech32>(s).expect("valid bech32 string with a valid checksum");
+/// let s = "abcd14g08d6qejxtdg4y5r3zarvary0c5xw7knqc5r8";
+/// let checked = CheckedHrpstring::new::<Bech32m>(s)
+///       .expect("valid bech32 string with a valid checksum according to the bech32m algorithm");
 ///
 /// // Do something with the encoded data.
 /// let _ = checked.byte_iter();
@@ -801,8 +802,6 @@ impl std::error::Error for PaddingError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(feature = "alloc")]
-    use crate::Variant;
 
     #[test]
     fn bip_173_invalid_parsing_fails() {
@@ -932,7 +931,7 @@ mod tests {
             "an83characterlonghumanreadablepartthatcontainsthenumber1andtheexcludedcharactersbio";
 
         let hrp = Hrp::parse_unchecked(hrps);
-        let s = crate::encode(hrp, [], Variant::Bech32).expect("failed to encode empty buffer");
+        let s = crate::encode::<Bech32>(hrp, &[]).expect("failed to encode empty buffer");
 
         let unchecked = UncheckedHrpstring::new(&s).expect("failed to parse address");
         assert_eq!(unchecked.hrp(), hrp);
