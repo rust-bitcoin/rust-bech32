@@ -345,7 +345,8 @@ pub fn encode_upper_to_writer<Ck: Checksum, W: std::io::Write>(
 
 /// An error while decoding an address.
 #[cfg(feature = "alloc")]
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum DecodeError {
     /// Parsing failed.
     Parse(UncheckedHrpstringError),
@@ -379,12 +380,14 @@ impl std::error::Error for DecodeError {
 
 #[cfg(feature = "alloc")]
 impl From<UncheckedHrpstringError> for DecodeError {
+    #[inline]
     fn from(e: UncheckedHrpstringError) -> Self { Self::Parse(e) }
 }
 
 /// An error while decoding an address from a reader.
 #[cfg(feature = "std")]
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum DecodeFromReaderError {
     /// Read error.
     Read(std::io::Error),
@@ -418,11 +421,13 @@ impl std::error::Error for DecodeFromReaderError {
 
 #[cfg(feature = "std")]
 impl From<std::io::Error> for DecodeFromReaderError {
+    #[inline]
     fn from(e: std::io::Error) -> Self { Self::Read(e) }
 }
 
 #[cfg(feature = "std")]
 impl From<DecodeError> for DecodeFromReaderError {
+    #[inline]
     fn from(e: DecodeError) -> Self { Self::Decode(e) }
 }
 

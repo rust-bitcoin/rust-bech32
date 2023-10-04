@@ -263,6 +263,7 @@ pub fn encode_upper_to_writer_unchecked<W: std::io::Write>(
 /// An error while decoding a segwit address.
 #[cfg(feature = "alloc")]
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct DecodeError(pub SegwitHrpstringError);
 
 #[cfg(feature = "alloc")]
@@ -279,12 +280,14 @@ impl std::error::Error for DecodeError {
 
 #[cfg(feature = "alloc")]
 impl From<SegwitHrpstringError> for DecodeError {
+    #[inline]
     fn from(e: SegwitHrpstringError) -> Self { Self(e) }
 }
 
 /// An error while decoding a segwit address from a reader.
 #[cfg(feature = "std")]
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum DecodeFromReaderError {
     /// Read error.
     Read(std::io::Error),
@@ -318,16 +321,19 @@ impl std::error::Error for DecodeFromReaderError {
 
 #[cfg(feature = "std")]
 impl From<std::io::Error> for DecodeFromReaderError {
+    #[inline]
     fn from(e: std::io::Error) -> Self { Self::Read(e) }
 }
 
 #[cfg(feature = "std")]
 impl From<DecodeError> for DecodeFromReaderError {
+    #[inline]
     fn from(e: DecodeError) -> Self { Self::Decode(e) }
 }
 
 /// An error while constructing a [`SegwitHrpstring`] type.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum EncodeError {
     /// Invalid witness version (must be 0-16 inclusive).
     WitnessVersion(InvalidWitnessVersionError),
@@ -363,14 +369,17 @@ impl std::error::Error for EncodeError {
 }
 
 impl From<InvalidWitnessVersionError> for EncodeError {
+    #[inline]
     fn from(e: InvalidWitnessVersionError) -> Self { Self::WitnessVersion(e) }
 }
 
 impl From<WitnessLengthError> for EncodeError {
+    #[inline]
     fn from(e: WitnessLengthError) -> Self { Self::WitnessLength(e) }
 }
 
 impl From<fmt::Error> for EncodeError {
+    #[inline]
     fn from(e: fmt::Error) -> Self { Self::Write(e) }
 }
 

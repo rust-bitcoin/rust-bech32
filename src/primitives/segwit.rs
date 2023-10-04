@@ -53,7 +53,8 @@ pub fn validate_witness_program_length(
 }
 
 /// Field element does not represent a valid witness version.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct InvalidWitnessVersionError(Fe32);
 
 impl fmt::Display for InvalidWitnessVersionError {
@@ -68,7 +69,7 @@ impl std::error::Error for InvalidWitnessVersionError {
 }
 
 /// Witness program invalid because of incorrect length.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum WitnessLengthError {
     /// The witness data is too short.

@@ -361,10 +361,12 @@ impl std::error::Error for Error {
 }
 
 impl From<num::TryFromIntError> for Error {
+    #[inline]
     fn from(e: num::TryFromIntError) -> Self { Error::NotAByte(e) }
 }
 
 impl From<Infallible> for Error {
+    #[inline]
     fn from(i: Infallible) -> Self { match i {} }
 }
 
