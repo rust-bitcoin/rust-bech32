@@ -545,6 +545,7 @@ where
 
 /// An error while constructing a [`SegwitHrpstring`] type.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SegwitHrpstringError {
     /// Error while parsing the encoded address string.
     Unchecked(UncheckedHrpstringError),
@@ -591,23 +592,28 @@ impl std::error::Error for SegwitHrpstringError {
 }
 
 impl From<UncheckedHrpstringError> for SegwitHrpstringError {
+    #[inline]
     fn from(e: UncheckedHrpstringError) -> Self { Self::Unchecked(e) }
 }
 
 impl From<WitnessLengthError> for SegwitHrpstringError {
+    #[inline]
     fn from(e: WitnessLengthError) -> Self { Self::WitnessLength(e) }
 }
 
 impl From<PaddingError> for SegwitHrpstringError {
+    #[inline]
     fn from(e: PaddingError) -> Self { Self::Padding(e) }
 }
 
 impl From<ChecksumError> for SegwitHrpstringError {
+    #[inline]
     fn from(e: ChecksumError) -> Self { Self::Checksum(e) }
 }
 
 /// An error while constructing a [`CheckedHrpstring`] type.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum CheckedHrpstringError {
     /// Error while parsing the encoded address string.
     Parse(UncheckedHrpstringError),
@@ -639,10 +645,12 @@ impl std::error::Error for CheckedHrpstringError {
 }
 
 impl From<UncheckedHrpstringError> for CheckedHrpstringError {
+    #[inline]
     fn from(e: UncheckedHrpstringError) -> Self { Self::Parse(e) }
 }
 
 impl From<ChecksumError> for CheckedHrpstringError {
+    #[inline]
     fn from(e: ChecksumError) -> Self { Self::Checksum(e) }
 }
 
@@ -680,10 +688,12 @@ impl std::error::Error for UncheckedHrpstringError {
 }
 
 impl From<CharError> for UncheckedHrpstringError {
+    #[inline]
     fn from(e: CharError) -> Self { Self::Char(e) }
 }
 
 impl From<hrp::Error> for UncheckedHrpstringError {
+    #[inline]
     fn from(e: hrp::Error) -> Self { Self::Hrp(e) }
 }
 
@@ -770,6 +780,7 @@ impl std::error::Error for ChecksumError {
 
 /// Error validating the padding bits on the witness data.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum PaddingError {
     /// The data payload has too many bits of padding.
     TooMuch,
