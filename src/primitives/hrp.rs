@@ -178,11 +178,8 @@ impl Hrp {
     ///
     /// Guaranteed to be between 1 and 83 inclusive.
     #[inline]
+    #[allow(clippy::len_without_is_empty)] // HRP is never empty.
     pub fn len(&self) -> usize { self.size }
-
-    /// Always false, the human-readable part is guaranteed to be between 1-83 characters.
-    #[inline]
-    pub fn is_empty(&self) -> bool { false }
 
     /// Returns `true` if this [`Hrp`] is valid according to the bips.
     ///
