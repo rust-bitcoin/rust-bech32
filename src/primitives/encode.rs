@@ -7,7 +7,7 @@
 //! prepending HRP strings etc.
 //!
 //! In general, directly using these adaptors is not very ergonomic, and users are recommended to
-//! instead use the higher-level functions at the root of this crate.
+//! instead use the higher crate level API.
 //!
 //! WARNING: This module does not enforce the maximum length of an encoded bech32 string (90 chars).
 //!
