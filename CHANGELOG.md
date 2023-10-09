@@ -1,3 +1,7 @@
+# 0.10.0-beta
+
+Re-implement the crate level API using the new `primitives` module.
+
 # 0.10.0-alpha
 
 This release introduces a new `primitives` module that is basically a new implementation of the
