@@ -130,28 +130,6 @@ extern crate alloc;
 #[cfg(any(test, feature = "std"))]
 extern crate core;
 
-#[cfg(all(feature = "alloc", not(feature = "std"), not(test)))]
-use alloc::{string::String, vec::Vec};
-use core::fmt;
-
-use crate::error::write_err;
-#[doc(inline)]
-pub use crate::primitives::checksum::Checksum;
-#[cfg(doc)]
-use crate::primitives::decode::CheckedHrpstring;
-#[cfg(feature = "alloc")]
-use crate::primitives::decode::UncheckedHrpstringError;
-#[cfg(feature = "alloc")]
-use crate::primitives::decode::{ChecksumError, UncheckedHrpstring};
-#[doc(inline)]
-pub use crate::primitives::gf32::Fe32;
-#[doc(inline)]
-pub use crate::primitives::hrp::Hrp;
-#[doc(inline)]
-pub use crate::primitives::iter::{ByteIterExt, Fe32IterExt};
-#[doc(inline)]
-pub use crate::primitives::{Bech32, Bech32m, NoChecksum};
-
 mod error;
 /// Re-exports the hrp types from [`primitives::hrp`] to make importing ergonomic for the top level APIs.
 pub mod hrp;
@@ -159,6 +137,28 @@ pub mod hrp;
 pub mod primitives;
 /// API for encoding and decoding segwit addresses.
 pub mod segwit;
+
+#[cfg(all(feature = "alloc", not(feature = "std"), not(test)))]
+use alloc::{string::String, vec::Vec};
+use core::fmt;
+
+use crate::error::write_err;
+#[cfg(doc)]
+use crate::primitives::decode::CheckedHrpstring;
+#[cfg(feature = "alloc")]
+use crate::primitives::decode::UncheckedHrpstringError;
+#[cfg(feature = "alloc")]
+use crate::primitives::decode::{ChecksumError, UncheckedHrpstring};
+
+#[rustfmt::skip]                // Keep public re-exports separate.
+#[doc(inline)]
+pub use {
+    crate::primitives::checksum::Checksum,
+    crate::primitives::gf32::Fe32,
+    crate::primitives::hrp::Hrp,
+    crate::primitives::iter::{ByteIterExt, Fe32IterExt},
+    crate::primitives::{Bech32, Bech32m, NoChecksum},
+};
 
 /// Decodes a bech32 encoded string.
 ///

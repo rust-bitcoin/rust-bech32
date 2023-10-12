@@ -53,9 +53,13 @@ use crate::primitives::iter::{ByteIterExt, Fe32IterExt};
 #[cfg(feature = "alloc")]
 use crate::primitives::segwit;
 use crate::primitives::segwit::{InvalidWitnessVersionError, WitnessLengthError};
-#[doc(inline)]
-pub use crate::primitives::segwit::{VERSION_0, VERSION_1};
 use crate::primitives::{Bech32, Bech32m};
+
+#[rustfmt::skip]                // Keep public re-exports separate.
+#[doc(inline)]
+pub use {
+    crate::primitives::segwit::{VERSION_0, VERSION_1},
+};
 
 /// Decodes a segwit address.
 ///
