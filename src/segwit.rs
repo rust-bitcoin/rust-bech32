@@ -221,12 +221,12 @@ pub fn encode_lower_to_writer_unchecked<W: std::io::Write>(
     match witness_version {
         VERSION_0 => {
             for c in iter.with_checksum::<Bech32>(hrp).with_witness_version(VERSION_0).chars() {
-                w.write_all(&[c.to_ascii_lowercase() as u8])?;
+                w.write_all(&[c as u8])?;
             }
         }
         version => {
             for c in iter.with_checksum::<Bech32m>(hrp).with_witness_version(version).chars() {
-                w.write_all(&[c.to_ascii_lowercase() as u8])?;
+                w.write_all(&[c as u8])?;
             }
         }
     }
@@ -414,6 +414,20 @@ mod tests {
 
         let address = std::str::from_utf8(&buf).expect("ascii is valid utf8");
         let want = "BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4";
+        assert_eq!(address, want);
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn encode_lower_to_writer_including_lowecaseing_hrp() {
+        let program = witness_program();
+        let mut buf = Vec::new();
+        let hrp = Hrp::parse_unchecked("BC");
+        encode_lower_to_writer_unchecked(&mut buf, &hrp, VERSION_0, &program)
+            .expect("failed to encode");
+
+        let address = std::str::from_utf8(&buf).expect("ascii is valid utf8");
+        let want = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
         assert_eq!(address, want);
     }
 }
