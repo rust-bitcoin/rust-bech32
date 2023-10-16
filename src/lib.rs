@@ -384,53 +384,6 @@ impl From<UncheckedHrpstringError> for DecodeError {
     fn from(e: UncheckedHrpstringError) -> Self { Self::Parse(e) }
 }
 
-/// An error while decoding an address from a reader.
-#[cfg(feature = "std")]
-#[derive(Debug)]
-#[non_exhaustive]
-pub enum DecodeFromReaderError {
-    /// Read error.
-    Read(std::io::Error),
-    /// Decode error.
-    Decode(DecodeError),
-}
-
-#[cfg(feature = "std")]
-impl fmt::Display for DecodeFromReaderError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use DecodeFromReaderError::*;
-
-        match *self {
-            Read(ref e) => write_err!(f, "read failed"; e),
-            Decode(ref e) => write_err!(f, "decoding failed"; e),
-        }
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for DecodeFromReaderError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        use DecodeFromReaderError::*;
-
-        match *self {
-            Read(ref e) => Some(e),
-            Decode(ref e) => Some(e),
-        }
-    }
-}
-
-#[cfg(feature = "std")]
-impl From<std::io::Error> for DecodeFromReaderError {
-    #[inline]
-    fn from(e: std::io::Error) -> Self { Self::Read(e) }
-}
-
-#[cfg(feature = "std")]
-impl From<DecodeError> for DecodeFromReaderError {
-    #[inline]
-    fn from(e: DecodeError) -> Self { Self::Decode(e) }
-}
-
 #[cfg(test)]
 #[cfg(feature = "alloc")]
 mod tests {
