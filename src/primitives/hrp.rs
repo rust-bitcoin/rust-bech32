@@ -245,6 +245,12 @@ impl PartialEq for Hrp {
 
 impl Eq for Hrp {}
 
+impl AsRef<[u8]> for Hrp {
+    fn as_ref(&self) -> &[u8] {
+        &self.buf[..self.size]
+    }
+}
+
 impl core::hash::Hash for Hrp {
     #[inline]
     fn hash<H: core::hash::Hasher>(&self, h: &mut H) { self.buf.hash(h) }
