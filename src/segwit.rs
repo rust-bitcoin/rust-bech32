@@ -297,7 +297,7 @@ pub enum EncodeError {
     /// Invalid witness length.
     WitnessLength(WitnessLengthError),
     /// Writing to formatter failed.
-    Write(fmt::Error),
+    Fmt(fmt::Error),
 }
 
 impl fmt::Display for EncodeError {
@@ -307,7 +307,7 @@ impl fmt::Display for EncodeError {
         match *self {
             WitnessVersion(ref e) => write_err!(f, "witness version"; e),
             WitnessLength(ref e) => write_err!(f, "witness length"; e),
-            Write(ref e) => write_err!(f, "writing to formatter failed"; e),
+            Fmt(ref e) => write_err!(f, "writing to formatter failed"; e),
         }
     }
 }
@@ -320,7 +320,7 @@ impl std::error::Error for EncodeError {
         match *self {
             WitnessVersion(ref e) => Some(e),
             WitnessLength(ref e) => Some(e),
-            Write(ref e) => Some(e),
+            Fmt(ref e) => Some(e),
         }
     }
 }
@@ -337,7 +337,7 @@ impl From<WitnessLengthError> for EncodeError {
 
 impl From<fmt::Error> for EncodeError {
     #[inline]
-    fn from(e: fmt::Error) -> Self { Self::Write(e) }
+    fn from(e: fmt::Error) -> Self { Self::Fmt(e) }
 }
 
 #[cfg(all(test, feature = "alloc"))]
