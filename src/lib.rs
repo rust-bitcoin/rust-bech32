@@ -345,6 +345,12 @@ pub fn encode_upper_to_writer<Ck: Checksum, W: std::io::Write>(
     Ok(())
 }
 
+/// Returns the length of the bech32 string after encoding `hrp` and `data` (incl. checksum).
+pub fn encoded_length<Ck: Checksum>(hrp: Hrp, data: &[u8]) -> usize {
+    let iter = data.iter().copied().bytes_to_fes();
+    hrp.len() + 1 + iter.len() + Ck::CHECKSUM_LENGTH // +1 for separator
+}
+
 /// An error while decoding a bech32 string.
 #[cfg(feature = "alloc")]
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -390,7 +396,7 @@ impl From<UncheckedHrpstringError> for DecodeError {
 #[cfg(feature = "alloc")]
 mod tests {
     use super::*;
-    use crate::Bech32;
+    use crate::{Bech32, Bech32m};
 
     // Tests below using this data, are based on the test vector (from BIP-173):
     // BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4: 0014751e76e8199196d454941c45d1b3a323f1433bd6
@@ -474,5 +480,17 @@ mod tests {
 
         assert_eq!(hrp, Hrp::parse_unchecked("TEST"));
         assert_eq!(data, DATA);
+    }
+
+    #[test]
+    fn encoded_length_works() {
+        let s = "test1lu08d6qejxtdg4y5r3zarvary0c5xw7kmz4lky";
+        let (hrp, data) = decode(s).expect("valid string");
+
+        let encoded = encode::<Bech32m>(hrp, &data).expect("valid data");
+        let want = encoded.len();
+        let got = encoded_length::<Bech32m>(hrp, &data);
+
+        assert_eq!(got, want);
     }
 }

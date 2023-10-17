@@ -264,6 +264,16 @@ pub fn encode_upper_to_writer_unchecked<W: std::io::Write>(
     Ok(())
 }
 
+/// Returns the length of the bech32 string after encoding HRP, witness version and program.
+pub fn encoded_length(
+    hrp: Hrp,
+    _witness_version: Fe32, // Emphasize that this is only for segwit.
+    witness_program: &[u8],
+) -> usize {
+    // Ck is only for length and since they are both the same we can use either here.
+    crate::encoded_length::<Bech32>(hrp, witness_program) + 1 // +1 for witness version.
+}
+
 /// An error while decoding a segwit address.
 #[cfg(feature = "alloc")]
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -429,5 +439,23 @@ mod tests {
         let address = std::str::from_utf8(&buf).expect("ascii is valid utf8");
         let want = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
         assert_eq!(address, want);
+    }
+
+    #[test]
+    fn encoded_length_works() {
+        let addresses = vec![
+            "bc1q2s3rjwvam9dt2ftt4sqxqjf3twav0gdx0k0q2etxflx38c3x8tnssdmnjq",
+            "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
+        ];
+
+        for address in addresses {
+            let (hrp, version, program) = decode(address).expect("valid address");
+
+            let encoded = encode(hrp, version, &program).expect("valid data");
+            let want = encoded.len();
+            let got = encoded_length(hrp, version, &program);
+
+            assert_eq!(got, want);
+        }
     }
 }

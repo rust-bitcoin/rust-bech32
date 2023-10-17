@@ -8,6 +8,8 @@
 //! - `FesToBytes`: An iterator over field elements to an iterator over bytes.
 //! - `Checksummed`: An iterator over field elements that appends the checksum.
 //!
+//! WARNING: This module does not enforce the maximum length of an encoded bech32 string (90 chars).
+//!
 //! # Examples
 //!
 //! ```
