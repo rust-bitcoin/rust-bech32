@@ -153,7 +153,7 @@ impl Hrp {
     /// If an uppercase HRP was parsed during object construction then this iterator will yield
     /// uppercase ASCII `char`s. For lowercase bytes see [`Self::lowercase_byte_iter`]
     #[inline]
-    pub fn byte_iter(&self) -> ByteIter { ByteIter { iter: self.buf[..self.size].iter() } }
+    pub fn byte_iter(&self) -> ByteIter { ByteIter { iter: self.as_bytes().iter() } }
 
     /// Creates a character iterator over the ASCII characters of this HRP.
     ///
@@ -180,6 +180,12 @@ impl Hrp {
     #[inline]
     #[allow(clippy::len_without_is_empty)] // HRP is never empty.
     pub fn len(&self) -> usize { self.size }
+
+    /// Returns the ASCII byte values (ASCII characters) of this HRP.
+    #[inline]
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.buf[..self.len()]
+    }
 
     /// Returns `true` if this [`Hrp`] is valid according to the bips.
     ///
@@ -517,5 +523,12 @@ mod tests {
         assert_eq!(BC, Hrp::parse_unchecked("bc"));
         assert_eq!(TB, Hrp::parse_unchecked("tb"));
         assert_eq!(BCRT, Hrp::parse_unchecked("bcrt"));
+    }
+
+    #[test]
+    fn hrp_as_bytes() {
+        assert_eq!(Hrp::parse_unchecked("bc").as_bytes(), &[98, 99]);
+        assert_eq!(Hrp::parse_unchecked("tb").as_bytes(), &[116, 98]);
+        assert_eq!(Hrp::parse_unchecked("bcrt").as_bytes(), &[98, 99, 114, 116]);
     }
 }
