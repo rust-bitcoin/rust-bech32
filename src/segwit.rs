@@ -89,8 +89,8 @@ pub fn decode(s: &str) -> Result<(Hrp, Fe32, Vec<u8>), DecodeError> {
 /// Does validity checks on the `witness_version`, length checks on the `witness_program`, and
 /// checks the total encoded string length.
 ///
-/// As specified by [`BIP-350`] we use the [`Bech32m`] checksum algorithm for witness versions 1 and
-/// above, and for witness version 0 we use the original ([`BIP-173`]) [`Bech32`] checksum
+/// As specified by [BIP-350] we use the [`Bech32m`] checksum algorithm for witness versions 1 and
+/// above, and for witness version 0 we use the original ([BIP-173]) [`Bech32`] checksum
 /// algorithm.
 ///
 /// See also [`encode_v0`] or [`encode_v1`].
