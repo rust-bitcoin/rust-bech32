@@ -14,7 +14,7 @@ use alloc::string::String;
 use core::cmp::Ordering;
 use core::fmt::{self, Write};
 use core::iter::FusedIterator;
-use core::slice;
+use core::{slice, str};
 
 /// Maximum length of the human-readable part, as defined by BIP-173.
 const MAX_HRP_LEN: usize = 83;
@@ -147,6 +147,16 @@ impl Hrp {
     #[cfg(feature = "alloc")]
     #[inline]
     pub fn to_lowercase(&self) -> String { self.lowercase_char_iter().collect() }
+
+    /// Returns this human-readable part as bytes.
+    #[inline]
+    pub fn as_bytes(&self) -> &[u8] { &self.buf[..self.size] }
+
+    /// Returns this human-readable part as str.
+    #[inline]
+    pub fn as_str(&self) -> &str {
+        str::from_utf8(&self.buf[..self.size]).expect("we only store ASCII bytes")
+    }
 
     /// Creates a byte iterator over the ASCII byte values (ASCII characters) of this HRP.
     ///
@@ -511,5 +521,19 @@ mod tests {
         assert_eq!(BC, Hrp::parse_unchecked("bc"));
         assert_eq!(TB, Hrp::parse_unchecked("tb"));
         assert_eq!(BCRT, Hrp::parse_unchecked("bcrt"));
+    }
+
+    #[test]
+    fn as_str() {
+        let s = "arbitraryhrp";
+        let hrp = Hrp::parse_unchecked(s);
+        assert_eq!(hrp.as_str(), s);
+    }
+
+    #[test]
+    fn as_bytes() {
+        let s = "arbitraryhrp";
+        let hrp = Hrp::parse_unchecked(s);
+        assert_eq!(hrp.as_bytes(), s.as_bytes());
     }
 }
