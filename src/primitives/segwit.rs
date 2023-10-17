@@ -55,7 +55,7 @@ pub fn validate_witness_program_length(
 /// Field element does not represent a valid witness version.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
-pub struct InvalidWitnessVersionError(Fe32);
+pub struct InvalidWitnessVersionError(pub Fe32);
 
 impl fmt::Display for InvalidWitnessVersionError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
