@@ -142,6 +142,7 @@ pub mod segwit;
 use alloc::{string::String, vec::Vec};
 use core::fmt;
 
+#[cfg(feature = "alloc")]
 use crate::error::write_err;
 #[cfg(doc)]
 use crate::primitives::decode::CheckedHrpstring;
