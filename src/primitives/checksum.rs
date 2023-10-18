@@ -27,11 +27,16 @@ pub trait Checksum {
     /// be pretty efficient no matter what.
     type MidstateRepr: PackedFe32;
 
+    /// The length of the code.
+    ///
+    /// The length of the code is how long a coded message can be (including the
+    /// checksum!) for the code to retain its error-correcting properties.
+    const CODE_LENGTH: usize;
+
     /// The number of characters in the checksum.
     ///
     /// Alternately, the degree of the generator polynomial. This is **not** the same
-    /// as the "length of the code", which is the maximum number of characters that
-    /// the checksum can usefully cover.
+    /// as `Self::CODE_LENGTH`.
     const CHECKSUM_LENGTH: usize;
 
     /// The coefficients of the generator polynomial, except the leading monic term,
