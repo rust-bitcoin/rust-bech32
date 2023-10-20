@@ -178,7 +178,7 @@ impl<'s> UncheckedHrpstring<'s> {
         }
 
         let mut checksum_eng = checksum::Engine::<Ck>::new();
-        checksum_eng.input_hrp(&self.hrp());
+        checksum_eng.input_hrp(self.hrp());
 
         // Unwrap ok since we checked all characters in our constructor.
         for fe in self.data.iter().map(|&b| Fe32::from_char_unchecked(b)) {

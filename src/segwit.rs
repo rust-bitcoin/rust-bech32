@@ -20,14 +20,14 @@
 //! ];
 //!
 //! // Encode a taproot address suitable for use on mainnet.
-//! let _ = segwit::encode_v1(&hrp::BC, &witness_prog);
+//! let _ = segwit::encode_v1(hrp::BC, &witness_prog);
 //!
 //! // Encode a segwit v0 address suitable for use on testnet.
-//! let _ = segwit::encode_v0(&hrp::TB, &witness_prog);
+//! let _ = segwit::encode_v0(hrp::TB, &witness_prog);
 //!
 //! // If you have the witness version already you can use:
 //! # let witness_version = segwit::VERSION_0;
-//! let _ = segwit::encode(&hrp::BC, witness_version, &witness_prog);
+//! let _ = segwit::encode(hrp::BC, witness_version, &witness_prog);
 //!
 //! // Decode a Bitcoin bech32 segwit address.
 //! let address = "bc1q2s3rjwvam9dt2ftt4sqxqjf3twav0gdx0k0q2etxflx38c3x8tnssdmnjq";
@@ -94,7 +94,7 @@ pub fn decode(s: &str) -> Result<(Hrp, Fe32, Vec<u8>), DecodeError> {
 #[cfg(feature = "alloc")]
 #[inline]
 pub fn encode(
-    hrp: &Hrp,
+    hrp: Hrp,
     witness_version: Fe32,
     witness_program: &[u8],
 ) -> Result<String, EncodeError> {
@@ -109,14 +109,14 @@ pub fn encode(
 /// Encodes a segwit version 0 address.
 #[cfg(feature = "alloc")]
 #[inline]
-pub fn encode_v0(hrp: &Hrp, witness_program: &[u8]) -> Result<String, EncodeError> {
+pub fn encode_v0(hrp: Hrp, witness_program: &[u8]) -> Result<String, EncodeError> {
     encode(hrp, VERSION_0, witness_program)
 }
 
 /// Encodes a segwit version 1 address.
 #[cfg(feature = "alloc")]
 #[inline]
-pub fn encode_v1(hrp: &Hrp, witness_program: &[u8]) -> Result<String, EncodeError> {
+pub fn encode_v1(hrp: Hrp, witness_program: &[u8]) -> Result<String, EncodeError> {
     encode(hrp, VERSION_1, witness_program)
 }
 
@@ -127,7 +127,7 @@ pub fn encode_v1(hrp: &Hrp, witness_program: &[u8]) -> Result<String, EncodeErro
 #[inline]
 pub fn encode_to_fmt_unchecked<W: fmt::Write>(
     fmt: &mut W,
-    hrp: &Hrp,
+    hrp: Hrp,
     witness_version: Fe32,
     witness_program: &[u8],
 ) -> fmt::Result {
@@ -140,19 +140,19 @@ pub fn encode_to_fmt_unchecked<W: fmt::Write>(
 /// the [`crate::primitives::segwit`] module for validation functions).
 pub fn encode_lower_to_fmt_unchecked<W: fmt::Write>(
     fmt: &mut W,
-    hrp: &Hrp,
+    hrp: Hrp,
     witness_version: Fe32,
     witness_program: &[u8],
 ) -> fmt::Result {
     let iter = witness_program.iter().copied().bytes_to_fes();
     match witness_version {
         VERSION_0 => {
-            for c in iter.with_checksum::<Bech32>(hrp).with_witness_version(VERSION_0).chars() {
+            for c in iter.with_checksum::<Bech32>(&hrp).with_witness_version(VERSION_0).chars() {
                 fmt.write_char(c)?;
             }
         }
         version => {
-            for c in iter.with_checksum::<Bech32m>(hrp).with_witness_version(version).chars() {
+            for c in iter.with_checksum::<Bech32m>(&hrp).with_witness_version(version).chars() {
                 fmt.write_char(c)?;
             }
         }
@@ -169,19 +169,19 @@ pub fn encode_lower_to_fmt_unchecked<W: fmt::Write>(
 #[inline]
 pub fn encode_upper_to_fmt_unchecked<W: fmt::Write>(
     fmt: &mut W,
-    hrp: &Hrp,
+    hrp: Hrp,
     witness_version: Fe32,
     witness_program: &[u8],
 ) -> fmt::Result {
     let iter = witness_program.iter().copied().bytes_to_fes();
     match witness_version {
         VERSION_0 => {
-            for c in iter.with_checksum::<Bech32>(hrp).with_witness_version(VERSION_0).chars() {
+            for c in iter.with_checksum::<Bech32>(&hrp).with_witness_version(VERSION_0).chars() {
                 fmt.write_char(c.to_ascii_uppercase())?;
             }
         }
         version => {
-            for c in iter.with_checksum::<Bech32m>(hrp).with_witness_version(version).chars() {
+            for c in iter.with_checksum::<Bech32m>(&hrp).with_witness_version(version).chars() {
                 fmt.write_char(c.to_ascii_uppercase())?;
             }
         }
@@ -198,7 +198,7 @@ pub fn encode_upper_to_fmt_unchecked<W: fmt::Write>(
 #[inline]
 pub fn encode_to_writer_unchecked<W: std::io::Write>(
     w: &mut W,
-    hrp: &Hrp,
+    hrp: Hrp,
     witness_version: Fe32,
     witness_program: &[u8],
 ) -> std::io::Result<()> {
@@ -213,20 +213,20 @@ pub fn encode_to_writer_unchecked<W: std::io::Write>(
 #[inline]
 pub fn encode_lower_to_writer_unchecked<W: std::io::Write>(
     w: &mut W,
-    hrp: &Hrp,
+    hrp: Hrp,
     witness_version: Fe32,
     witness_program: &[u8],
 ) -> std::io::Result<()> {
     let iter = witness_program.iter().copied().bytes_to_fes();
     match witness_version {
         VERSION_0 => {
-            for c in iter.with_checksum::<Bech32>(hrp).with_witness_version(VERSION_0).chars() {
-                w.write_all(&[c as u8])?;
+            for c in iter.with_checksum::<Bech32>(&hrp).with_witness_version(VERSION_0).chars() {
+                w.write_all(&[c.to_ascii_lowercase() as u8])?;
             }
         }
         version => {
-            for c in iter.with_checksum::<Bech32m>(hrp).with_witness_version(version).chars() {
-                w.write_all(&[c as u8])?;
+            for c in iter.with_checksum::<Bech32m>(&hrp).with_witness_version(version).chars() {
+                w.write_all(&[c.to_ascii_lowercase() as u8])?;
             }
         }
     }
@@ -243,19 +243,19 @@ pub fn encode_lower_to_writer_unchecked<W: std::io::Write>(
 #[inline]
 pub fn encode_upper_to_writer_unchecked<W: std::io::Write>(
     w: &mut W,
-    hrp: &Hrp,
+    hrp: Hrp,
     witness_version: Fe32,
     witness_program: &[u8],
 ) -> std::io::Result<()> {
     let iter = witness_program.iter().copied().bytes_to_fes();
     match witness_version {
         VERSION_0 => {
-            for c in iter.with_checksum::<Bech32>(hrp).with_witness_version(VERSION_0).chars() {
+            for c in iter.with_checksum::<Bech32>(&hrp).with_witness_version(VERSION_0).chars() {
                 w.write_all(&[c.to_ascii_uppercase() as u8])?;
             }
         }
         version => {
-            for c in iter.with_checksum::<Bech32m>(hrp).with_witness_version(version).chars() {
+            for c in iter.with_checksum::<Bech32m>(&hrp).with_witness_version(version).chars() {
                 w.write_all(&[c.to_ascii_uppercase() as u8])?;
             }
         }
@@ -357,7 +357,7 @@ mod tests {
 
         for address in addresses {
             let (hrp, version, program) = decode(address).expect("failed to decode valid address");
-            let encoded = encode(&hrp, version, &program).expect("failed to encode address");
+            let encoded = encode(hrp, version, &program).expect("failed to encode address");
             assert_eq!(encoded, address);
         }
     }
@@ -373,7 +373,7 @@ mod tests {
     fn encode_lower_to_fmt() {
         let program = witness_program();
         let mut address = String::new();
-        encode_to_fmt_unchecked(&mut address, &hrp::BC, VERSION_0, &program)
+        encode_to_fmt_unchecked(&mut address, hrp::BC, VERSION_0, &program)
             .expect("failed to encode address to QR code");
 
         let want = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
@@ -384,7 +384,7 @@ mod tests {
     fn encode_upper_to_fmt() {
         let program = witness_program();
         let mut address = String::new();
-        encode_upper_to_fmt_unchecked(&mut address, &hrp::BC, VERSION_0, &program)
+        encode_upper_to_fmt_unchecked(&mut address, hrp::BC, VERSION_0, &program)
             .expect("failed to encode address to QR code");
 
         let want = "BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4";
@@ -396,7 +396,7 @@ mod tests {
     fn encode_lower_to_writer() {
         let program = witness_program();
         let mut buf = Vec::new();
-        encode_lower_to_writer_unchecked(&mut buf, &hrp::BC, VERSION_0, &program)
+        encode_lower_to_writer_unchecked(&mut buf, hrp::BC, VERSION_0, &program)
             .expect("failed to encode");
 
         let address = std::str::from_utf8(&buf).expect("ascii is valid utf8");
@@ -409,7 +409,7 @@ mod tests {
     fn encode_upper_to_writer() {
         let program = witness_program();
         let mut buf = Vec::new();
-        encode_upper_to_writer_unchecked(&mut buf, &hrp::BC, VERSION_0, &program)
+        encode_upper_to_writer_unchecked(&mut buf, hrp::BC, VERSION_0, &program)
             .expect("failed to encode");
 
         let address = std::str::from_utf8(&buf).expect("ascii is valid utf8");
@@ -423,7 +423,7 @@ mod tests {
         let program = witness_program();
         let mut buf = Vec::new();
         let hrp = Hrp::parse_unchecked("BC");
-        encode_lower_to_writer_unchecked(&mut buf, &hrp, VERSION_0, &program)
+        encode_lower_to_writer_unchecked(&mut buf, hrp, VERSION_0, &program)
             .expect("failed to encode");
 
         let address = std::str::from_utf8(&buf).expect("ascii is valid utf8");

@@ -98,8 +98,8 @@ impl<Ck: Checksum> Engine<Ck> {
 
     /// Feeds `hrp` into the checksum engine.
     #[inline]
-    pub fn input_hrp(&mut self, hrp: &Hrp) {
-        for fe in HrpFe32Iter::new(hrp) {
+    pub fn input_hrp(&mut self, hrp: Hrp) {
+        for fe in HrpFe32Iter::new(&hrp) {
             self.input_fe(fe)
         }
     }

@@ -41,7 +41,7 @@
 //! assert_eq!(address, ADDR);
 //!
 //! // Encode arbitrary data as a Bitcoin taproot address.
-//! let taproot_address = segwit::encode(&hrp::BC, segwit::VERSION_1, &DATA).expect("valid witness version and program");
+//! let taproot_address = segwit::encode(hrp::BC, segwit::VERSION_1, &DATA).expect("valid witness version and program");
 //! assert_eq!(taproot_address, TAP_ADDR);
 //!
 //! // No-alloc: Encode without allocating (ignoring that String::new() allocates :).
