@@ -183,7 +183,7 @@ where
     /// Adapts the `Fe32Iter` iterator to yield characters representing the bech32 encoding.
     #[inline]
     pub fn new(hrp: &'hrp Hrp, data: WitnessVersionIter<I>) -> Self {
-        let checksummed = Checksummed::new_hrp(hrp, data);
+        let checksummed = Checksummed::new_hrp(*hrp, data);
         Self { hrp_iter: Some(hrp.lowercase_char_iter()), checksummed }
     }
 }
@@ -258,7 +258,7 @@ where
     #[inline]
     pub fn new(hrp: &'hrp Hrp, data: WitnessVersionIter<I>) -> Self {
         let hrp_iter = HrpFe32Iter::new(hrp);
-        let checksummed = Checksummed::new_hrp(hrp, data);
+        let checksummed = Checksummed::new_hrp(*hrp, data);
         Self { hrp_iter: Some(hrp_iter), checksummed }
     }
 }

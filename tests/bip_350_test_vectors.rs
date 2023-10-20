@@ -56,7 +56,7 @@ macro_rules! check_valid_address_roundtrip {
             #[cfg(feature = "alloc")]
             fn $test_name() {
                 let (hrp, version, program) = bech32::segwit::decode($addr).expect("failed to decode valid address");
-                let encoded = bech32::segwit::encode(&hrp, version, &program).expect("failed to encode address");
+                let encoded = bech32::segwit::encode(hrp, version, &program).expect("failed to encode address");
 
                 // The bips specifically say that encoder should output lowercase characters so we uppercase manually.
                 if encoded != $addr {
