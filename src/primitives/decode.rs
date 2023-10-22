@@ -174,7 +174,7 @@ impl<'s> UncheckedHrpstring<'s> {
         }
 
         if self.data.len() < Ck::CHECKSUM_LENGTH {
-            return Err(InvalidChecksumLength);
+            return Err(InvalidLength);
         }
 
         let mut checksum_eng = checksum::Engine::<Ck>::new();
@@ -186,7 +186,7 @@ impl<'s> UncheckedHrpstring<'s> {
         }
 
         if checksum_eng.residue() != &Ck::TARGET_RESIDUE {
-            return Err(InvalidChecksum);
+            return Err(InvalidResidue);
         }
 
         Ok(())
@@ -705,10 +705,6 @@ pub enum CharError {
     MissingSeparator,
     /// No characters after the separator.
     NothingAfterSeparator,
-    /// The checksum does not match the rest of the data.
-    InvalidChecksum,
-    /// The checksum is not a valid length.
-    InvalidChecksumLength,
     /// Some part of the string contains an invalid character.
     InvalidChar(char),
     /// The whole string must be of one case.
@@ -722,8 +718,6 @@ impl fmt::Display for CharError {
         match *self {
             MissingSeparator => write!(f, "missing human-readable separator, \"{}\"", SEP),
             NothingAfterSeparator => write!(f, "invalid data - no characters after the separator"),
-            InvalidChecksum => write!(f, "invalid checksum"),
-            InvalidChecksumLength => write!(f, "the checksum is not a valid length"),
             InvalidChar(n) => write!(f, "invalid character (code={})", n),
             MixedCase => write!(f, "mixed-case strings not allowed"),
         }
@@ -736,12 +730,7 @@ impl std::error::Error for CharError {
         use CharError::*;
 
         match *self {
-            MissingSeparator
-            | NothingAfterSeparator
-            | InvalidChecksum
-            | InvalidChecksumLength
-            | InvalidChar(_)
-            | MixedCase => None,
+            MissingSeparator | NothingAfterSeparator | InvalidChar(_) | MixedCase => None,
         }
     }
 }
@@ -750,10 +739,10 @@ impl std::error::Error for CharError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ChecksumError {
-    /// The checksum does not match the rest of the data.
-    InvalidChecksum,
-    /// The checksum is not a valid length.
-    InvalidChecksumLength,
+    /// The checksum residue is not valid for the data.
+    InvalidResidue,
+    /// The checksummed string is not a valid length.
+    InvalidLength,
 }
 
 impl fmt::Display for ChecksumError {
@@ -761,8 +750,8 @@ impl fmt::Display for ChecksumError {
         use ChecksumError::*;
 
         match *self {
-            InvalidChecksum => write!(f, "invalid checksum"),
-            InvalidChecksumLength => write!(f, "the checksum is not a valid length"),
+            InvalidResidue => write!(f, "the checksum residue is not valid for the data"),
+            InvalidLength => write!(f, "the checksummed string is not a valid length"),
         }
     }
 }
@@ -773,7 +762,7 @@ impl std::error::Error for ChecksumError {
         use ChecksumError::*;
 
         match *self {
-            InvalidChecksum | InvalidChecksumLength => None,
+            InvalidResidue | InvalidLength => None,
         }
     }
 }
@@ -858,13 +847,13 @@ mod tests {
             .expect("string parses correctly")
             .validate_checksum::<Bech32>()
             .unwrap_err();
-        assert_eq!(err, InvalidChecksumLength);
+        assert_eq!(err, InvalidLength);
 
         let err = UncheckedHrpstring::new("A1G7SGD8")
             .expect("string parses correctly")
             .validate_checksum::<Bech32>()
             .unwrap_err();
-        assert_eq!(err, InvalidChecksum);
+        assert_eq!(err, InvalidResidue);
     }
 
     #[test]
@@ -918,14 +907,14 @@ mod tests {
         for s in invalid {
             let err =
                 UncheckedHrpstring::new(s).unwrap().validate_checksum::<Bech32m>().unwrap_err();
-            assert_eq!(err, InvalidChecksumLength);
+            assert_eq!(err, InvalidLength);
         }
 
         let err = UncheckedHrpstring::new("M1VUXWEZ")
             .unwrap()
             .validate_checksum::<Bech32m>()
             .unwrap_err();
-        assert_eq!(err, InvalidChecksum);
+        assert_eq!(err, InvalidResidue);
     }
 
     #[test]
