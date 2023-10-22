@@ -18,12 +18,12 @@ fn bip_173_checksum_calculated_with_uppercase_form() {
 
     assert_eq!(
         CheckedHrpstring::new::<Bech32>(s).unwrap_err(),
-        CheckedHrpstringError::Checksum(ChecksumError::InvalidChecksum)
+        CheckedHrpstringError::Checksum(ChecksumError::InvalidResidue)
     );
 
     assert_eq!(
         SegwitHrpstring::new(s).unwrap_err(),
-        SegwitHrpstringError::Checksum(ChecksumError::InvalidChecksum)
+        SegwitHrpstringError::Checksum(ChecksumError::InvalidResidue)
     );
 }
 
@@ -35,7 +35,7 @@ macro_rules! check_valid_bech32 {
                 let p = UncheckedHrpstring::new($valid_bech32).unwrap();
                 p.validate_checksum::<Bech32>().expect("valid bech32");
                 // Valid bech32 strings are by definition invalid bech32m.
-                assert_eq!(p.validate_checksum::<Bech32m>().unwrap_err(), ChecksumError::InvalidChecksum);
+                assert_eq!(p.validate_checksum::<Bech32m>().unwrap_err(), ChecksumError::InvalidResidue);
             }
         )*
     }
