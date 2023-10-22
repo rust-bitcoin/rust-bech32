@@ -166,7 +166,8 @@ pub use {
 /// If this function succeeds the input string was found to be well formed (hrp, separator, bech32
 /// characters), and to have either a valid bech32m checksum or a valid bech32 checksum.
 ///
-/// If your input string has no checksum use the [`CheckedHrpstring`] constructor, which allows selecting the checksum algorithm explicitly.
+/// If your input string has no checksum use the [`CheckedHrpstring`] constructor, which allows
+/// selecting the checksum algorithm explicitly.
 ///
 /// # Returns
 ///
