@@ -1043,12 +1043,13 @@ mod tests {
                 fn $test_name() {
                     let res = SegwitHrpstring::new($address);
                     if res.is_ok() {
-                        panic!("{} sting should not be valid: {}", $address, $reason);
+                        panic!("{} string should not be valid: {}", $address, $reason);
                     }
                 }
             )*
         }
     }
+    // TODO: We are not asserting on the error value, at least one of these is not failing for the reason stated.
     check_invalid_segwit_addresses! {
         invalid_segwit_address_0, "missing hrp", "1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
         invalid_segwit_address_1, "missing data-checksum", "91111";
