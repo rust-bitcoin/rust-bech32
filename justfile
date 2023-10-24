@@ -34,3 +34,8 @@ clippy-fix:
 # Check for API changes.
 check-api:
  contrib/check-for-api-changes.sh
+
+# run `semgrep`
+semgrep:
+  env SEMGREP_ENABLE_VERSION_CHECK=0 \
+    semgrep --error --no-rewrite-rule-ids --config contrib/semgrep.yml
