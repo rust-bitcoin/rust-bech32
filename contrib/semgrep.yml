@@ -1,0 +1,11 @@
+rules:
+
+- id: inline-from-impls
+  patterns:
+    - pattern: |-
+        impl From<$F> for $T { fn from(...) -> $SELF { ... } }
+    - pattern-not-regex: '\#\[inline\]'
+  message: Use inline attribute on `From` implementations.
+  languages:
+    - rust
+  severity: ERROR
