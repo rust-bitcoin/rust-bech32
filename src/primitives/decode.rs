@@ -271,7 +271,7 @@ impl<'s> CheckedHrpstring<'s> {
     #[inline]
     pub fn validate_segwit(mut self) -> Result<SegwitHrpstring<'s>, SegwitHrpstringError> {
         if self.data.is_empty() {
-            return Err(SegwitHrpstringError::MissingWitnessVersion);
+            return Err(SegwitHrpstringError::NoData);
         }
         // Unwrap ok since check_characters checked the bech32-ness of this char.
         let witness_version = Fe32::from_char(self.data[0].into()).unwrap();
@@ -371,7 +371,7 @@ impl<'s> SegwitHrpstring<'s> {
         let unchecked = UncheckedHrpstring::new(s)?;
 
         if unchecked.data.is_empty() {
-            return Err(SegwitHrpstringError::MissingWitnessVersion);
+            return Err(SegwitHrpstringError::NoData);
         }
 
         // Unwrap ok since check_characters (in `Self::new`) checked the bech32-ness of this char.
@@ -549,8 +549,8 @@ where
 pub enum SegwitHrpstringError {
     /// Error while parsing the encoded address string.
     Unchecked(UncheckedHrpstringError),
-    /// The witness version byte is missing.
-    MissingWitnessVersion,
+    /// No data found after removing the checksum.
+    NoData,
     /// Invalid witness version (must be 0-16 inclusive).
     InvalidWitnessVersion(Fe32),
     /// Invalid padding on the witness data.
@@ -567,7 +567,7 @@ impl fmt::Display for SegwitHrpstringError {
 
         match *self {
             Unchecked(ref e) => write_err!(f, "parsing unchecked hrpstring failed"; e),
-            MissingWitnessVersion => write!(f, "the witness version byte is missing"),
+            NoData => write!(f, "no data found after removing the checksum"),
             InvalidWitnessVersion(fe) => write!(f, "invalid segwit witness version: {}", fe),
             Padding(ref e) => write_err!(f, "invalid padding on the witness data"; e),
             WitnessLength(ref e) => write_err!(f, "invalid witness length"; e),
@@ -586,7 +586,7 @@ impl std::error::Error for SegwitHrpstringError {
             Padding(ref e) => Some(e),
             WitnessLength(ref e) => Some(e),
             Checksum(ref e) => Some(e),
-            MissingWitnessVersion | InvalidWitnessVersion(_) => None,
+            NoData | InvalidWitnessVersion(_) => None,
         }
     }
 }

@@ -32,13 +32,13 @@
 //! use bech32::{hrp, segwit, Hrp, Bech32m};
 //!
 //! const DATA: [u8; 20] = [0xab; 20]; // Arbitrary data to be encoded.
-//! const ADDR: &str = "abc14w46h2at4w46h2at4w46h2at4w46h2at958ngu";
+//! const STRING: &str = "abc14w46h2at4w46h2at4w46h2at4w46h2at958ngu";
 //! const TAP_ADDR: &str = "bc1p4w46h2at4w46h2at4w46h2at4w46h2at5kreae";
 //!
 //! // Encode arbitrary data using "abc" as the human-readable part and append a bech32m checksum.
 //! let hrp = Hrp::parse("abc").expect("valid hrp");
-//! let address = bech32::encode::<Bech32m>(hrp, &DATA).expect("failed to encode address");
-//! assert_eq!(address, ADDR);
+//! let string = bech32::encode::<Bech32m>(hrp, &DATA).expect("failed to encode string");
+//! assert_eq!(string, STRING);
 //!
 //! // Encode arbitrary data as a Bitcoin taproot address.
 //! let taproot_address = segwit::encode(hrp::BC, segwit::VERSION_1, &DATA).expect("valid witness version and program");
@@ -47,7 +47,7 @@
 //! // No-alloc: Encode without allocating (ignoring that String::new() allocates :).
 //! let mut buf = String::new();
 //! bech32::encode_to_fmt::<Bech32m, String>(&mut buf, hrp, &DATA).expect("failed to encode to buffer");
-//! assert_eq!(buf, ADDR);
+//! assert_eq!(buf, STRING);
 //! # }
 //! ```
 //!
@@ -59,7 +59,7 @@
 //! use bech32::{hrp, segwit, Hrp, Bech32m};
 //!
 //! const DATA: [u8; 20] = [0xab; 20]; // Arbitrary data to be encoded.
-//! const ADDR: &str = "abc14w46h2at4w46h2at4w46h2at4w46h2at958ngu";
+//! const STRING: &str = "abc14w46h2at4w46h2at4w46h2at4w46h2at958ngu";
 //! const TAP_ADDR: &str = "bc1p4w46h2at4w46h2at4w46h2at4w46h2at5kreae";
 //!
 //! // Decode a bech32 encoded string that includes a bech32/bech32m checksum.
@@ -67,7 +67,7 @@
 //! // The input address MUST include a valid bech32 or bech32m checksum, for individual specific
 //! // checksum algorithms see [`decode_bech32`], [`decode_bech32m`], [`decode_no_checksum`] or use
 //! // the [`primitives::decode::CheckedHrpstring`] type directly.
-//! let (hrp, data) = bech32::decode(&ADDR).expect("failed to decode");
+//! let (hrp, data) = bech32::decode(&STRING).expect("failed to decode");
 //! assert_eq!(hrp, Hrp::parse("abc").unwrap());
 //! assert_eq!(data, DATA);
 //!
@@ -76,7 +76,7 @@
 //! assert_eq!(program, DATA);
 //!
 //! // No-alloc: Decode a bech32m checksummed address without allocating.
-//! let p = CheckedHrpstring::new::<Bech32m>(&ADDR).expect("failed to parse address");
+//! let p = CheckedHrpstring::new::<Bech32m>(&STRING).expect("failed to parse string");
 //! assert_eq!(hrp, p.hrp());
 //! assert!(p.byte_iter().eq(DATA.iter().map(|&b| b))); // We yield bytes not references.
 //!
@@ -166,7 +166,8 @@ pub use {
 /// If this function succeeds the input string was found to be well formed (hrp, separator, bech32
 /// characters), and to have either a valid bech32m checksum or a valid bech32 checksum.
 ///
-/// If your input string has no checksum use the [`CheckedHrpstring`] constructor, which allows selecting the checksum algorithm explicitly.
+/// If your input string has no checksum use the [`CheckedHrpstring`] constructor, which allows
+/// selecting the checksum algorithm explicitly.
 ///
 /// # Returns
 ///
@@ -182,14 +183,14 @@ pub use {
 /// const BECH32M: &str = "abc14w46h2at4w46h2at4w46h2at4w46h2at958ngu";
 /// const NO_CHECKSUM: &str = "abc14w46h2at4w46h2at4w46h2at4w46h2at";
 ///
-/// let (hrp, data) = decode(&BECH32).expect("valid address with valid bech32 checksum");
-/// let (hrp, data) = decode(&BECH32M).expect("valid address with valid bech32m checksum");
+/// let (hrp, data) = decode(&BECH32).expect("valid bech32 string with valid bech32 checksum");
+/// let (hrp, data) = decode(&BECH32M).expect("valid bech32 string with valid bech32m checksum");
 /// assert!(decode(&NO_CHECKSUM).is_err());
 ///
 /// // You can control the checksum algorithm directly by using the [`CheckedHrpstring`] type.
-/// let p = CheckedHrpstring::new::<Bech32>(&BECH32).expect("valid address with valid bech32 checksum");
-/// let p = CheckedHrpstring::new::<Bech32m>(&BECH32M).expect("valid address with valid bech32 checksum");
-/// let p = CheckedHrpstring::new::<NoChecksum>(&NO_CHECKSUM).expect("valid address with no checksum");
+/// let p = CheckedHrpstring::new::<Bech32>(&BECH32).expect("valid bech32 string with valid bech32 checksum");
+/// let p = CheckedHrpstring::new::<Bech32m>(&BECH32M).expect("valid bech32 string with valid bech32 checksum");
+/// let p = CheckedHrpstring::new::<NoChecksum>(&NO_CHECKSUM).expect("valid bech32 string with no checksum");
 /// # }
 /// ```
 #[cfg(feature = "alloc")]
@@ -344,7 +345,7 @@ pub fn encode_upper_to_writer<Ck: Checksum, W: std::io::Write>(
     Ok(())
 }
 
-/// An error while decoding an address.
+/// An error while decoding a bech32 string.
 #[cfg(feature = "alloc")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
