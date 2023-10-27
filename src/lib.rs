@@ -23,6 +23,12 @@
 //! The original description in [BIP-0173](https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki)
 //! has more details. See also [BIP-0350](https://github.com/bitcoin/bips/blob/master/bip-0350.mediawiki).
 //!
+//! # Deviation from spec
+//!
+//! We do not enforce the 90 character limit specified by [BIP-173], instead we enforce the code
+//! length for the respective checksum algorithm (see [`Checksum::CODE_LENGTH`]). We do however
+//! enforce the 90 character limit within the `segwit` modules and types.
+//!
 //! # Examples
 //!
 //! ## Encoding
@@ -100,6 +106,7 @@
 //! impl Checksum for Codex32 {
 //!     type MidstateRepr = u128;
 //!     const CHECKSUM_LENGTH: usize = 13;
+//!     const CODE_LENGTH: usize = 93;
 //!     // Copied from BIP-93
 //!     const GENERATOR_SH: [u128; 5] = [
 //!         0x19dc500ce73fde210,
@@ -113,6 +120,8 @@
 //!
 //! # }
 //! ```
+//!
+//! [`Checksum::CODE_LENGTH`]: crate::primitives::checksum::Checksum::CODE_LENGTH
 
 #![cfg_attr(all(not(feature = "std"), not(test)), no_std)]
 // Experimental features we need.
@@ -142,14 +151,12 @@ pub mod segwit;
 use alloc::{string::String, vec::Vec};
 use core::fmt;
 
-#[cfg(feature = "alloc")]
 use crate::error::write_err;
 #[cfg(doc)]
 use crate::primitives::decode::CheckedHrpstring;
+use crate::primitives::decode::CodeLengthError;
 #[cfg(feature = "alloc")]
-use crate::primitives::decode::UncheckedHrpstringError;
-#[cfg(feature = "alloc")]
-use crate::primitives::decode::{ChecksumError, UncheckedHrpstring};
+use crate::primitives::decode::{ChecksumError, UncheckedHrpstring, UncheckedHrpstringError};
 
 #[rustfmt::skip]                // Keep public re-exports separate.
 #[doc(inline)]
@@ -216,7 +223,7 @@ pub fn decode(s: &str) -> Result<(Hrp, Vec<u8>), DecodeError> {
 /// `Ck` algorithm (`NoChecksum` to exclude checksum all together).
 #[cfg(feature = "alloc")]
 #[inline]
-pub fn encode<Ck: Checksum>(hrp: Hrp, data: &[u8]) -> Result<String, fmt::Error> {
+pub fn encode<Ck: Checksum>(hrp: Hrp, data: &[u8]) -> Result<String, EncodeError> {
     encode_lower::<Ck>(hrp, data)
 }
 
@@ -226,7 +233,7 @@ pub fn encode<Ck: Checksum>(hrp: Hrp, data: &[u8]) -> Result<String, fmt::Error>
 /// `Ck` algorithm (`NoChecksum` to exclude checksum all together).
 #[cfg(feature = "alloc")]
 #[inline]
-pub fn encode_lower<Ck: Checksum>(hrp: Hrp, data: &[u8]) -> Result<String, fmt::Error> {
+pub fn encode_lower<Ck: Checksum>(hrp: Hrp, data: &[u8]) -> Result<String, EncodeError> {
     let mut buf = String::new();
     encode_lower_to_fmt::<Ck, String>(&mut buf, hrp, data)?;
     Ok(buf)
@@ -238,7 +245,7 @@ pub fn encode_lower<Ck: Checksum>(hrp: Hrp, data: &[u8]) -> Result<String, fmt::
 /// `Ck` algorithm (`NoChecksum` to exclude checksum all together).
 #[cfg(feature = "alloc")]
 #[inline]
-pub fn encode_upper<Ck: Checksum>(hrp: Hrp, data: &[u8]) -> Result<String, fmt::Error> {
+pub fn encode_upper<Ck: Checksum>(hrp: Hrp, data: &[u8]) -> Result<String, EncodeError> {
     let mut buf = String::new();
     encode_upper_to_fmt::<Ck, String>(&mut buf, hrp, data)?;
     Ok(buf)
@@ -253,7 +260,7 @@ pub fn encode_to_fmt<Ck: Checksum, W: fmt::Write>(
     fmt: &mut W,
     hrp: Hrp,
     data: &[u8],
-) -> Result<(), fmt::Error> {
+) -> Result<(), EncodeError> {
     encode_lower_to_fmt::<Ck, W>(fmt, hrp, data)
 }
 
@@ -266,7 +273,9 @@ pub fn encode_lower_to_fmt<Ck: Checksum, W: fmt::Write>(
     fmt: &mut W,
     hrp: Hrp,
     data: &[u8],
-) -> Result<(), fmt::Error> {
+) -> Result<(), EncodeError> {
+    let _ = encoded_length::<Ck>(hrp, data)?;
+
     let iter = data.iter().copied().bytes_to_fes();
     let chars = iter.with_checksum::<Ck>(&hrp).chars();
     for c in chars {
@@ -284,7 +293,9 @@ pub fn encode_upper_to_fmt<Ck: Checksum, W: fmt::Write>(
     fmt: &mut W,
     hrp: Hrp,
     data: &[u8],
-) -> Result<(), fmt::Error> {
+) -> Result<(), EncodeError> {
+    let _ = encoded_length::<Ck>(hrp, data)?;
+
     let iter = data.iter().copied().bytes_to_fes();
     let chars = iter.with_checksum::<Ck>(&hrp).chars();
     for c in chars {
@@ -303,7 +314,7 @@ pub fn encode_to_writer<Ck: Checksum, W: std::io::Write>(
     w: &mut W,
     hrp: Hrp,
     data: &[u8],
-) -> Result<(), std::io::Error> {
+) -> Result<(), EncodeIoError> {
     encode_lower_to_writer::<Ck, W>(w, hrp, data)
 }
 
@@ -317,7 +328,9 @@ pub fn encode_lower_to_writer<Ck: Checksum, W: std::io::Write>(
     w: &mut W,
     hrp: Hrp,
     data: &[u8],
-) -> Result<(), std::io::Error> {
+) -> Result<(), EncodeIoError> {
+    let _ = encoded_length::<Ck>(hrp, data)?;
+
     let iter = data.iter().copied().bytes_to_fes();
     let chars = iter.with_checksum::<Ck>(&hrp).chars();
     for c in chars {
@@ -336,13 +349,34 @@ pub fn encode_upper_to_writer<Ck: Checksum, W: std::io::Write>(
     w: &mut W,
     hrp: Hrp,
     data: &[u8],
-) -> Result<(), std::io::Error> {
+) -> Result<(), EncodeIoError> {
+    let _ = encoded_length::<Ck>(hrp, data)?;
+
     let iter = data.iter().copied().bytes_to_fes();
     let chars = iter.with_checksum::<Ck>(&hrp).chars();
     for c in chars {
         w.write_all(&[c.to_ascii_uppercase() as u8])?;
     }
     Ok(())
+}
+
+/// Checks that encoding `hrp` and `data` creates a code that is less than the code length for `Ck`.
+///
+/// The length of the code is how long a coded message can be (including the checksum!) for the code
+/// to retain its error-correcting properties.
+///
+/// # Returns
+///
+/// `Ok(encoded_string_length)` if the encoded length is less than or equal to `Ck::CODE_LENGTH`
+/// otherwise a [`CodeLengthError`] containing the encoded length and the maximum allowed.
+pub fn encoded_length<Ck: Checksum>(hrp: Hrp, data: &[u8]) -> Result<usize, CodeLengthError> {
+    let iter = data.iter().copied().bytes_to_fes();
+    let len = hrp.len() + 1 + iter.len() + Ck::CHECKSUM_LENGTH; // +1 for separator
+    if len > Ck::CODE_LENGTH {
+        Err(CodeLengthError { encoded_length: len, code_length: Ck::CODE_LENGTH })
+    } else {
+        Ok(len)
+    }
 }
 
 /// An error while decoding a bech32 string.
@@ -386,11 +420,101 @@ impl From<UncheckedHrpstringError> for DecodeError {
     fn from(e: UncheckedHrpstringError) -> Self { Self::Parse(e) }
 }
 
+/// An error while encoding a bech32 string.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum EncodeError {
+    /// Encoding HRP and data into a bech32 string exceeds maximum allowed.
+    TooLong(CodeLengthError),
+    /// Encode to formatter failed.
+    Fmt(fmt::Error),
+}
+
+impl fmt::Display for EncodeError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use EncodeError::*;
+
+        match *self {
+            TooLong(ref e) => write_err!(f, "encode error"; e),
+            Fmt(ref e) => write_err!(f, "encode to formatter failed"; e),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for EncodeError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        use EncodeError::*;
+
+        match *self {
+            TooLong(ref e) => Some(e),
+            Fmt(ref e) => Some(e),
+        }
+    }
+}
+
+impl From<CodeLengthError> for EncodeError {
+    #[inline]
+    fn from(e: CodeLengthError) -> Self { Self::TooLong(e) }
+}
+
+impl From<fmt::Error> for EncodeError {
+    #[inline]
+    fn from(e: fmt::Error) -> Self { Self::Fmt(e) }
+}
+
+/// An error while encoding a bech32 string.
+#[cfg(feature = "std")]
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum EncodeIoError {
+    /// Encoding HRP and data into a bech32 string exceeds maximum allowed.
+    TooLong(CodeLengthError),
+    /// Encode to writer failed.
+    Write(std::io::Error),
+}
+
+#[cfg(feature = "std")]
+impl fmt::Display for EncodeIoError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use EncodeIoError::*;
+
+        match *self {
+            TooLong(ref e) => write_err!(f, "encode error"; e),
+            Write(ref e) => write_err!(f, "encode to writer failed"; e),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for EncodeIoError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        use EncodeIoError::*;
+
+        match *self {
+            TooLong(ref e) => Some(e),
+            Write(ref e) => Some(e),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl From<CodeLengthError> for EncodeIoError {
+    #[inline]
+    fn from(e: CodeLengthError) -> Self { Self::TooLong(e) }
+}
+
+#[cfg(feature = "std")]
+impl From<std::io::Error> for EncodeIoError {
+    #[inline]
+    fn from(e: std::io::Error) -> Self { Self::Write(e) }
+}
+
 #[cfg(test)]
 #[cfg(feature = "alloc")]
 mod tests {
     use super::*;
-    use crate::Bech32;
+    use crate::{Bech32, Bech32m};
 
     // Tests below using this data, are based on the test vector (from BIP-173):
     // BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4: 0014751e76e8199196d454941c45d1b3a323f1433bd6
@@ -474,5 +598,45 @@ mod tests {
 
         assert_eq!(hrp, Hrp::parse_unchecked("TEST"));
         assert_eq!(data, DATA);
+    }
+
+    #[test]
+    fn encoded_length_works() {
+        let s = "test1lu08d6qejxtdg4y5r3zarvary0c5xw7kmz4lky";
+        let (hrp, data) = decode(s).expect("valid string");
+
+        let encoded = encode::<Bech32m>(hrp, &data).expect("valid data");
+        let want = encoded.len();
+        let got = encoded_length::<Bech32m>(hrp, &data).expect("encoded length");
+
+        assert_eq!(got, want);
+    }
+
+    #[test]
+    fn can_encode_maximum_length_string() {
+        let data = [0_u8; 632];
+        let hrp = Hrp::parse_unchecked("abcd");
+        let s = encode::<Bech32m>(hrp, &data).expect("valid data");
+        assert_eq!(s.len(), 1023);
+    }
+
+    #[test]
+    fn can_not_encode_string_too_long() {
+        let data = [0_u8; 632];
+        let hrp = Hrp::parse_unchecked("abcde");
+
+        match encode::<Bech32m>(hrp, &data) {
+            Ok(_) => panic!("false positive"),
+            Err(EncodeError::TooLong(CodeLengthError { encoded_length, code_length: _ })) =>
+                assert_eq!(encoded_length, 1024),
+            _ => panic!("false negative"),
+        }
+    }
+
+    #[test]
+    fn can_decode_segwit_too_long_string() {
+        // A  91 character long string, greater than the segwit enforced maximum of 90.
+        let s = "abcd1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqrw9z3s";
+        assert!(decode(s).is_ok());
     }
 }

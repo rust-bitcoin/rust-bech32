@@ -119,6 +119,8 @@ pub struct UncheckedHrpstring<'s> {
     ///
     /// Contains the checksum if one was present in the parsed string.
     data: &'s [u8],
+    /// The length of the parsed hrpstring.
+    hrpstring_length: usize,
 }
 
 impl<'s> UncheckedHrpstring<'s> {
@@ -133,6 +135,7 @@ impl<'s> UncheckedHrpstring<'s> {
         let ret = UncheckedHrpstring {
             hrp: Hrp::parse(hrp)?,
             data: data[1..].as_bytes(), // Skip the separator.
+            hrpstring_length: s.len(),
         };
 
         Ok(ret)
@@ -167,6 +170,13 @@ impl<'s> UncheckedHrpstring<'s> {
     #[inline]
     pub fn validate_checksum<Ck: Checksum>(&self) -> Result<(), ChecksumError> {
         use ChecksumError::*;
+
+        if self.hrpstring_length > Ck::CODE_LENGTH {
+            return Err(ChecksumError::CodeLength(CodeLengthError {
+                encoded_length: self.hrpstring_length,
+                code_length: Ck::CODE_LENGTH,
+            }));
+        }
 
         if Ck::CHECKSUM_LENGTH == 0 {
             // Called with NoChecksum
@@ -205,7 +215,11 @@ impl<'s> UncheckedHrpstring<'s> {
     pub fn remove_checksum<Ck: Checksum>(self) -> CheckedHrpstring<'s> {
         let data_len = self.data.len() - Ck::CHECKSUM_LENGTH;
 
-        CheckedHrpstring { hrp: self.hrp(), data: &self.data[..data_len] }
+        CheckedHrpstring {
+            hrp: self.hrp(),
+            data: &self.data[..data_len],
+            hrpstring_length: self.hrpstring_length,
+        }
     }
 }
 
@@ -239,6 +253,8 @@ pub struct CheckedHrpstring<'s> {
     /// This is ASCII byte values of the parsed string, guaranteed to be valid bech32 characters,
     /// with the checksum removed.
     data: &'s [u8],
+    /// The length of the parsed hrpstring.
+    hrpstring_length: usize, // Guaranteed to be <= CK::CODE_LENGTH
 }
 
 impl<'s> CheckedHrpstring<'s> {
@@ -273,6 +289,11 @@ impl<'s> CheckedHrpstring<'s> {
         if self.data.is_empty() {
             return Err(SegwitHrpstringError::NoData);
         }
+
+        if self.hrpstring_length > segwit::MAX_STRING_LENGTH {
+            return Err(SegwitHrpstringError::TooLong(self.hrpstring_length));
+        }
+
         // Unwrap ok since check_characters checked the bech32-ness of this char.
         let witness_version = Fe32::from_char(self.data[0].into()).unwrap();
         self.data = &self.data[1..]; // Remove the witness version byte from data.
@@ -331,8 +352,8 @@ impl<'s> CheckedHrpstring<'s> {
     }
 }
 
-/// An HRP string that has been parsed, had the checksum validated, had the witness version
-/// validated, had the witness data length checked, and the had witness version and checksum
+/// An valid length HRP string that has been parsed, had the checksum validated, had the witness
+/// version validated, had the witness data length checked, and the had witness version and checksum
 /// removed.
 ///
 /// # Examples
@@ -368,6 +389,11 @@ impl<'s> SegwitHrpstring<'s> {
     /// to get strict BIP conformance (also [`Hrp::is_valid_on_mainnet`] and friends).
     #[inline]
     pub fn new(s: &'s str) -> Result<Self, SegwitHrpstringError> {
+        let len = s.len();
+        if len > segwit::MAX_STRING_LENGTH {
+            return Err(SegwitHrpstringError::TooLong(len));
+        }
+
         let unchecked = UncheckedHrpstring::new(s)?;
 
         if unchecked.data.is_empty() {
@@ -551,6 +577,8 @@ pub enum SegwitHrpstringError {
     Unchecked(UncheckedHrpstringError),
     /// No data found after removing the checksum.
     NoData,
+    /// String exceeds maximum allowed length.
+    TooLong(usize),
     /// Invalid witness version (must be 0-16 inclusive).
     InvalidWitnessVersion(Fe32),
     /// Invalid padding on the witness data.
@@ -568,6 +596,12 @@ impl fmt::Display for SegwitHrpstringError {
         match *self {
             Unchecked(ref e) => write_err!(f, "parsing unchecked hrpstring failed"; e),
             NoData => write!(f, "no data found after removing the checksum"),
+            TooLong(len) => write!(
+                f,
+                "encoded length {} exceeds spec limit {} chars",
+                len,
+                segwit::MAX_STRING_LENGTH
+            ),
             InvalidWitnessVersion(fe) => write!(f, "invalid segwit witness version: {}", fe),
             Padding(ref e) => write_err!(f, "invalid padding on the witness data"; e),
             WitnessLength(ref e) => write_err!(f, "invalid witness length"; e),
@@ -586,7 +620,7 @@ impl std::error::Error for SegwitHrpstringError {
             Padding(ref e) => Some(e),
             WitnessLength(ref e) => Some(e),
             Checksum(ref e) => Some(e),
-            NoData | InvalidWitnessVersion(_) => None,
+            NoData | TooLong(_) | InvalidWitnessVersion(_) => None,
         }
     }
 }
@@ -739,6 +773,8 @@ impl std::error::Error for CharError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ChecksumError {
+    /// String exceeds maximum allowed length.
+    CodeLength(CodeLengthError),
     /// The checksum residue is not valid for the data.
     InvalidResidue,
     /// The checksummed string is not a valid length.
@@ -750,6 +786,7 @@ impl fmt::Display for ChecksumError {
         use ChecksumError::*;
 
         match *self {
+            CodeLength(ref e) => write_err!(f, "string exceeds maximum allowed length"; e),
             InvalidResidue => write!(f, "the checksum residue is not valid for the data"),
             InvalidLength => write!(f, "the checksummed string is not a valid length"),
         }
@@ -762,9 +799,60 @@ impl std::error::Error for ChecksumError {
         use ChecksumError::*;
 
         match *self {
+            CodeLength(ref e) => Some(e),
             InvalidResidue | InvalidLength => None,
         }
     }
+}
+
+/// Encoding HRP and data into a bech32 string exceeds the checksum code length.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct CodeLengthError {
+    /// The length of the string if encoded with checksum.
+    pub encoded_length: usize,
+    /// The checksum specific code length.
+    pub code_length: usize,
+}
+
+impl fmt::Display for CodeLengthError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "encoded length {} exceeds maximum (code length) {}",
+            self.encoded_length, self.code_length
+        )
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for CodeLengthError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> { None }
+}
+
+/// Encoding HRP, witver, and program into an address exceeds maximum allowed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct SegwitCodeLengthError(pub usize);
+
+impl fmt::Display for SegwitCodeLengthError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "encoded length {} exceeds maximum (code length) {}",
+            self.0,
+            segwit::MAX_STRING_LENGTH
+        )
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for SegwitCodeLengthError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> { None }
+}
+
+impl From<CodeLengthError> for SegwitCodeLengthError {
+    fn from(e: CodeLengthError) -> Self { Self(e.encoded_length) }
 }
 
 /// Error validating the padding bits on the witness data.

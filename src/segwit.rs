@@ -45,6 +45,7 @@ use alloc::{string::String, vec::Vec};
 use core::fmt;
 
 use crate::error::write_err;
+use crate::primitives::decode::SegwitCodeLengthError;
 #[cfg(feature = "alloc")]
 use crate::primitives::decode::{SegwitHrpstring, SegwitHrpstringError};
 use crate::primitives::gf32::Fe32;
@@ -52,7 +53,9 @@ use crate::primitives::hrp::Hrp;
 use crate::primitives::iter::{ByteIterExt, Fe32IterExt};
 #[cfg(feature = "alloc")]
 use crate::primitives::segwit;
-use crate::primitives::segwit::{InvalidWitnessVersionError, WitnessLengthError};
+use crate::primitives::segwit::{
+    InvalidWitnessVersionError, WitnessLengthError, MAX_STRING_LENGTH,
+};
 use crate::primitives::{Bech32, Bech32m};
 
 #[rustfmt::skip]                // Keep public re-exports separate.
@@ -79,7 +82,8 @@ pub fn decode(s: &str) -> Result<(Hrp, Fe32, Vec<u8>), DecodeError> {
 
 /// Encodes a segwit address.
 ///
-/// Does validity checks on the `witness_version` and length checks on the `witness_program`.
+/// Does validity checks on the `witness_version`, length checks on the `witness_program`, and
+/// checks the total encoded string length.
 ///
 /// As specified by [`BIP-350`] we use the [`Bech32m`] checksum algorithm for witness versions 1 and
 /// above, and for witness version 0 we use the original ([`BIP-173`]) [`Bech32`] checksum
@@ -101,12 +105,17 @@ pub fn encode(
     segwit::validate_witness_version(witness_version)?;
     segwit::validate_witness_program_length(witness_program.len(), witness_version)?;
 
+    let _ = encoded_length(hrp, witness_version, witness_program)?;
+
     let mut buf = String::new();
     encode_to_fmt_unchecked(&mut buf, hrp, witness_version, witness_program)?;
     Ok(buf)
 }
 
 /// Encodes a segwit version 0 address.
+///
+/// Does validity checks on the `witness_version`, length checks on the `witness_program`, and
+/// checks the total encoded string length.
 #[cfg(feature = "alloc")]
 #[inline]
 pub fn encode_v0(hrp: Hrp, witness_program: &[u8]) -> Result<String, EncodeError> {
@@ -114,6 +123,9 @@ pub fn encode_v0(hrp: Hrp, witness_program: &[u8]) -> Result<String, EncodeError
 }
 
 /// Encodes a segwit version 1 address.
+///
+/// Does validity checks on the `witness_version`, length checks on the `witness_program`, and
+/// checks the total encoded string length.
 #[cfg(feature = "alloc")]
 #[inline]
 pub fn encode_v1(hrp: Hrp, witness_program: &[u8]) -> Result<String, EncodeError> {
@@ -122,8 +134,8 @@ pub fn encode_v1(hrp: Hrp, witness_program: &[u8]) -> Result<String, EncodeError
 
 /// Encodes a segwit address to a writer ([`fmt::Write`]) using lowercase characters.
 ///
-/// Does not check the validity of the witness version and witness program lengths (see
-/// the [`crate::primitives::segwit`] module for validation functions).
+/// There are no guarantees that the written string is a valid segwit address unless all the
+/// parameters are valid. See the body of `encode()` to see the validity checks required.
 #[inline]
 pub fn encode_to_fmt_unchecked<W: fmt::Write>(
     fmt: &mut W,
@@ -136,8 +148,8 @@ pub fn encode_to_fmt_unchecked<W: fmt::Write>(
 
 /// Encodes a segwit address to a writer ([`fmt::Write`]) using lowercase characters.
 ///
-/// Does not check the validity of the witness version and witness program lengths (see
-/// the [`crate::primitives::segwit`] module for validation functions).
+/// There are no guarantees that the written string is a valid segwit address unless all the
+/// parameters are valid. See the body of `encode()` to see the validity checks required.
 pub fn encode_lower_to_fmt_unchecked<W: fmt::Write>(
     fmt: &mut W,
     hrp: Hrp,
@@ -164,8 +176,8 @@ pub fn encode_lower_to_fmt_unchecked<W: fmt::Write>(
 ///
 /// This is provided for use when creating QR codes.
 ///
-/// Does not check the validity of the witness version and witness program lengths (see
-/// the [`crate::primitives::segwit`] module for validation functions).
+/// There are no guarantees that the written string is a valid segwit address unless all the
+/// parameters are valid. See the body of `encode()` to see the validity checks required.
 #[inline]
 pub fn encode_upper_to_fmt_unchecked<W: fmt::Write>(
     fmt: &mut W,
@@ -192,8 +204,8 @@ pub fn encode_upper_to_fmt_unchecked<W: fmt::Write>(
 
 /// Encodes a segwit address to a writer ([`std::io::Write`]) using lowercase characters.
 ///
-/// Does not check the validity of the witness version and witness program lengths (see
-/// the [`crate::primitives::segwit`] module for validation functions).
+/// There are no guarantees that the written string is a valid segwit address unless all the
+/// parameters are valid. See the body of `encode()` to see the validity checks required.
 #[cfg(feature = "std")]
 #[inline]
 pub fn encode_to_writer_unchecked<W: std::io::Write>(
@@ -207,8 +219,8 @@ pub fn encode_to_writer_unchecked<W: std::io::Write>(
 
 /// Encodes a segwit address to a writer ([`std::io::Write`]) using lowercase characters.
 ///
-/// Does not check the validity of the witness version and witness program lengths (see
-/// the [`crate::primitives::segwit`] module for validation functions).
+/// There are no guarantees that the written string is a valid segwit address unless all the
+/// parameters are valid. See the body of `encode()` to see the validity checks required.
 #[cfg(feature = "std")]
 #[inline]
 pub fn encode_lower_to_writer_unchecked<W: std::io::Write>(
@@ -237,8 +249,8 @@ pub fn encode_lower_to_writer_unchecked<W: std::io::Write>(
 ///
 /// This is provided for use when creating QR codes.
 ///
-/// Does not check the validity of the witness version and witness program lengths (see
-/// the [`crate::primitives::segwit`] module for validation functions).
+/// There are no guarantees that the written string is a valid segwit address unless all the
+/// parameters are valid. See the body of `encode()` to see the validity checks required.
 #[cfg(feature = "std")]
 #[inline]
 pub fn encode_upper_to_writer_unchecked<W: std::io::Write>(
@@ -262,6 +274,27 @@ pub fn encode_upper_to_writer_unchecked<W: std::io::Write>(
     }
 
     Ok(())
+}
+
+/// Returns the length of the address after encoding HRP, witness version and program.
+///
+/// # Returns
+///
+/// `Ok(address_length)` if the encoded address length is less than or equal to 90. Otherwise
+/// returns a [`SegwitCodeLengthError`] containing the encoded address length.
+pub fn encoded_length(
+    hrp: Hrp,
+    _witness_version: Fe32, // Emphasize that this is only for segwit.
+    witness_program: &[u8],
+) -> Result<usize, SegwitCodeLengthError> {
+    // Ck is only for length and since they are both the same we can use either here.
+    let len = crate::encoded_length::<Bech32>(hrp, witness_program).map(|len| len + 1)?; // +1 for witness version.
+
+    if len > MAX_STRING_LENGTH {
+        Err(SegwitCodeLengthError(len))
+    } else {
+        Ok(len)
+    }
 }
 
 /// An error while decoding a segwit address.
@@ -296,6 +329,8 @@ pub enum EncodeError {
     WitnessVersion(InvalidWitnessVersionError),
     /// Invalid witness length.
     WitnessLength(WitnessLengthError),
+    /// Encoding HRP, witver, and program into a bech32 string exceeds maximum allowed.
+    TooLong(SegwitCodeLengthError),
     /// Writing to formatter failed.
     Fmt(fmt::Error),
 }
@@ -307,6 +342,7 @@ impl fmt::Display for EncodeError {
         match *self {
             WitnessVersion(ref e) => write_err!(f, "witness version"; e),
             WitnessLength(ref e) => write_err!(f, "witness length"; e),
+            TooLong(ref e) => write_err!(f, "encode error"; e),
             Fmt(ref e) => write_err!(f, "writing to formatter failed"; e),
         }
     }
@@ -320,6 +356,7 @@ impl std::error::Error for EncodeError {
         match *self {
             WitnessVersion(ref e) => Some(e),
             WitnessLength(ref e) => Some(e),
+            TooLong(ref e) => Some(e),
             Fmt(ref e) => Some(e),
         }
     }
@@ -335,6 +372,11 @@ impl From<WitnessLengthError> for EncodeError {
     fn from(e: WitnessLengthError) -> Self { Self::WitnessLength(e) }
 }
 
+impl From<SegwitCodeLengthError> for EncodeError {
+    #[inline]
+    fn from(e: SegwitCodeLengthError) -> Self { Self::TooLong(e) }
+}
+
 impl From<fmt::Error> for EncodeError {
     #[inline]
     fn from(e: fmt::Error) -> Self { Self::Fmt(e) }
@@ -343,6 +385,7 @@ impl From<fmt::Error> for EncodeError {
 #[cfg(all(test, feature = "alloc"))]
 mod tests {
     use super::*;
+    use crate::primitives::decode::{SegwitCodeLengthError, SegwitHrpstringError};
     use crate::primitives::hrp;
 
     #[test]
@@ -429,5 +472,62 @@ mod tests {
         let address = std::str::from_utf8(&buf).expect("ascii is valid utf8");
         let want = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
         assert_eq!(address, want);
+    }
+
+    #[test]
+    fn encoded_length_works() {
+        let addresses = vec![
+            "bc1q2s3rjwvam9dt2ftt4sqxqjf3twav0gdx0k0q2etxflx38c3x8tnssdmnjq",
+            "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
+        ];
+
+        for address in addresses {
+            let (hrp, version, program) = decode(address).expect("valid address");
+
+            let encoded = encode(hrp, version, &program).expect("valid data");
+            let want = encoded.len();
+            let got = encoded_length(hrp, version, &program).expect("encoded length");
+
+            assert_eq!(got, want);
+        }
+    }
+
+    #[test]
+    fn can_encode_maximum_length_address() {
+        let program = [0_u8; 40]; // Maximum witness program length.
+        let hrp = Hrp::parse_unchecked("anhrpthatis18chars");
+        let addr = encode(hrp, VERSION_1, &program).expect("valid data");
+        assert_eq!(addr.len(), MAX_STRING_LENGTH);
+    }
+
+    #[test]
+    fn can_not_encode_address_too_long() {
+        let tcs = vec![
+            ("anhrpthatis19charsx", 91),
+            ("anhrpthatisthemaximumallowedlengthofeightythreebytesxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", 155)
+        ];
+
+        for (hrp, len) in tcs {
+            let program = [0_u8; 40]; // Maximum witness program length.
+            let hrp = Hrp::parse_unchecked(hrp);
+            let err = encode(hrp, VERSION_1, &program).unwrap_err();
+            assert_eq!(err, EncodeError::TooLong(SegwitCodeLengthError(len)));
+        }
+    }
+
+    #[test]
+    fn can_decode_maximum_length_address() {
+        let address = "anhrpthatisnineteen1pqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqghfyyfz";
+        assert_eq!(address.len(), MAX_STRING_LENGTH);
+
+        assert!(decode(address).is_ok());
+    }
+
+    #[test]
+    fn can_not_decode_address_too_long() {
+        let address = "anhrpthatistwentycha1pqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgqfrwjz";
+        assert_eq!(address.len(), MAX_STRING_LENGTH + 1);
+
+        assert_eq!(decode(address).unwrap_err(), DecodeError(SegwitHrpstringError::TooLong(91)));
     }
 }

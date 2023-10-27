@@ -9,6 +9,14 @@ use core::fmt;
 
 use crate::primitives::gf32::Fe32;
 
+/// The maximum enforced string length of a segwit address.
+///
+/// The maximum length as specified in BIP-173, this is less than the 1023 character code length.
+/// This limit is based on empirical error-correcting properties. See ["Checksum design"] section.
+///
+/// ["Checksum design"]: <https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki#user-content-Checksum_design>
+pub const MAX_STRING_LENGTH: usize = 90;
+
 /// The field element representing segwit version 0.
 pub const VERSION_0: Fe32 = Fe32::Q;
 /// The field element representing segwit version 1 (taproot).
