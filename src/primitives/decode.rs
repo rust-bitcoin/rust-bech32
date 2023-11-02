@@ -752,7 +752,7 @@ impl fmt::Display for CharError {
         match *self {
             MissingSeparator => write!(f, "missing human-readable separator, \"{}\"", SEP),
             NothingAfterSeparator => write!(f, "invalid data - no characters after the separator"),
-            InvalidChar(n) => write!(f, "invalid character (code={})", n),
+            InvalidChar(n) => write!(f, "invalid character '{}'", n),
             MixedCase => write!(f, "mixed-case strings not allowed"),
         }
     }
