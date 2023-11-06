@@ -168,6 +168,12 @@ pub use {
     crate::primitives::{Bech32, Bech32m, NoChecksum},
 };
 
+// Write to fmt buffer, small during testing to exercise full code path.
+#[cfg(not(test))]
+const BUF_LENGTH: usize = 1024;
+#[cfg(test)]
+const BUF_LENGTH: usize = 10;
+
 /// Decodes a bech32 encoded string.
 ///
 /// If this function succeeds the input string was found to be well formed (hrp, separator, bech32
@@ -276,11 +282,26 @@ pub fn encode_lower_to_fmt<Ck: Checksum, W: fmt::Write>(
 ) -> Result<(), EncodeError> {
     let _ = encoded_length::<Ck>(hrp, data)?;
 
+    let mut buf = [0u8; BUF_LENGTH];
+    let mut pos = 0;
+
     let iter = data.iter().copied().bytes_to_fes();
     let chars = iter.with_checksum::<Ck>(&hrp).chars();
+
     for c in chars {
-        fmt.write_char(c)?;
+        buf[pos] = c as u8;
+        pos += 1;
+
+        if pos == BUF_LENGTH {
+            let s = core::str::from_utf8(&buf).expect("we only write ASCII");
+            fmt.write_str(s)?;
+            pos = 0;
+        }
     }
+
+    let s = core::str::from_utf8(&buf[..pos]).expect("we only write ASCII");
+    fmt.write_str(s)?;
+
     Ok(())
 }
 
@@ -296,11 +317,25 @@ pub fn encode_upper_to_fmt<Ck: Checksum, W: fmt::Write>(
 ) -> Result<(), EncodeError> {
     let _ = encoded_length::<Ck>(hrp, data)?;
 
+    let mut buf = [0u8; BUF_LENGTH];
+    let mut pos = 0;
+
     let iter = data.iter().copied().bytes_to_fes();
     let chars = iter.with_checksum::<Ck>(&hrp).chars();
+
     for c in chars {
-        fmt.write_char(c.to_ascii_uppercase())?;
+        buf[pos] = c.to_ascii_uppercase() as u8;
+        pos += 1;
+        if pos == BUF_LENGTH {
+            let s = core::str::from_utf8(&buf).expect("we only write ASCII");
+            fmt.write_str(s)?;
+            pos = 0;
+        }
     }
+
+    let s = core::str::from_utf8(&buf[..pos]).expect("we only write ASCII");
+    fmt.write_str(s)?;
+
     Ok(())
 }
 
@@ -331,11 +366,23 @@ pub fn encode_lower_to_writer<Ck: Checksum, W: std::io::Write>(
 ) -> Result<(), EncodeIoError> {
     let _ = encoded_length::<Ck>(hrp, data)?;
 
+    let mut buf = [0u8; BUF_LENGTH];
+    let mut pos = 0;
+
     let iter = data.iter().copied().bytes_to_fes();
     let chars = iter.with_checksum::<Ck>(&hrp).chars();
+
     for c in chars {
-        w.write_all(&[c as u8])?;
+        buf[pos] = c as u8;
+        pos += 1;
+        if pos == BUF_LENGTH {
+            w.write_all(&buf)?;
+            pos = 0;
+        }
     }
+
+    w.write_all(&buf[..pos])?;
+
     Ok(())
 }
 
@@ -352,11 +399,23 @@ pub fn encode_upper_to_writer<Ck: Checksum, W: std::io::Write>(
 ) -> Result<(), EncodeIoError> {
     let _ = encoded_length::<Ck>(hrp, data)?;
 
+    let mut buf = [0u8; BUF_LENGTH];
+    let mut pos = 0;
+
     let iter = data.iter().copied().bytes_to_fes();
     let chars = iter.with_checksum::<Ck>(&hrp).chars();
+
     for c in chars {
-        w.write_all(&[c.to_ascii_uppercase() as u8])?;
+        buf[pos] = c.to_ascii_uppercase() as u8;
+        pos += 1;
+        if pos == BUF_LENGTH {
+            w.write_all(&buf)?;
+            pos = 0;
+        }
     }
+
+    w.write_all(&buf[..pos])?;
+
     Ok(())
 }
 

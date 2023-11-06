@@ -156,19 +156,30 @@ pub fn encode_lower_to_fmt_unchecked<W: fmt::Write>(
     witness_version: Fe32,
     witness_program: &[u8],
 ) -> fmt::Result {
+    let mut buf = [0u8; MAX_STRING_LENGTH];
+    let mut pos = 0;
+
     let iter = witness_program.iter().copied().bytes_to_fes();
     match witness_version {
         VERSION_0 => {
-            for c in iter.with_checksum::<Bech32>(&hrp).with_witness_version(VERSION_0).chars() {
-                fmt.write_char(c)?;
-            }
+            let bytes = iter.with_checksum::<Bech32>(&hrp).with_witness_version(VERSION_0).bytes();
+            buf.iter_mut().zip(bytes).for_each(|(dst, src)| {
+                *dst = src;
+                pos += 1;
+            });
         }
         version => {
-            for c in iter.with_checksum::<Bech32m>(&hrp).with_witness_version(version).chars() {
-                fmt.write_char(c)?;
-            }
+            let bytes = iter.with_checksum::<Bech32m>(&hrp).with_witness_version(version).bytes();
+            buf.iter_mut().zip(bytes).for_each(|(dst, src)| {
+                *dst = src;
+                pos += 1;
+            });
         }
     }
+
+    let s = core::str::from_utf8(&buf[..pos]).expect("we only write ASCII");
+    fmt.write_str(s)?;
+
     Ok(())
 }
 
@@ -185,19 +196,29 @@ pub fn encode_upper_to_fmt_unchecked<W: fmt::Write>(
     witness_version: Fe32,
     witness_program: &[u8],
 ) -> fmt::Result {
+    let mut buf = [0u8; MAX_STRING_LENGTH];
+    let mut pos = 0;
+
     let iter = witness_program.iter().copied().bytes_to_fes();
     match witness_version {
         VERSION_0 => {
-            for c in iter.with_checksum::<Bech32>(&hrp).with_witness_version(VERSION_0).chars() {
-                fmt.write_char(c.to_ascii_uppercase())?;
-            }
+            let bytes = iter.with_checksum::<Bech32>(&hrp).with_witness_version(VERSION_0).bytes();
+            buf.iter_mut().zip(bytes).for_each(|(dst, src)| {
+                *dst = src.to_ascii_uppercase();
+                pos += 1;
+            });
         }
         version => {
-            for c in iter.with_checksum::<Bech32m>(&hrp).with_witness_version(version).chars() {
-                fmt.write_char(c.to_ascii_uppercase())?;
-            }
+            let bytes = iter.with_checksum::<Bech32m>(&hrp).with_witness_version(version).bytes();
+            buf.iter_mut().zip(bytes).for_each(|(dst, src)| {
+                *dst = src.to_ascii_uppercase();
+                pos += 1;
+            });
         }
     }
+
+    let s = core::str::from_utf8(&buf[..pos]).expect("we only write ASCII");
+    fmt.write_str(s)?;
 
     Ok(())
 }
@@ -229,19 +250,29 @@ pub fn encode_lower_to_writer_unchecked<W: std::io::Write>(
     witness_version: Fe32,
     witness_program: &[u8],
 ) -> std::io::Result<()> {
+    let mut buf = [0u8; MAX_STRING_LENGTH];
+    let mut pos = 0;
+
     let iter = witness_program.iter().copied().bytes_to_fes();
     match witness_version {
         VERSION_0 => {
-            for c in iter.with_checksum::<Bech32>(&hrp).with_witness_version(VERSION_0).chars() {
-                w.write_all(&[c.to_ascii_lowercase() as u8])?;
-            }
+            let bytes = iter.with_checksum::<Bech32>(&hrp).with_witness_version(VERSION_0).bytes();
+            buf.iter_mut().zip(bytes).for_each(|(dst, src)| {
+                *dst = src;
+                pos += 1;
+            });
         }
         version => {
-            for c in iter.with_checksum::<Bech32m>(&hrp).with_witness_version(version).chars() {
-                w.write_all(&[c.to_ascii_lowercase() as u8])?;
-            }
+            let bytes = iter.with_checksum::<Bech32m>(&hrp).with_witness_version(version).bytes();
+            buf.iter_mut().zip(bytes).for_each(|(dst, src)| {
+                *dst = src;
+                pos += 1;
+            });
         }
     }
+
+    w.write_all(&buf[..pos])?;
+
     Ok(())
 }
 
@@ -259,19 +290,28 @@ pub fn encode_upper_to_writer_unchecked<W: std::io::Write>(
     witness_version: Fe32,
     witness_program: &[u8],
 ) -> std::io::Result<()> {
+    let mut buf = [0u8; MAX_STRING_LENGTH];
+    let mut pos = 0;
+
     let iter = witness_program.iter().copied().bytes_to_fes();
     match witness_version {
         VERSION_0 => {
-            for c in iter.with_checksum::<Bech32>(&hrp).with_witness_version(VERSION_0).chars() {
-                w.write_all(&[c.to_ascii_uppercase() as u8])?;
-            }
+            let bytes = iter.with_checksum::<Bech32>(&hrp).with_witness_version(VERSION_0).bytes();
+            buf.iter_mut().zip(bytes).for_each(|(dst, src)| {
+                *dst = src.to_ascii_uppercase();
+                pos += 1;
+            });
         }
         version => {
-            for c in iter.with_checksum::<Bech32m>(&hrp).with_witness_version(version).chars() {
-                w.write_all(&[c.to_ascii_uppercase() as u8])?;
-            }
+            let bytes = iter.with_checksum::<Bech32m>(&hrp).with_witness_version(version).bytes();
+            buf.iter_mut().zip(bytes).for_each(|(dst, src)| {
+                *dst = src.to_ascii_uppercase();
+                pos += 1;
+            });
         }
     }
+
+    w.write_all(&buf[..pos])?;
 
     Ok(())
 }
