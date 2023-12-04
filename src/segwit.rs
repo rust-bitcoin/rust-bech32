@@ -66,6 +66,10 @@ pub use {
 
 /// Decodes a segwit address.
 ///
+/// # Returns
+///
+/// The HRP, the witness version, and a guaranteed valid length witness program.
+///
 /// # Examples
 ///
 /// ```
