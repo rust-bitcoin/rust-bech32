@@ -1,3 +1,12 @@
+Rust Bech32 Qtum
+================
+
+Rust implementation of the Bech32 encoding format for Qtum. This repository was forked from [rust-bech32](https://github.com/rust-bitcoin/rust-bech32).
+
+See below for the original `rust-bech32` README.
+
+---
+
 Rust Bech32
 ===========
 

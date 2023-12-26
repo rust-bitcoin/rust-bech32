@@ -19,8 +19,8 @@ use core::{slice, str};
 /// Maximum length of the human-readable part, as defined by BIP-173.
 const MAX_HRP_LEN: usize = 83;
 
-// Defines HRP constants for the different bitcoin networks.
-// You can also access these at `crate::hrp::BC` etc.
+// Defines HRP constants for the different Qtum networks.
+// You can also access these at `crate::hrp::QC` etc.
 #[rustfmt::skip]
 macro_rules! define_hrp_const {
     (
@@ -42,16 +42,16 @@ macro_rules! define_hrp_const {
     };
 }
 define_hrp_const! {
-    /// The human-readable part used by the Bitcoin mainnet network.
-    pub const BC 2 [98, 99, 0, 0];
+    /// The human-readable part used by the Qtum mainnet network.
+    pub const QC 2 [113, 99, 0, 0];
 }
 define_hrp_const! {
-    /// The human-readable part used by the Bitcoin testnet networks (testnet, signet).
-    pub const TB 2 [116, 98, 0, 0];
+    /// The human-readable part used by the Qtum testnet networks (testnet, signet).
+    pub const TQ 2 [116, 113, 0, 0];
 }
 define_hrp_const! {
-    /// The human-readable part used when running a Bitcoin regtest network.
-    pub const BCRT 4 [98, 99, 114, 116];
+    /// The human-readable part used when running a Qtum regtest network.
+    pub const QCRT 4 [113, 99, 114, 116];
 }
 
 /// The human-readable part (human readable prefix before the '1' separator).
@@ -66,7 +66,7 @@ pub struct Hrp {
 impl Hrp {
     /// Parses the human-readable part checking it is valid as defined by [BIP-173].
     ///
-    /// This does _not_ check that the `hrp` is an in-use HRP within Bitcoin (eg, "bc"), rather it
+    /// This does _not_ check that the `hrp` is an in-use HRP within Qtum (eg, "qc"), rather it
     /// checks that the HRP string is valid as per the specification in [BIP-173]:
     ///
     /// > The human-readable part, which is intended to convey the type of data, or anything else that
@@ -194,6 +194,7 @@ impl Hrp {
     /// Returns `true` if this [`Hrp`] is valid according to the bips.
     ///
     /// [BIP-173] states that the HRP must be either "bc" or "tb".
+    /// For Qtum the HRP must be either "qc" or "tq".
     ///
     /// [BIP-173]: https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki#user-content-Segwit_address_format
     #[inline]
@@ -201,21 +202,21 @@ impl Hrp {
         self.is_valid_on_mainnet() || self.is_valid_on_testnet()
     }
 
-    /// Returns `true` if this hrpstring is valid on the Bitcoin network i.e., HRP is "bc".
+    /// Returns `true` if this hrpstring is valid on the Qtum network i.e., HRP is "qc".
     #[inline]
-    pub fn is_valid_on_mainnet(&self) -> bool { *self == self::BC }
+    pub fn is_valid_on_mainnet(&self) -> bool { *self == self::QC }
 
-    /// Returns `true` if this hrpstring is valid on the Bitcoin testnet network i.e., HRP is "tb".
+    /// Returns `true` if this hrpstring is valid on the Qtum testnet network i.e., HRP is "tq".
     #[inline]
-    pub fn is_valid_on_testnet(&self) -> bool { *self == self::TB }
+    pub fn is_valid_on_testnet(&self) -> bool { *self == self::TQ }
 
-    /// Returns `true` if this hrpstring is valid on the Bitcoin signet network i.e., HRP is "tb".
+    /// Returns `true` if this hrpstring is valid on the Qtum signet network i.e., HRP is "tq".
     #[inline]
-    pub fn is_valid_on_signet(&self) -> bool { *self == self::TB }
+    pub fn is_valid_on_signet(&self) -> bool { *self == self::TQ }
 
-    /// Returns `true` if this hrpstring is valid on the Bitcoin regtest network i.e., HRP is "bcrt".
+    /// Returns `true` if this hrpstring is valid on the Qtum regtest network i.e., HRP is "qcrt".
     #[inline]
-    pub fn is_valid_on_regtest(&self) -> bool { *self == self::BCRT }
+    pub fn is_valid_on_regtest(&self) -> bool { *self == self::QCRT }
 }
 
 /// Displays the human-readable part.
@@ -517,10 +518,10 @@ mod tests {
     #[cfg(feature = "alloc")]
     #[test]
     fn hrp_consts() {
-        use crate::primitives::hrp::{BC, BCRT, TB};
-        assert_eq!(BC, Hrp::parse_unchecked("bc"));
-        assert_eq!(TB, Hrp::parse_unchecked("tb"));
-        assert_eq!(BCRT, Hrp::parse_unchecked("bcrt"));
+        use crate::primitives::hrp::{QC, QCRT, TQ};
+        assert_eq!(QC, Hrp::parse_unchecked("qc"));
+        assert_eq!(TQ, Hrp::parse_unchecked("tq"));
+        assert_eq!(QCRT, Hrp::parse_unchecked("qcrt"));
     }
 
     #[test]

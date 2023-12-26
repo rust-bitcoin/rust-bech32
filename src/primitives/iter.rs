@@ -16,9 +16,9 @@
 //! use bech32::{Bech32, ByteIterExt, Fe32IterExt, Fe32, Hrp};
 //!
 //! let data = [
-//!     0x75, 0x1e, 0x76, 0xe8, 0x19, 0x91, 0x96, 0xd4,
-//!     0x54, 0x94, 0x1c, 0x45, 0xd1, 0xb3, 0xa3, 0x23,
-//!     0xf1, 0x43, 0x3b, 0xd6,
+//!     0xf1, 0xb4, 0x3c, 0x26, 0xb1, 0x70, 0x4a, 0xea,
+//!     0x71, 0x4b, 0x84, 0x7f, 0x12, 0x01, 0x1c, 0x3e,
+//!     0x88, 0xd4, 0x69, 0x54,
 //! ];
 //!
 //! // Convert byte data to GF32 field elements.
@@ -306,12 +306,12 @@ mod tests {
     use super::*;
 
     // Tests below using this data, are based on the test vector (from BIP-173):
-    // BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4: 0014751e76e8199196d454941c45d1b3a323f1433bd6
+    // QC1Q7X6RCF43WP9W5U2TS3L3YQGU86YDG625NF3PFT: 0014f1b43c26b1704aea714b847f12011c3e88d46954
     #[rustfmt::skip]
     const DATA: [u8; 20] = [
-        0x75, 0x1e, 0x76, 0xe8, 0x19, 0x91, 0x96, 0xd4,
-        0x54, 0x94, 0x1c, 0x45, 0xd1, 0xb3, 0xa3, 0x23,
-        0xf1, 0x43, 0x3b, 0xd6,
+        0xf1, 0xb4, 0x3c, 0x26, 0xb1, 0x70, 0x4a, 0xea,
+        0x71, 0x4b, 0x84, 0x7f, 0x12, 0x01, 0x1c, 0x3e,
+        0x88, 0xd4, 0x69, 0x54,
     ];
 
     #[test]
@@ -321,18 +321,18 @@ mod tests {
             .copied()
             .bytes_to_fes()
             .map(Fe32::to_char)
-            .eq("w508d6qejxtdg4y5r3zarvary0c5xw7k".chars()));
+            .eq("7x6rcf43wp9w5u2ts3l3yqgu86ydg625".chars()));
     }
 
     #[test]
     fn bytes_to_fes_size_hint() {
-        let char_len = "w508d6qejxtdg4y5r3zarvary0c5xw7k".len();
+        let char_len = "7x6rcf43wp9w5u2ts3l3yqgu86ydg625".len();
         assert_eq!(DATA.iter().copied().bytes_to_fes().size_hint(), (char_len, Some(char_len)));
     }
 
     #[test]
     fn fe32_iter_ext() {
-        let fe_iter = "w508d6qejxtdg4y5r3zarvary0c5xw7k"
+        let fe_iter = "7x6rcf43wp9w5u2ts3l3yqgu86ydg625"
             .bytes()
             .map(|b| Fe32::from_char(char::from(b)).unwrap());
 
@@ -341,7 +341,7 @@ mod tests {
 
     #[test]
     fn fes_to_bytes_size_hint() {
-        let fe_iter = "w508d6qejxtdg4y5r3zarvary0c5xw7k"
+        let fe_iter = "7x6rcf43wp9w5u2ts3l3yqgu86ydg625"
             .bytes()
             .map(|b| Fe32::from_char(char::from(b)).unwrap());
 
@@ -354,35 +354,35 @@ mod tests {
     #[test]
     fn padding_bytes_trailing_0_bits_roundtrips() {
         // 5 * 8 % 5 = 0
-        const BYTES: [u8; 5] = [0x75, 0x1e, 0x76, 0xe8, 0x19];
+        const BYTES: [u8; 5] = [0xf1, 0xb4, 0x3c, 0x26, 0xb1];
         assert!(BYTES.iter().copied().bytes_to_fes().fes_to_bytes().eq(BYTES.iter().copied()))
     }
 
     #[test]
     fn padding_bytes_trailing_1_bit_roundtrips() {
         // 2 * 8 % 5 = 1
-        const BYTES: [u8; 2] = [0x75, 0x1e];
+        const BYTES: [u8; 2] = [0xf1, 0xb4];
         assert!(BYTES.iter().copied().bytes_to_fes().fes_to_bytes().eq(BYTES.iter().copied()))
     }
 
     #[test]
     fn padding_bytes_trailing_2_bits_roundtrips() {
         // 4 * 8 % 5 = 2
-        const BYTES: [u8; 4] = [0x75, 0x1e, 0x76, 0xe8];
+        const BYTES: [u8; 4] = [0xf1, 0xb4, 0x3c, 0x26];
         assert!(BYTES.iter().copied().bytes_to_fes().fes_to_bytes().eq(BYTES.iter().copied()))
     }
 
     #[test]
     fn padding_bytes_trailing_3_bits_roundtrips() {
         // 6 * 8 % 5 = 3
-        const BYTES: [u8; 6] = [0x75, 0x1e, 0x76, 0xe8, 0x19, 0xab];
+        const BYTES: [u8; 6] = [0xf1, 0xb4, 0x3c, 0x26, 0xb1, 0x70];
         assert!(BYTES.iter().copied().bytes_to_fes().fes_to_bytes().eq(BYTES.iter().copied()))
     }
 
     #[test]
     fn padding_bytes_trailing_4_bits_roundtrips() {
         // 3 * 8 % 5 = 4
-        const BYTES: [u8; 3] = [0x75, 0x1e, 0x76];
+        const BYTES: [u8; 3] = [0xf1, 0xb4, 0x3c];
         assert!(BYTES.iter().copied().bytes_to_fes().fes_to_bytes().eq(BYTES.iter().copied()))
     }
 

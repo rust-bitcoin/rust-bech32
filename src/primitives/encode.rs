@@ -17,14 +17,14 @@
 //! use bech32::{Bech32, ByteIterExt, Fe32IterExt, Fe32, Hrp};
 //!
 //! let witness_prog = [
-//!     0x75, 0x1e, 0x76, 0xe8, 0x19, 0x91, 0x96, 0xd4,
-//!     0x54, 0x94, 0x1c, 0x45, 0xd1, 0xb3, 0xa3, 0x23,
-//!     0xf1, 0x43, 0x3b, 0xd6,
+//!     0xf1, 0xb4, 0x3c, 0x26, 0xb1, 0x70, 0x4a, 0xea,
+//!     0x71, 0x4b, 0x84, 0x7f, 0x12, 0x01, 0x1c, 0x3e,
+//!     0x88, 0xd4, 0x69, 0x54,
 //! ];
 //!
 //! // Get a stream of characters representing the bech32 encoded
 //! // address using "bc" for the human-readable part.
-//! let hrp = Hrp::parse("bc").expect("bc is valid hrp string");
+//! let hrp = Hrp::parse("qc").expect("qc is valid hrp string");
 //! let chars = witness_prog
 //!     .iter()
 //!     .copied()
@@ -36,7 +36,7 @@
 //! #[cfg(feature = "alloc")]
 //! {
 //!     let addr = chars.collect::<String>();
-//!     assert_eq!(addr.to_uppercase(), "BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4");
+//!     assert_eq!(addr.to_uppercase(), "QC1Q7X6RCF43WP9W5U2TS3L3YQGU86YDG625NF3PFT");
 //! }
 //! ```
 
@@ -59,7 +59,7 @@ use crate::{Checksum, Fe32};
 /// ```
 /// use bech32::{Bech32, ByteIterExt, Fe32IterExt, Hrp};
 ///
-/// let data = [0x75, 0x1e, 0x76, 0xe8, 0x19, 0x91, 0x96, 0xd4];
+/// let data = [0xf1, 0xb4, 0x3c, 0x26, 0xb1, 0x70, 0x4a, 0xea];
 ///
 /// let hrp = Hrp::parse("abc").expect("bc is valid hrp string");
 /// let chars = data
@@ -348,22 +348,22 @@ mod tests {
     use crate::{Bech32, ByteIterExt, Fe32, Fe32IterExt, Hrp};
 
     // Tests below using this data, are based on the test vector (from BIP-173):
-    // BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4: 0014751e76e8199196d454941c45d1b3a323f1433bd6
+    // QC1Q7X6RCF43WP9W5U2TS3L3YQGU86YDG625NF3PFT: 0014f1b43c26b1704aea714b847f12011c3e88d46954
     #[rustfmt::skip]
     const DATA: [u8; 20] = [
-        0x75, 0x1e, 0x76, 0xe8, 0x19, 0x91, 0x96, 0xd4,
-        0x54, 0x94, 0x1c, 0x45, 0xd1, 0xb3, 0xa3, 0x23,
-        0xf1, 0x43, 0x3b, 0xd6,
+        0xf1, 0xb4, 0x3c, 0x26, 0xb1, 0x70, 0x4a, 0xea,
+        0x71, 0x4b, 0x84, 0x7f, 0x12, 0x01, 0x1c, 0x3e,
+        0x88, 0xd4, 0x69, 0x54,
     ];
 
     #[test]
     fn hrpstring_iter() {
         let iter = DATA.iter().copied().bytes_to_fes();
 
-        let hrp = Hrp::parse_unchecked("bc");
+        let hrp = Hrp::parse_unchecked("qc");
         let iter = iter.with_checksum::<Bech32>(&hrp).with_witness_version(Fe32::Q).chars();
 
-        assert!(iter.eq("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4".chars()));
+        assert!(iter.eq("qc1q7x6rcf43wp9w5u2ts3l3yqgu86ydg625nf3pft".chars()));
     }
 
     #[test]
@@ -371,11 +371,11 @@ mod tests {
     fn hrpstring_iter_collect() {
         let iter = DATA.iter().copied().bytes_to_fes();
 
-        let hrp = Hrp::parse_unchecked("bc");
+        let hrp = Hrp::parse_unchecked("qc");
         let iter = iter.with_checksum::<Bech32>(&hrp).with_witness_version(Fe32::Q).chars();
 
         let encoded = iter.collect::<String>();
-        assert_eq!(encoded, "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4");
+        assert_eq!(encoded, "qc1q7x6rcf43wp9w5u2ts3l3yqgu86ydg625nf3pft");
     }
 
     #[test]
@@ -383,17 +383,17 @@ mod tests {
         let char_len = "w508d6qejxtdg4y5r3zarvary0c5xw7k".len();
         let iter = DATA.iter().copied().bytes_to_fes();
 
-        let hrp = Hrp::parse_unchecked("bc");
+        let hrp = Hrp::parse_unchecked("qc");
         let iter = iter.with_checksum::<Bech32>(&hrp).with_witness_version(Fe32::Q).chars();
 
-        let checksummed_len = 2 + 1 + 1 + char_len + 6; // bc + SEP + Q + chars + checksum
+        let checksummed_len = 2 + 1 + 1 + char_len + 6; // qc + SEP + Q + chars + checksum
         assert_eq!(iter.size_hint().0, checksummed_len);
     }
 
     #[test]
     #[cfg(feature = "alloc")]
     fn hrpstring_iter_bytes() {
-        let hrp = Hrp::parse_unchecked("bc");
+        let hrp = Hrp::parse_unchecked("qc");
         let fes = DATA.iter().copied().bytes_to_fes();
         let iter = fes.with_checksum::<Bech32>(&hrp).with_witness_version(Fe32::Q);
 

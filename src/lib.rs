@@ -39,15 +39,15 @@
 //!
 //! const DATA: [u8; 20] = [0xab; 20]; // Arbitrary data to be encoded.
 //! const STRING: &str = "abc14w46h2at4w46h2at4w46h2at4w46h2at958ngu";
-//! const TAP_ADDR: &str = "bc1p4w46h2at4w46h2at4w46h2at4w46h2at5kreae";
+//! const TAP_ADDR: &str = "qc1p4w46h2at4w46h2at4w46h2at4w46h2atc9q4ar";
 //!
 //! // Encode arbitrary data using "abc" as the human-readable part and append a bech32m checksum.
 //! let hrp = Hrp::parse("abc").expect("valid hrp");
 //! let string = bech32::encode::<Bech32m>(hrp, &DATA).expect("failed to encode string");
 //! assert_eq!(string, STRING);
 //!
-//! // Encode arbitrary data as a Bitcoin taproot address.
-//! let taproot_address = segwit::encode(hrp::BC, segwit::VERSION_1, &DATA).expect("valid witness version and program");
+//! // Encode arbitrary data as a Qtum taproot address.
+//! let taproot_address = segwit::encode(hrp::QC, segwit::VERSION_1, &DATA).expect("valid witness version and program");
 //! assert_eq!(taproot_address, TAP_ADDR);
 //!
 //! // No-alloc: Encode without allocating (ignoring that String::new() allocates :).
@@ -66,7 +66,7 @@
 //!
 //! const DATA: [u8; 20] = [0xab; 20]; // Arbitrary data to be encoded.
 //! const STRING: &str = "abc14w46h2at4w46h2at4w46h2at4w46h2at958ngu";
-//! const TAP_ADDR: &str = "bc1p4w46h2at4w46h2at4w46h2at4w46h2at5kreae";
+//! const TAP_ADDR: &str = "qc1p4w46h2at4w46h2at4w46h2at4w46h2atc9q4ar";
 //!
 //! // Decode a bech32 encoded string that includes a bech32/bech32m checksum.
 //! //
@@ -576,19 +576,19 @@ mod tests {
     use crate::{Bech32, Bech32m};
 
     // Tests below using this data, are based on the test vector (from BIP-173):
-    // BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4: 0014751e76e8199196d454941c45d1b3a323f1433bd6
+    // QC1Q7X6RCF43WP9W5U2TS3L3YQGU86YDG625NF3PFT: 0014f1b43c26b1704aea714b847f12011c3e88d46954
     #[rustfmt::skip]
     const DATA: [u8; 20] = [
-        0xff, 0x1e, 0x76, 0xe8, 0x19, 0x91, 0x96, 0xd4,
-        0x54, 0x94, 0x1c, 0x45, 0xd1, 0xb3, 0xa3, 0x23,
-        0xf1, 0x43, 0x3b, 0xd6,
+        0xff, 0xb4, 0x3c, 0x26, 0xb1, 0x70, 0x4a, 0xea,
+        0x71, 0x4b, 0x84, 0x7f, 0x12, 0x01, 0x1c, 0x3e,
+        0x88, 0xd4, 0x69, 0x54,
     ];
 
     #[test]
     fn encode_bech32m() {
         let hrp = Hrp::parse_unchecked("test");
         let got = encode::<Bech32m>(hrp, &DATA).expect("failed to encode");
-        let want = "test1lu08d6qejxtdg4y5r3zarvary0c5xw7kmz4lky";
+        let want = "test1l76rcf43wp9w5u2ts3l3yqgu86ydg625tep5f8";
         assert_eq!(got, want);
     }
 
@@ -596,7 +596,7 @@ mod tests {
     fn encode_bech32_lower() {
         let hrp = Hrp::parse_unchecked("test");
         let got = encode_lower::<Bech32>(hrp, &DATA).expect("failed to encode");
-        let want = "test1lu08d6qejxtdg4y5r3zarvary0c5xw7kw79nnx";
+        let want = "test1l76rcf43wp9w5u2ts3l3yqgu86ydg625793cv9";
         assert_eq!(got, want);
     }
 
@@ -608,7 +608,7 @@ mod tests {
         encode_lower_to_writer::<Bech32, _>(&mut buf, hrp, &DATA).expect("failed to encode");
 
         let got = std::str::from_utf8(&buf).expect("ascii is valid utf8");
-        let want = "test1lu08d6qejxtdg4y5r3zarvary0c5xw7kw79nnx";
+        let want = "test1l76rcf43wp9w5u2ts3l3yqgu86ydg625793cv9";
         assert_eq!(got, want);
     }
 
@@ -616,7 +616,7 @@ mod tests {
     fn encode_bech32_upper() {
         let hrp = Hrp::parse_unchecked("test");
         let got = encode_upper::<Bech32>(hrp, &DATA).expect("failed to encode");
-        let want = "TEST1LU08D6QEJXTDG4Y5R3ZARVARY0C5XW7KW79NNX";
+        let want = "TEST1L76RCF43WP9W5U2TS3L3YQGU86YDG625793CV9";
         assert_eq!(got, want);
     }
 
@@ -628,13 +628,13 @@ mod tests {
         encode_upper_to_writer::<Bech32, _>(&mut buf, hrp, &DATA).expect("failed to encode");
 
         let got = std::str::from_utf8(&buf).expect("ascii is valid utf8");
-        let want = "TEST1LU08D6QEJXTDG4Y5R3ZARVARY0C5XW7KW79NNX";
+        let want = "TEST1L76RCF43WP9W5U2TS3L3YQGU86YDG625793CV9";
         assert_eq!(got, want);
     }
 
     #[test]
     fn decode_bech32m() {
-        let s = "test1lu08d6qejxtdg4y5r3zarvary0c5xw7kmz4lky";
+        let s = "test1l76rcf43wp9w5u2ts3l3yqgu86ydg625tep5f8";
         let (hrp, data) = decode(s).expect("failed to encode");
 
         assert_eq!(hrp, Hrp::parse_unchecked("test"));
@@ -643,7 +643,7 @@ mod tests {
 
     #[test]
     fn decode_bech32_lower() {
-        let s = "test1lu08d6qejxtdg4y5r3zarvary0c5xw7kw79nnx";
+        let s = "test1l76rcf43wp9w5u2ts3l3yqgu86ydg625793cv9";
         let (hrp, data) = decode(s).expect("failed to encode");
 
         assert_eq!(hrp, Hrp::parse_unchecked("test"));
@@ -652,7 +652,7 @@ mod tests {
 
     #[test]
     fn decode_bech32_upper() {
-        let s = "TEST1LU08D6QEJXTDG4Y5R3ZARVARY0C5XW7KW79NNX";
+        let s = "TEST1L76RCF43WP9W5U2TS3L3YQGU86YDG625793CV9";
         let (hrp, data) = decode(s).expect("failed to encode");
 
         assert_eq!(hrp, Hrp::parse_unchecked("TEST"));
@@ -661,7 +661,7 @@ mod tests {
 
     #[test]
     fn encoded_length_works() {
-        let s = "test1lu08d6qejxtdg4y5r3zarvary0c5xw7kmz4lky";
+        let s = "test1l76rcf43wp9w5u2ts3l3yqgu86ydg625tep5f8";
         let (hrp, data) = decode(s).expect("valid string");
 
         let encoded = encode::<Bech32m>(hrp, &data).expect("valid data");

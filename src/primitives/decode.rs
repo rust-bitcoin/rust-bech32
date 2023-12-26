@@ -99,7 +99,7 @@ const SEP: char = '1';
 /// ```
 /// use bech32::{Bech32, Bech32m, primitives::decode::UncheckedHrpstring};
 ///
-/// let addr = "BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4";
+/// let addr = "QC1Q7X6RCF43WP9W5U2TS3L3YQGU86YDG625NF3PFT";
 /// let unchecked = UncheckedHrpstring::new(addr).expect("valid bech32 character encoded string");
 /// if unchecked.has_valid_checksum::<Bech32>() {
 ///     // Remove the checksum and do something with the data.
@@ -1007,9 +1007,9 @@ mod tests {
 
     #[test]
     fn check_hrp_uppercase_returns_lower() {
-        let addr = "BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4";
+        let addr = "QC1Q7X6RCF43WP9W5U2TS3L3YQGU86YDG625NF3PFT";
         let unchecked = UncheckedHrpstring::new(addr).expect("failed to parse address");
-        assert_eq!(unchecked.hrp(), Hrp::parse_unchecked("bc"));
+        assert_eq!(unchecked.hrp(), Hrp::parse_unchecked("qc"));
     }
 
     #[test]
