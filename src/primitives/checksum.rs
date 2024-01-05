@@ -161,7 +161,7 @@ pub trait PackedFe32: Copy + PartialEq + Eq + ops::BitXor<Self, Output = Self> {
     /// add a new field element to the now-0 constant coefficient.
     ///
     /// Takes the degree of the polynomial as an input; for checksum applications
-    /// this shoud basically always be `Checksum::CHECKSUM_WIDTH`.
+    /// this should basically always be `Checksum::CHECKSUM_WIDTH`.
     fn mul_by_x_then_add(&mut self, degree: usize, add: u8) -> u8;
 }
 
