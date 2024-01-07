@@ -177,6 +177,10 @@ impl Fe32 {
     }
 
     /// Creates a field element from a single bech32 character.
+    ///
+    /// # Errors
+    ///
+    /// If the input char is not part of the bech32 alphabet.
     #[inline]
     pub fn from_char(c: char) -> Result<Fe32, FromCharError> {
         use FromCharError::*;
@@ -191,7 +195,12 @@ impl Fe32 {
         Ok(Fe32(u5))
     }
 
-    pub(crate) fn from_char_unchecked(c: u8) -> Fe32 { Fe32(CHARS_INV[usize::from(c)] as u8) }
+    /// Creates a field element from a single bech32 character.
+    ///
+    /// # Panics
+    ///
+    /// If the input character is not part of the bech32 alphabet.
+    pub fn from_char_unchecked(c: u8) -> Fe32 { Fe32(CHARS_INV[usize::from(c)] as u8) }
 
     /// Converts the field element to a lowercase bech32 character.
     #[inline]
