@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-//! Provides an `Hrp` type that represents the human-readable part of a bech32 encoded string.
+//! Provides an [`Hrp`] type that represents the human-readable part of a bech32 encoded string.
 //!
 //! > The human-readable part, which is intended to convey the type of data, or anything else that
 //! > is relevant to the reader. This part MUST contain 1 to 83 US-ASCII characters, with each
@@ -195,7 +195,7 @@ impl Hrp {
     ///
     /// [BIP-173] states that the HRP must be either "bc" or "tb".
     ///
-    /// [BIP-173]: https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki#user-content-Segwit_address_format
+    /// [BIP-173]: <https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki#user-content-Segwit_address_format>
     #[inline]
     pub fn is_valid_segwit(&self) -> bool {
         self.is_valid_on_mainnet() || self.is_valid_on_testnet()
@@ -371,6 +371,7 @@ impl<'b> FusedIterator for LowercaseCharIter<'b> {}
 fn is_ascii_uppercase(b: u8) -> bool { (65..=90).contains(&b) }
 
 /// Errors encountered while checking the human-readable part as defined by [BIP-173].
+///
 /// [BIP-173]: <https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki#user-content-Bech32>
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-//! Segregated Witness functionality - useful for enforcing parts of [`BIP-173`] and [`BIP-350`].
+//! Segregated Witness functionality - useful for enforcing parts of [BIP-173] and [BIP-350].
 //!
 //! [BIP-173]: <https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki>
 //! [BIP-350]: <https://github.com/bitcoin/bips/blob/master/bip-0350.mediawiki>
