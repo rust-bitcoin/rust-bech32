@@ -17,11 +17,13 @@ use checksum::{Checksum, PackedNull};
 pub enum NoChecksum {}
 
 /// The bech32 checksum algorithm, defined in [BIP-173].
+///
 /// [BIP-173]: <https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki>
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Bech32 {}
 
 /// The bech32m checksum algorithm, defined in [BIP-350].
+///
 /// [BIP-350]: <https://github.com/bitcoin/bips/blob/master/bip-0359.mediawiki>
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Bech32m {}

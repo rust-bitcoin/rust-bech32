@@ -165,7 +165,9 @@ pub trait PackedFe32: Copy + PartialEq + Eq + ops::BitXor<Self, Output = Self> {
     fn mul_by_x_then_add(&mut self, degree: usize, add: u8) -> u8;
 }
 
-/// A placeholder type used as part of the [`crate::primitives::NoChecksum`] "checksum".
+/// A placeholder type used as part of the [`NoChecksum`] "checksum".
+///
+/// [`NoChecksum`]: crate::primitives::NoChecksum
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct PackedNull;
 

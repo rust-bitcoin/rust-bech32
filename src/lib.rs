@@ -15,13 +15,11 @@
 //! - Non-segwit stuff and you have an allocator, use the top level API. For normal usage the
 //!   [`encode`] and [`decode`] functions should suffice. There are also various other functions for
 //!   explicit control of the checksum algorithm and the case used when encoding.
-//! - Non-segwit stuff and you do *not* have an allocator, use the
-//!   [`primitives::decode::CheckedHrpstring`] type for decoding. For encoding we provide various
-//!   top level functions of the form `encode*_to_fmt`.
-//! - To define your own checksum algorithm implement [`crate::Checksum`] (see example below).
+//! - Non-segwit stuff and you do *not* have an allocator, use the [`CheckedHrpstring`] type for
+//!   decoding. For encoding we provide various top level functions of the form `encode*_to_fmt`.
+//! - To define your own checksum algorithm implement [`Checksum`] (see example below).
 //!
-//! The original description in [BIP-0173](https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki)
-//! has more details. See also [BIP-0350](https://github.com/bitcoin/bips/blob/master/bip-0350.mediawiki).
+//! The original description in [BIP-173] has more details. See also [BIP-350].
 //!
 //! # Deviation from spec
 //!
@@ -121,6 +119,9 @@
 //! # }
 //! ```
 //!
+//! [BIP-173]: <https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki>
+//! [BIP-350]: <https://github.com/bitcoin/bips/blob/master/bip-0350.mediawiki>
+//! [`CheckedHrpstring`]: crate::primitives::decode::CheckedHrpstring
 //! [`Checksum::CODE_LENGTH`]: crate::primitives::checksum::Checksum::CODE_LENGTH
 
 #![cfg_attr(all(not(feature = "std"), not(test)), no_std)]
@@ -339,10 +340,12 @@ pub fn encode_upper_to_fmt<Ck: Checksum, W: fmt::Write>(
     Ok(())
 }
 
-/// Encodes `data` to a writer ([`std::io::Write`]) as a lowercase bech32 encoded string.
+/// Encodes `data` to a writer ([`io::Write`]) as a lowercase bech32 encoded string.
 ///
 /// Encoded string will be prefixed with the `hrp` and have a checksum appended as specified by the
 /// `Ck` algorithm (`NoChecksum` to exclude checksum all together).
+///
+/// [`io::Write`]: std::io::Write
 #[cfg(feature = "std")]
 #[inline]
 pub fn encode_to_writer<Ck: Checksum, W: std::io::Write>(
@@ -353,10 +356,12 @@ pub fn encode_to_writer<Ck: Checksum, W: std::io::Write>(
     encode_lower_to_writer::<Ck, W>(w, hrp, data)
 }
 
-/// Encodes `data` to a writer ([`std::io::Write`]) as a lowercase bech32 encoded string.
+/// Encodes `data` to a writer ([`io::Write`]) as a lowercase bech32 encoded string.
 ///
 /// Encoded string will be prefixed with the `hrp` and have a checksum appended as specified by the
 /// `Ck` algorithm (`NoChecksum` to exclude checksum all together).
+///
+/// [`io::Write`]: std::io::Write
 #[cfg(feature = "std")]
 #[inline]
 pub fn encode_lower_to_writer<Ck: Checksum, W: std::io::Write>(
@@ -386,10 +391,12 @@ pub fn encode_lower_to_writer<Ck: Checksum, W: std::io::Write>(
     Ok(())
 }
 
-/// Encodes `data` to a writer ([`std::io::Write`]) as a uppercase bech32 encoded string.
+/// Encodes `data` to a writer ([`io::Write`]) as a uppercase bech32 encoded string.
 ///
 /// Encoded string will be prefixed with the `hrp` and have a checksum appended as specified by the
 /// `Ck` algorithm (`NoChecksum` to exclude checksum all together).
+///
+/// [`io::Write`]: std::io::Write
 #[cfg(feature = "std")]
 #[inline]
 pub fn encode_upper_to_writer<Ck: Checksum, W: std::io::Write>(

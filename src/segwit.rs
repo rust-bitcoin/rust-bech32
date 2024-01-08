@@ -227,10 +227,12 @@ pub fn encode_upper_to_fmt_unchecked<W: fmt::Write>(
     Ok(())
 }
 
-/// Encodes a segwit address to a writer ([`std::io::Write`]) using lowercase characters.
+/// Encodes a segwit address to a writer ([`io::Write`]) using lowercase characters.
 ///
 /// There are no guarantees that the written string is a valid segwit address unless all the
 /// parameters are valid. See the body of `encode()` to see the validity checks required.
+///
+/// [`io::Write`]: std::io::Write
 #[cfg(feature = "std")]
 #[inline]
 pub fn encode_to_writer_unchecked<W: std::io::Write>(
@@ -242,10 +244,12 @@ pub fn encode_to_writer_unchecked<W: std::io::Write>(
     encode_lower_to_writer_unchecked(w, hrp, witness_version, witness_program)
 }
 
-/// Encodes a segwit address to a writer ([`std::io::Write`]) using lowercase characters.
+/// Encodes a segwit address to a writer ([`io::Write`]) using lowercase characters.
 ///
 /// There are no guarantees that the written string is a valid segwit address unless all the
 /// parameters are valid. See the body of `encode()` to see the validity checks required.
+///
+/// [`io::Write`]: std::io::Write
 #[cfg(feature = "std")]
 #[inline]
 pub fn encode_lower_to_writer_unchecked<W: std::io::Write>(
@@ -280,12 +284,14 @@ pub fn encode_lower_to_writer_unchecked<W: std::io::Write>(
     Ok(())
 }
 
-/// Encodes a segwit address to a [`std::io::Write`] writer using uppercase characters.
+/// Encodes a segwit address to a [`io::Write`] writer using uppercase characters.
 ///
 /// This is provided for use when creating QR codes.
 ///
 /// There are no guarantees that the written string is a valid segwit address unless all the
 /// parameters are valid. See the body of `encode()` to see the validity checks required.
+///
+/// [`io::Write`]: std::io::Write
 #[cfg(feature = "std")]
 #[inline]
 pub fn encode_upper_to_writer_unchecked<W: std::io::Write>(

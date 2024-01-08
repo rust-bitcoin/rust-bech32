@@ -2,13 +2,15 @@
 
 //! GF32 - Galois Field over 32 elements.
 //!
-//! Implements GF32 arithmetic, defined and encoded as in BIP-0173 "bech32".
+//! Implements GF32 arithmetic, defined and encoded as in [BIP-173] "bech32".
 //!
 //! > A finite field is a finite set which is a field; this means that multiplication, addition,
 //! > subtraction and division (excluding division by zero) are defined and satisfy the rules of
 //! > arithmetic known as the field axioms.
 //!
 //! ref: <https://en.wikipedia.org/wiki/Finite_field>
+//!
+//! [BIP-173]: <https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki>
 
 use core::convert::{Infallible, TryFrom};
 use core::{fmt, num, ops};
