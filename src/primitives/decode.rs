@@ -117,8 +117,8 @@ pub struct UncheckedHrpstring<'s> {
     hrp: Hrp,
     /// This is ASCII byte values of the parsed string, guaranteed to be valid bech32 characters.
     ///
-    /// Contains the checksum if one was present in the parsed string.
-    data: &'s [u8],
+    /// The characters after the separator i.e., the "data part" defined by BIP-173.
+    data_part_ascii: &'s [u8],
     /// The length of the parsed hrpstring.
     hrpstring_length: usize,
 }
@@ -130,11 +130,11 @@ impl<'s> UncheckedHrpstring<'s> {
     #[inline]
     pub fn new(s: &'s str) -> Result<Self, UncheckedHrpstringError> {
         let sep_pos = check_characters(s)?;
-        let (hrp, data) = s.split_at(sep_pos);
+        let (hrp, rest) = s.split_at(sep_pos);
 
         let ret = UncheckedHrpstring {
             hrp: Hrp::parse(hrp)?,
-            data: data[1..].as_bytes(), // Skip the separator.
+            data_part_ascii: rest[1..].as_bytes(), // Skip the separator.
             hrpstring_length: s.len(),
         };
 
@@ -183,7 +183,7 @@ impl<'s> UncheckedHrpstring<'s> {
             return Ok(());
         }
 
-        if self.data.len() < Ck::CHECKSUM_LENGTH {
+        if self.data_part_ascii.len() < Ck::CHECKSUM_LENGTH {
             return Err(InvalidLength);
         }
 
@@ -191,7 +191,7 @@ impl<'s> UncheckedHrpstring<'s> {
         checksum_eng.input_hrp(self.hrp());
 
         // Unwrap ok since we checked all characters in our constructor.
-        for fe in self.data.iter().map(|&b| Fe32::from_char_unchecked(b)) {
+        for fe in self.data_part_ascii.iter().map(|&b| Fe32::from_char_unchecked(b)) {
             checksum_eng.input_fe(fe);
         }
 
@@ -213,11 +213,11 @@ impl<'s> UncheckedHrpstring<'s> {
     /// May panic if data is not valid.
     #[inline]
     pub fn remove_checksum<Ck: Checksum>(self) -> CheckedHrpstring<'s> {
-        let data_len = self.data.len() - Ck::CHECKSUM_LENGTH;
+        let end = self.data_part_ascii.len() - Ck::CHECKSUM_LENGTH;
 
         CheckedHrpstring {
             hrp: self.hrp(),
-            data: &self.data[..data_len],
+            ascii: &self.data_part_ascii[..end],
             hrpstring_length: self.hrpstring_length,
         }
     }
@@ -225,8 +225,8 @@ impl<'s> UncheckedHrpstring<'s> {
 
 /// An HRP string that has been parsed and had the checksum validated.
 ///
-/// This type does not treat the first byte of the data in any special way i.e., as the witness
-/// version byte. If you are parsing Bitcoin segwit addresses you likely want to use [`SegwitHrpstring`].
+/// This type does not treat the first byte of the data part in any special way i.e., as the witness
+/// version byte. If you are parsing Bitcoin segwit addresses consider using [`SegwitHrpstring`].
 ///
 /// > We first describe the general checksummed base32 format called Bech32 and then
 /// > define Segregated Witness addresses using it.
@@ -250,9 +250,10 @@ impl<'s> UncheckedHrpstring<'s> {
 pub struct CheckedHrpstring<'s> {
     /// The human-readable part, guaranteed to be lowercase ASCII characters.
     hrp: Hrp,
-    /// This is ASCII byte values of the parsed string, guaranteed to be valid bech32 characters,
-    /// with the checksum removed.
-    data: &'s [u8],
+    /// This is ASCII byte values of the parsed string, guaranteed to be valid bech32 characters.
+    ///
+    /// The characters after the '1' separator and the before the checksum.
+    ascii: &'s [u8],
     /// The length of the parsed hrpstring.
     hrpstring_length: usize, // Guaranteed to be <= CK::CODE_LENGTH
 }
@@ -280,13 +281,13 @@ impl<'s> CheckedHrpstring<'s> {
     /// converts the stream of field elements to a stream of bytes.
     #[inline]
     pub fn byte_iter(&self) -> ByteIter {
-        ByteIter { iter: AsciiToFe32Iter { iter: self.data.iter().copied() }.fes_to_bytes() }
+        ByteIter { iter: AsciiToFe32Iter { iter: self.ascii.iter().copied() }.fes_to_bytes() }
     }
 
     /// Converts this type to a [`SegwitHrpstring`] after validating the witness and HRP.
     #[inline]
     pub fn validate_segwit(mut self) -> Result<SegwitHrpstring<'s>, SegwitHrpstringError> {
-        if self.data.is_empty() {
+        if self.ascii.is_empty() {
             return Err(SegwitHrpstringError::NoData);
         }
 
@@ -295,28 +296,28 @@ impl<'s> CheckedHrpstring<'s> {
         }
 
         // Unwrap ok since check_characters checked the bech32-ness of this char.
-        let witness_version = Fe32::from_char(self.data[0].into()).unwrap();
-        self.data = &self.data[1..]; // Remove the witness version byte from data.
+        let witness_version = Fe32::from_char(self.ascii[0].into()).unwrap();
+        self.ascii = &self.ascii[1..]; // Remove the witness version byte.
 
         self.validate_padding()?;
         self.validate_witness_program_length(witness_version)?;
 
-        Ok(SegwitHrpstring { hrp: self.hrp(), witness_version, data: self.data })
+        Ok(SegwitHrpstring { hrp: self.hrp(), witness_version, ascii: self.ascii })
     }
 
     /// Validates the segwit padding rules.
     ///
-    /// Must be called after the witness version byte is removed from the data.
+    /// Must be called after the witness version byte is removed from the data part.
     ///
     /// From BIP-173:
     /// > Re-arrange those bits into groups of 8 bits. Any incomplete group at the
     /// > end MUST be 4 bits or less, MUST be all zeroes, and is discarded.
     fn validate_padding(&self) -> Result<(), PaddingError> {
-        if self.data.is_empty() {
+        if self.ascii.is_empty() {
             return Ok(()); // Empty data implies correct padding.
         }
 
-        let fe_iter = AsciiToFe32Iter { iter: self.data.iter().copied() };
+        let fe_iter = AsciiToFe32Iter { iter: self.ascii.iter().copied() };
         let padding_len = fe_iter.len() * 5 % 8;
 
         if padding_len > 4 {
@@ -343,7 +344,7 @@ impl<'s> CheckedHrpstring<'s> {
 
     /// Validates the segwit witness length rules.
     ///
-    /// Must be called after the witness version byte is removed from the data.
+    /// Must be called after the witness version byte is removed from the data part.
     fn validate_witness_program_length(
         &self,
         witness_version: Fe32,
@@ -372,11 +373,12 @@ impl<'s> CheckedHrpstring<'s> {
 pub struct SegwitHrpstring<'s> {
     /// The human-readable part, valid for segwit addresses.
     hrp: Hrp,
-    /// The first byte of the parsed data.
+    /// The first byte of the parsed data part.
     witness_version: Fe32,
-    /// This is ASCII byte values of the parsed string, guaranteed to be valid bech32 characters,
-    /// with the witness version and checksum removed.
-    data: &'s [u8],
+    /// This is ASCII byte values of the parsed string, guaranteed to be valid bech32 characters.
+    ///
+    /// The characters after the witness version and before the checksum.
+    ascii: &'s [u8],
 }
 
 impl<'s> SegwitHrpstring<'s> {
@@ -396,12 +398,15 @@ impl<'s> SegwitHrpstring<'s> {
 
         let unchecked = UncheckedHrpstring::new(s)?;
 
-        if unchecked.data.is_empty() {
+        // TODO: Use accessor function.
+        let data_part = unchecked.data_part_ascii;
+
+        if data_part.is_empty() {
             return Err(SegwitHrpstringError::NoData);
         }
 
         // Unwrap ok since check_characters (in `Self::new`) checked the bech32-ness of this char.
-        let witness_version = Fe32::from_char(unchecked.data[0].into()).unwrap();
+        let witness_version = Fe32::from_char(data_part[0].into()).unwrap();
         if witness_version.to_u8() > 16 {
             return Err(SegwitHrpstringError::InvalidWitnessVersion(witness_version));
         }
@@ -429,9 +434,11 @@ impl<'s> SegwitHrpstring<'s> {
     #[inline]
     pub fn new_bech32(s: &'s str) -> Result<Self, SegwitHrpstringError> {
         let unchecked = UncheckedHrpstring::new(s)?;
+        // TODO: Use accessor function.
+        let data_part = unchecked.data_part_ascii;
 
         // Unwrap ok since check_characters (in `Self::new`) checked the bech32-ness of this char.
-        let witness_version = Fe32::from_char(unchecked.data[0].into()).unwrap();
+        let witness_version = Fe32::from_char(data_part[0].into()).unwrap();
         if witness_version.to_u8() > 16 {
             return Err(SegwitHrpstringError::InvalidWitnessVersion(witness_version));
         }
@@ -465,12 +472,12 @@ impl<'s> SegwitHrpstring<'s> {
     /// Use `self.witness_version()` to get the witness version.
     #[inline]
     pub fn byte_iter(&self) -> ByteIter {
-        ByteIter { iter: AsciiToFe32Iter { iter: self.data.iter().copied() }.fes_to_bytes() }
+        ByteIter { iter: AsciiToFe32Iter { iter: self.ascii.iter().copied() }.fes_to_bytes() }
     }
 }
 
-/// Checks whether a given HRP string has data characters in the bech32 alphabet (incl. checksum
-/// characters), and that the whole string has consistent casing (hrp, data, and checksum).
+/// Checks whether a given HRP string has data part characters in the bech32 alphabet (incl.
+/// checksum characters), and that the whole string has consistent casing (hrp and data part).
 ///
 /// # Returns
 ///
