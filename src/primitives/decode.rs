@@ -589,6 +589,7 @@ pub enum SegwitHrpstringError {
     Checksum(ChecksumError),
 }
 
+#[rustfmt::skip]
 impl fmt::Display for SegwitHrpstringError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use SegwitHrpstringError::*;
@@ -596,12 +597,8 @@ impl fmt::Display for SegwitHrpstringError {
         match *self {
             Unchecked(ref e) => write_err!(f, "parsing unchecked hrpstring failed"; e),
             NoData => write!(f, "no data found after removing the checksum"),
-            TooLong(len) => write!(
-                f,
-                "encoded length {} exceeds spec limit {} chars",
-                len,
-                segwit::MAX_STRING_LENGTH
-            ),
+            TooLong(len) =>
+                write!(f, "encoded length {} exceeds spec limit {} chars", len, segwit::MAX_STRING_LENGTH),
             InvalidWitnessVersion(fe) => write!(f, "invalid segwit witness version: {}", fe),
             Padding(ref e) => write_err!(f, "invalid padding on the witness data"; e),
             WitnessLength(ref e) => write_err!(f, "invalid witness length"; e),
