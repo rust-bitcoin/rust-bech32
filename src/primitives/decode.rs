@@ -145,6 +145,25 @@ impl<'s> UncheckedHrpstring<'s> {
     #[inline]
     pub fn hrp(&self) -> Hrp { self.hrp }
 
+    /// Returns the data part as ASCII bytes i.e., everything after the separator '1'.
+    ///
+    /// The byte values are guaranteed to be valid bech32 characters. Includes the checksum
+    /// if one was present in the parsed string.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bech32::primitives::decode::UncheckedHrpstring;
+    ///
+    /// let addr = "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
+    /// let ascii = "qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
+    ///
+    /// let unchecked = UncheckedHrpstring::new(&addr).unwrap();
+    /// assert!(unchecked.data_part_ascii().iter().eq(ascii.as_bytes().iter()))
+    /// ```
+    #[inline]
+    pub fn data_part_ascii(&self) -> &[u8] { self.data_part_ascii }
+
     /// Validates that data has a valid checksum for the `Ck` algorithm and returns a [`CheckedHrpstring`].
     #[inline]
     pub fn validate_and_remove_checksum<Ck: Checksum>(
@@ -275,6 +294,25 @@ impl<'s> CheckedHrpstring<'s> {
     #[inline]
     pub fn hrp(&self) -> Hrp { self.hrp }
 
+    /// Returns a partial slice of the data part, as ASCII bytes, everything after the separator '1'
+    /// before the checksum.
+    ///
+    /// The byte values are guaranteed to be valid bech32 characters.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bech32::{Bech32, primitives::decode::CheckedHrpstring};
+    ///
+    /// let addr = "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
+    /// let ascii = "qar0srrr7xfkvy5l643lydnw9re59gtzz";
+    ///
+    /// let checked = CheckedHrpstring::new::<Bech32>(&addr).unwrap();
+    /// assert!(checked.data_part_ascii_no_checksum().iter().eq(ascii.as_bytes().iter()))
+    /// ```
+    #[inline]
+    pub fn data_part_ascii_no_checksum(&self) -> &[u8] { self.ascii }
+
     /// Returns an iterator that yields the data part of the parsed bech32 encoded string.
     ///
     /// Converts the ASCII bytes representing field elements to the respective field elements, then
@@ -398,8 +436,7 @@ impl<'s> SegwitHrpstring<'s> {
 
         let unchecked = UncheckedHrpstring::new(s)?;
 
-        // TODO: Use accessor function.
-        let data_part = unchecked.data_part_ascii;
+        let data_part = unchecked.data_part_ascii();
 
         if data_part.is_empty() {
             return Err(SegwitHrpstringError::NoData);
@@ -434,8 +471,7 @@ impl<'s> SegwitHrpstring<'s> {
     #[inline]
     pub fn new_bech32(s: &'s str) -> Result<Self, SegwitHrpstringError> {
         let unchecked = UncheckedHrpstring::new(s)?;
-        // TODO: Use accessor function.
-        let data_part = unchecked.data_part_ascii;
+        let data_part = unchecked.data_part_ascii();
 
         // Unwrap ok since check_characters (in `Self::new`) checked the bech32-ness of this char.
         let witness_version = Fe32::from_char(data_part[0].into()).unwrap();
@@ -462,6 +498,25 @@ impl<'s> SegwitHrpstring<'s> {
     /// Returns the witness version.
     #[inline]
     pub fn witness_version(&self) -> Fe32 { self.witness_version }
+
+    /// Returns a partial slice of the data part, as ASCII bytes, everything after the witness
+    /// version and before the checksum.
+    ///
+    /// The byte values are guaranteed to be valid bech32 characters.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bech32::{Bech32, primitives::decode::SegwitHrpstring};
+    ///
+    /// let addr = "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
+    /// let ascii = "ar0srrr7xfkvy5l643lydnw9re59gtzz";
+    ///
+    /// let segwit = SegwitHrpstring::new(&addr).unwrap();
+    /// assert!(segwit.data_part_ascii_no_witver_no_checksum().iter().eq(ascii.as_bytes().iter()))
+    /// ```
+    #[inline]
+    pub fn data_part_ascii_no_witver_no_checksum(&self) -> &[u8] { self.ascii }
 
     /// Returns an iterator that yields the data part, excluding the witness version, of the parsed
     /// bech32 encoded string.
