@@ -164,6 +164,39 @@ impl<'s> UncheckedHrpstring<'s> {
     #[inline]
     pub fn data_part_ascii(&self) -> &[u8] { self.data_part_ascii }
 
+    /// Returns the segwit witness version if there is one.
+    ///
+    /// Attempts to convert the first character of the data part to a witness version. If this
+    /// succeeds, and it is a valid version (0..16 inclusive) we return it, otherwise `None`.
+    ///
+    /// This function makes no guarantees on the validity of the checksum.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bech32::{primitives::decode::UncheckedHrpstring, Fe32};
+    ///
+    /// // Note the invalid checksum!
+    /// let addr = "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzffffff";
+    ///
+    /// let unchecked = UncheckedHrpstring::new(&addr).unwrap();
+    /// assert_eq!(unchecked.witness_version(), Some(Fe32::Q));
+    /// ```
+    #[inline]
+    pub fn witness_version(&self) -> Option<Fe32> {
+        let data_part = self.data_part_ascii();
+        if data_part.is_empty() {
+            return None;
+        }
+
+        // unwrap ok because we know we gave valid bech32 characters.
+        let witness_version = Fe32::from_char(data_part[0].into()).unwrap();
+        if witness_version.to_u8() > 16 {
+            return None;
+        }
+        Some(witness_version)
+    }
+
     /// Validates that data has a valid checksum for the `Ck` algorithm and returns a [`CheckedHrpstring`].
     #[inline]
     pub fn validate_and_remove_checksum<Ck: Checksum>(
