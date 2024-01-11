@@ -164,6 +164,33 @@ impl<'s> UncheckedHrpstring<'s> {
     #[inline]
     pub fn data_part_ascii(&self) -> &[u8] { self.data_part_ascii }
 
+    /// Attempts to remove the first byte of the data part, treating it as a witness version.
+    ///
+    /// If [`Self::witness_version`] succeeds this function removes the first character (witness
+    /// version byte) from the internal ASCII data part buffer. Future calls to
+    /// [`Self::data_part_ascii`] will no longer include it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bech32::{primitives::decode::UncheckedHrpstring, Fe32};
+    ///
+    /// let addr = "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
+    /// let ascii = "ar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
+    ///
+    /// let mut unchecked = UncheckedHrpstring::new(&addr).unwrap();
+    /// let witness_version = unchecked.remove_witness_version().unwrap();
+    /// assert_eq!(witness_version, Fe32::Q);
+    /// assert!(unchecked.data_part_ascii().iter().eq(ascii.as_bytes().iter()))
+    /// ```
+    #[inline]
+    pub fn remove_witness_version(&mut self) -> Option<Fe32> {
+        self.witness_version().map(|witver| {
+            self.data_part_ascii = &self.data_part_ascii[1..]; // Remove the witness version byte.
+            witver
+        })
+    }
+
     /// Returns the segwit witness version if there is one.
     ///
     /// Attempts to convert the first character of the data part to a witness version. If this
