@@ -191,7 +191,7 @@ impl Hrp {
     #[allow(clippy::len_without_is_empty)] // HRP is never empty.
     pub fn len(&self) -> usize { self.size }
 
-    /// Returns `true` if this [`Hrp`] is valid according to the bips.
+    /// Returns `true` if this HRP is valid according to the bips.
     ///
     /// [BIP-173] states that the HRP must be either "bc" or "tb".
     ///
@@ -201,19 +201,19 @@ impl Hrp {
         self.is_valid_on_mainnet() || self.is_valid_on_testnet()
     }
 
-    /// Returns `true` if this hrpstring is valid on the Bitcoin network i.e., HRP is "bc".
+    /// Returns `true` if this HRP is valid on the Bitcoin network i.e., HRP is "bc".
     #[inline]
     pub fn is_valid_on_mainnet(&self) -> bool { *self == self::BC }
 
-    /// Returns `true` if this hrpstring is valid on the Bitcoin testnet network i.e., HRP is "tb".
+    /// Returns `true` if this HRP is valid on the Bitcoin testnet network i.e., HRP is "tb".
     #[inline]
     pub fn is_valid_on_testnet(&self) -> bool { *self == self::TB }
 
-    /// Returns `true` if this hrpstring is valid on the Bitcoin signet network i.e., HRP is "tb".
+    /// Returns `true` if this HRP is valid on the Bitcoin signet network i.e., HRP is "tb".
     #[inline]
     pub fn is_valid_on_signet(&self) -> bool { *self == self::TB }
 
-    /// Returns `true` if this hrpstring is valid on the Bitcoin regtest network i.e., HRP is "bcrt".
+    /// Returns `true` if this HRP is valid on the Bitcoin regtest network i.e., HRP is "bcrt".
     #[inline]
     pub fn is_valid_on_regtest(&self) -> bool { *self == self::BCRT }
 }

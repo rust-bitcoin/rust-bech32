@@ -141,11 +141,8 @@ extern crate alloc;
 extern crate core;
 
 mod error;
-/// Re-exports the hrp types from [`primitives::hrp`] to make importing ergonomic for the top level APIs.
 pub mod hrp;
-/// All the primitive types and functionality used in encoding and decoding.
 pub mod primitives;
-/// API for encoding and decoding segwit addresses.
 pub mod segwit;
 
 #[cfg(all(feature = "alloc", not(feature = "std"), not(test)))]

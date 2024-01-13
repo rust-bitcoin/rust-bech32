@@ -5,7 +5,7 @@
 //! You should only need to use this module directly if you want control over exactly what is
 //! checked and when it is checked (correct bech32 characters, valid checksum, valid checksum for
 //! specific checksum algorithm, etc). If you are parsing/validating modern (post BIP-350) bitcoin
-//! segwit addresses consider using the higher crate level API.
+//! segwit addresses consider using the [`crate::segwit`] API.
 //!
 //! If you do find yourself using this module directly then consider using the most general type
 //! that serves your purposes, each type can be created by parsing an address string to `new`. You

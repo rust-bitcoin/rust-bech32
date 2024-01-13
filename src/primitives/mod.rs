@@ -24,7 +24,7 @@ pub enum Bech32 {}
 
 /// The bech32m checksum algorithm, defined in [BIP-350].
 ///
-/// [BIP-350]: <https://github.com/bitcoin/bips/blob/master/bip-0359.mediawiki>
+/// [BIP-350]: <https://github.com/bitcoin/bips/blob/master/bip-0350.mediawiki>
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Bech32m {}
 
