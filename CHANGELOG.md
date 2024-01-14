@@ -1,6 +1,12 @@
-# 0.10.0-beta.2 - 2024-01-17
+# 0.10.0 - 2024-02-22
 
-- Add accessor functions to the `decode` types [167](https://github.com/rust-bitcoin/rust-bech32/pull/167)
+Release the new `primitives` module! This release is a total re-write of the crate - enjoy.
+
+Right before doing this release we added a few API improvements to the `primitives::decode` module:
+
+- Add accessor functions to the `decode` types [#167](https://github.com/rust-bitcoin/rust-bech32/pull/167)
+- Add `CheckedHrpstring::fe32_iter` function [#174](https://github.com/rust-bitcoin/rust-bech32/pull/174)
+- Make a couple of the functions on `CheckedHrpstring` struct public [#173](https://github.com/rust-bitcoin/rust-bech32/pull/173)
 
 # 0.10.0-beta
 
