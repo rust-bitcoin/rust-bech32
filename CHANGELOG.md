@@ -1,3 +1,7 @@
+# 0.10.0-beta2 - 2024-01-16
+
+- Add accessor functions to the `decode` types [167](https://github.com/rust-bitcoin/rust-bech32/pull/167)
+
 # 0.10.0-beta
 
 Re-implement the crate level API using the new `primitives` module.
