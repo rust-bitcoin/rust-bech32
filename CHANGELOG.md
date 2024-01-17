@@ -1,4 +1,4 @@
-# 0.10.0-beta2 - 2024-01-16
+# 0.10.0-beta.2 - 2024-01-17
 
 - Add accessor functions to the `decode` types [167](https://github.com/rust-bitcoin/rust-bech32/pull/167)
 
