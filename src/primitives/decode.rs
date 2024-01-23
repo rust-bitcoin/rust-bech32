@@ -377,9 +377,7 @@ impl<'s> CheckedHrpstring<'s> {
     ///
     /// Converts the ASCII bytes representing field elements to the respective field elements.
     #[inline]
-    pub fn fe32_iter<I: Iterator<Item = u8>>(
-        &self,
-    ) -> AsciiToFe32Iter<iter::Copied<slice::Iter<'s, u8>>> {
+    pub fn fe32_iter<I: Iterator<Item = u8>>(&self) -> AsciiToFe32Iter {
         AsciiToFe32Iter { iter: self.ascii.iter().copied() }
     }
 
@@ -639,7 +637,7 @@ fn check_characters(s: &str) -> Result<usize, CharError> {
 
 /// An iterator over a parsed HRP string data as bytes.
 pub struct ByteIter<'s> {
-    iter: FesToBytes<AsciiToFe32Iter<iter::Copied<slice::Iter<'s, u8>>>>,
+    iter: FesToBytes<AsciiToFe32Iter<'s>>,
 }
 
 impl<'s> Iterator for ByteIter<'s> {
@@ -657,7 +655,7 @@ impl<'s> ExactSizeIterator for ByteIter<'s> {
 
 /// An iterator over a parsed HRP string data as field elements.
 pub struct Fe32Iter<'s> {
-    iter: AsciiToFe32Iter<iter::Copied<slice::Iter<'s, u8>>>,
+    iter: AsciiToFe32Iter<'s>,
 }
 
 impl<'s> Iterator for Fe32Iter<'s> {
@@ -675,14 +673,11 @@ impl<'s> Iterator for Fe32Iter<'s> {
 ///
 /// If any `u8` in the input iterator is out of range for an [`Fe32`]. Should only be used on data
 /// that has already been checked for validity (eg, by using `check_characters`).
-pub struct AsciiToFe32Iter<I: Iterator<Item = u8>> {
-    iter: I,
+pub struct AsciiToFe32Iter<'s> {
+    iter: iter::Copied<slice::Iter<'s, u8>>,
 }
 
-impl<I> Iterator for AsciiToFe32Iter<I>
-where
-    I: Iterator<Item = u8>,
-{
+impl<'s> Iterator for AsciiToFe32Iter<'s> {
     type Item = Fe32;
     #[inline]
     fn next(&mut self) -> Option<Fe32> { self.iter.next().map(Fe32::from_char_unchecked) }
@@ -693,10 +688,7 @@ where
     }
 }
 
-impl<I> ExactSizeIterator for AsciiToFe32Iter<I>
-where
-    I: Iterator<Item = u8> + ExactSizeIterator,
-{
+impl<'s> ExactSizeIterator for AsciiToFe32Iter<'s> {
     #[inline]
     fn len(&self) -> usize { self.iter.len() }
 }
