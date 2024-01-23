@@ -397,7 +397,7 @@ impl<'s> CheckedHrpstring<'s> {
         let witness_version = Fe32::from_char(self.ascii[0].into()).unwrap();
         self.ascii = &self.ascii[1..]; // Remove the witness version byte.
 
-        self.validate_padding()?;
+        self.validate_segwit_padding()?;
         self.validate_witness_program_length(witness_version)?;
 
         Ok(SegwitHrpstring { hrp: self.hrp(), witness_version, ascii: self.ascii })
@@ -410,7 +410,8 @@ impl<'s> CheckedHrpstring<'s> {
     /// From BIP-173:
     /// > Re-arrange those bits into groups of 8 bits. Any incomplete group at the
     /// > end MUST be 4 bits or less, MUST be all zeroes, and is discarded.
-    fn validate_padding(&self) -> Result<(), PaddingError> {
+    #[inline]
+    pub fn validate_segwit_padding(&self) -> Result<(), PaddingError> {
         if self.ascii.is_empty() {
             return Ok(()); // Empty data implies correct padding.
         }
