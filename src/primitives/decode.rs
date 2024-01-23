@@ -444,7 +444,8 @@ impl<'s> CheckedHrpstring<'s> {
     /// Validates the segwit witness length rules.
     ///
     /// Must be called after the witness version byte is removed from the data part.
-    fn validate_witness_program_length(
+    #[inline]
+    pub fn validate_witness_program_length(
         &self,
         witness_version: Fe32,
     ) -> Result<(), WitnessLengthError> {
