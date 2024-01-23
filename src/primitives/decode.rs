@@ -162,7 +162,7 @@ impl<'s> UncheckedHrpstring<'s> {
     /// assert!(unchecked.data_part_ascii().iter().eq(ascii.as_bytes().iter()))
     /// ```
     #[inline]
-    pub fn data_part_ascii(&self) -> &[u8] { self.data_part_ascii }
+    pub fn data_part_ascii(&self) -> &'s [u8] { self.data_part_ascii }
 
     /// Attempts to remove the first byte of the data part, treating it as a witness version.
     ///
@@ -371,7 +371,7 @@ impl<'s> CheckedHrpstring<'s> {
     /// assert!(checked.data_part_ascii_no_checksum().iter().eq(ascii.as_bytes().iter()))
     /// ```
     #[inline]
-    pub fn data_part_ascii_no_checksum(&self) -> &[u8] { self.ascii }
+    pub fn data_part_ascii_no_checksum(&self) -> &'s [u8] { self.ascii }
 
     /// Returns an iterator that yields the data part of the parsed bech32 encoded string.
     ///
@@ -576,7 +576,7 @@ impl<'s> SegwitHrpstring<'s> {
     /// assert!(segwit.data_part_ascii_no_witver_no_checksum().iter().eq(ascii.as_bytes().iter()))
     /// ```
     #[inline]
-    pub fn data_part_ascii_no_witver_no_checksum(&self) -> &[u8] { self.ascii }
+    pub fn data_part_ascii_no_witver_no_checksum(&self) -> &'s [u8] { self.ascii }
 
     /// Returns an iterator that yields the data part, excluding the witness version, of the parsed
     /// bech32 encoded string.
