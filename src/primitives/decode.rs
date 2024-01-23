@@ -373,6 +373,16 @@ impl<'s> CheckedHrpstring<'s> {
     #[inline]
     pub fn data_part_ascii_no_checksum(&self) -> &[u8] { self.ascii }
 
+    /// Returns an iterator that yields the data part of the parsed bech32 encoded string as [`Fe32`]s.
+    ///
+    /// Converts the ASCII bytes representing field elements to the respective field elements.
+    #[inline]
+    pub fn fe32_iter<I: Iterator<Item = u8>>(
+        &self,
+    ) -> AsciiToFe32Iter<iter::Copied<slice::Iter<'s, u8>>> {
+        AsciiToFe32Iter { iter: self.ascii.iter().copied() }
+    }
+
     /// Returns an iterator that yields the data part of the parsed bech32 encoded string.
     ///
     /// Converts the ASCII bytes representing field elements to the respective field elements, then
@@ -658,14 +668,14 @@ impl<'s> Iterator for Fe32Iter<'s> {
     fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
 }
 
-/// Helper iterator adaptor that maps an iterator of valid bech32 character ASCII bytes to an
+/// Iterator adaptor that maps an iterator of valid bech32 character ASCII bytes to an
 /// iterator of field elements.
 ///
 /// # Panics
 ///
 /// If any `u8` in the input iterator is out of range for an [`Fe32`]. Should only be used on data
 /// that has already been checked for validity (eg, by using `check_characters`).
-struct AsciiToFe32Iter<I: Iterator<Item = u8>> {
+pub struct AsciiToFe32Iter<I: Iterator<Item = u8>> {
     iter: I,
 }
 
