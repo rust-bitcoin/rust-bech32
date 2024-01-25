@@ -1041,6 +1041,7 @@ impl std::error::Error for SegwitCodeLengthError {
 }
 
 impl From<CodeLengthError> for SegwitCodeLengthError {
+    #[inline]
     fn from(e: CodeLengthError) -> Self { Self(e.encoded_length) }
 }
 
