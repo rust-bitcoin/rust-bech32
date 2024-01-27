@@ -221,7 +221,7 @@ impl Hrp {
 /// Displays the human-readable part.
 ///
 /// If an uppercase HRP was parsed during object construction then the returned string will be
-/// in uppercase also. For a lowercase string see [`Self::to_lowercase`].
+/// in uppercase also. For a lowercase string see `Self::to_lowercase`.
 impl fmt::Display for Hrp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for c in self.char_iter() {
