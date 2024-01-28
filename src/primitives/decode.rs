@@ -196,6 +196,9 @@ impl<'s> UncheckedHrpstring<'s> {
     /// Attempts to convert the first character of the data part to a witness version. If this
     /// succeeds, and it is a valid version (0..16 inclusive) we return it, otherwise `None`.
     ///
+    /// Future calls to [`Self::data_part_ascii`] will still include the witness version, use
+    /// [`Self::remove_witness_version`] to remove it.
+    ///
     /// This function makes no guarantees on the validity of the checksum.
     ///
     /// # Examples
