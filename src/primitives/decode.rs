@@ -376,6 +376,68 @@ impl<'s> CheckedHrpstring<'s> {
     #[inline]
     pub fn data_part_ascii_no_checksum(&self) -> &'s [u8] { self.ascii }
 
+    /// Attempts to remove the first byte of the data part, treating it as a witness version.
+    ///
+    /// If [`Self::witness_version`] succeeds this function removes the first character (witness
+    /// version byte) from the internal ASCII data part buffer. Future calls to
+    /// [`Self::data_part_ascii_no_checksum`] will no longer include it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bech32::{primitives::decode::CheckedHrpstring, Bech32, Fe32};
+    ///
+    /// let addr = "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
+    /// let ascii = "ar0srrr7xfkvy5l643lydnw9re59gtzz";
+    ///
+    /// let mut checked = CheckedHrpstring::new::<Bech32>(&addr).unwrap();
+    /// let witness_version = checked.remove_witness_version().unwrap();
+    /// assert_eq!(witness_version, Fe32::Q);
+    /// assert!(checked.data_part_ascii_no_checksum().iter().eq(ascii.as_bytes().iter()))
+    /// ```
+    #[inline]
+    pub fn remove_witness_version(&mut self) -> Option<Fe32> {
+        self.witness_version().map(|witver| {
+            self.ascii = &self.ascii[1..]; // Remove the witness version byte.
+            witver
+        })
+    }
+
+    /// Returns the segwit witness version if there is one.
+    ///
+    /// Attempts to convert the first character of the data part to a witness version. If this
+    /// succeeds, and it is a valid version (0..16 inclusive) we return it, otherwise `None`.
+    ///
+    /// Future calls to [`Self::data_part_ascii_no_checksum`] will still include the witness
+    /// version, use [`Self::remove_witness_version`] to remove it.
+    ///
+    /// This function makes no guarantees on the validity of the checksum.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bech32::{primitives::decode::CheckedHrpstring, Bech32, Fe32};
+    ///
+    /// let addr = "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
+    ///
+    /// let checked = CheckedHrpstring::new::<Bech32>(&addr).unwrap();
+    /// assert_eq!(checked.witness_version(), Some(Fe32::Q));
+    /// ```
+    #[inline]
+    pub fn witness_version(&self) -> Option<Fe32> {
+        let data_part = self.data_part_ascii_no_checksum();
+        if data_part.is_empty() {
+            return None;
+        }
+
+        // unwrap ok because we know we gave valid bech32 characters.
+        let witness_version = Fe32::from_char(data_part[0].into()).unwrap();
+        if witness_version.to_u8() > 16 {
+            return None;
+        }
+        Some(witness_version)
+    }
+
     /// Returns an iterator that yields the data part of the parsed bech32 encoded string as [`Fe32`]s.
     ///
     /// Converts the ASCII bytes representing field elements to the respective field elements.
