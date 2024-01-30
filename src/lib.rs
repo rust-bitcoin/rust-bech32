@@ -13,7 +13,7 @@
 //!
 //! - If you are doing segwit stuff you likely want to use the [`segwit`] API.
 //! - Non-segwit stuff and you have an allocator, use the top level API. For normal usage the
-//!   [`encode`] and [`decode`] functions should suffice. There are also various other functions for
+//!   `encode` and `decode` functions should suffice. There are also various other functions for
 //!   explicit control of the checksum algorithm and the case used when encoding.
 //! - Non-segwit stuff and you do *not* have an allocator, use the [`CheckedHrpstring`] type for
 //!   decoding. For encoding we provide various top level functions of the form `encode*_to_fmt`.

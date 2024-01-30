@@ -374,6 +374,7 @@ impl From<SegwitHrpstringError> for DecodeError {
 /// An error while constructing a [`SegwitHrpstring`] type.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
+#[cfg(feature = "alloc")]
 pub enum EncodeError {
     /// Invalid witness version (must be 0-16 inclusive).
     WitnessVersion(InvalidWitnessVersionError),
@@ -385,6 +386,7 @@ pub enum EncodeError {
     Fmt(fmt::Error),
 }
 
+#[cfg(feature = "alloc")]
 impl fmt::Display for EncodeError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use EncodeError::*;
@@ -399,6 +401,7 @@ impl fmt::Display for EncodeError {
 }
 
 #[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl std::error::Error for EncodeError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         use EncodeError::*;
@@ -412,21 +415,25 @@ impl std::error::Error for EncodeError {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl From<InvalidWitnessVersionError> for EncodeError {
     #[inline]
     fn from(e: InvalidWitnessVersionError) -> Self { Self::WitnessVersion(e) }
 }
 
+#[cfg(feature = "alloc")]
 impl From<WitnessLengthError> for EncodeError {
     #[inline]
     fn from(e: WitnessLengthError) -> Self { Self::WitnessLength(e) }
 }
 
+#[cfg(feature = "alloc")]
 impl From<SegwitCodeLengthError> for EncodeError {
     #[inline]
     fn from(e: SegwitCodeLengthError) -> Self { Self::TooLong(e) }
 }
 
+#[cfg(feature = "alloc")]
 impl From<fmt::Error> for EncodeError {
     #[inline]
     fn from(e: fmt::Error) -> Self { Self::Fmt(e) }
