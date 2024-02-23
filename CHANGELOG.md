@@ -1,4 +1,10 @@
-# 0.10.0 - 2024-02-22
+# 0.11.0 - 2024-02-23
+
+The `0.10.0` release contains API breaking changes compared to `0.10.0-beta` and because of semver
+rules (which we adhere to) cannot be released with that version number, we had to yank it and re-do
+the release as `0.11.0` - sorry.
+
+# 0.10.0 - 2024-02-22 - yanked
 
 Release the new `primitives` module! This release is a total re-write of the crate - enjoy.
 
