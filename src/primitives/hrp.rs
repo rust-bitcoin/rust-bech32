@@ -393,7 +393,7 @@ impl fmt::Display for Error {
         use Error::*;
 
         match *self {
-            TooLong(len) => write!(f, "hrp is too long, found {} characters, must be <= 126", len),
+            TooLong(len) => write!(f, "hrp is too long, found {} characters, must be <= {}", len, MAX_HRP_LEN),
             Empty => write!(f, "hrp is empty, must have at least 1 character"),
             NonAsciiChar(c) => write!(f, "found non-ASCII character: {}", c),
             InvalidAsciiByte(b) => write!(f, "byte value is not valid US-ASCII: \'{:x}\'", b),
@@ -536,5 +536,14 @@ mod tests {
         let s = "arbitraryhrp";
         let hrp = Hrp::parse_unchecked(s);
         assert_eq!(hrp.as_bytes(), s.as_bytes());
+    }
+
+    #[test]
+    fn error_messages() {
+        assert_eq!("hrp is too long, found 92 characters, must be <= 83", Error::TooLong(92).to_string());
+        assert_eq!("hrp is empty, must have at least 1 character", Error::Empty.to_string());
+        assert_eq!("found non-ASCII character: 😊", Error::NonAsciiChar('😊').to_string());
+        assert_eq!("byte value is not valid US-ASCII: 'ff'", Error::InvalidAsciiByte(255).to_string());
+        assert_eq!("hrp cannot mix upper and lower case", Error::MixedCase.to_string());
     }
 }
