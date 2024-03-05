@@ -393,7 +393,8 @@ impl fmt::Display for Error {
         use Error::*;
 
         match *self {
-            TooLong(len) => write!(f, "hrp is too long, found {} characters, must be <= {}", len, MAX_HRP_LEN),
+            TooLong(len) =>
+                write!(f, "hrp is too long, found {} characters, must be <= {}", len, MAX_HRP_LEN),
             Empty => write!(f, "hrp is empty, must have at least 1 character"),
             NonAsciiChar(c) => write!(f, "found non-ASCII character: {}", c),
             InvalidAsciiByte(b) => write!(f, "byte value is not valid US-ASCII: \'{:x}\'", b),
