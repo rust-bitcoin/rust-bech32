@@ -7,6 +7,7 @@ pub mod decode;
 pub mod encode;
 mod field;
 pub mod gf32;
+pub mod gf32_ext;
 pub mod hrp;
 pub mod iter;
 pub mod segwit;
