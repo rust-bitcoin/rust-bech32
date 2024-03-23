@@ -5,12 +5,15 @@
 pub mod checksum;
 pub mod decode;
 pub mod encode;
+mod field;
 pub mod gf32;
 pub mod hrp;
 pub mod iter;
 pub mod segwit;
 
 use checksum::{Checksum, PackedNull};
+use field::impl_ops_for_fe;
+pub use field::{ExtensionField, Field};
 
 /// The "null checksum" used on bech32 strings for which we want to do no checksum checking.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
