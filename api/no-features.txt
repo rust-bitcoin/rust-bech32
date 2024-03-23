@@ -14,6 +14,7 @@
 #[non_exhaustive] pub struct bech32::primitives::segwit::InvalidWitnessVersionError(pub bech32::primitives::gf32::Fe32)
 #[repr(transparent)] pub struct bech32::Fe32(_)
 #[repr(transparent)] pub struct bech32::primitives::gf32::Fe32(_)
+impl bech32::primitives::Field for bech32::primitives::gf32::Fe32
 impl bech32::primitives::checksum::Checksum for bech32::primitives::Bech32
 impl bech32::primitives::checksum::Checksum for bech32::primitives::Bech32m
 impl bech32::primitives::checksum::Checksum for bech32::primitives::NoChecksum
@@ -266,21 +267,26 @@ impl core::ops::arith::Add<&bech32::primitives::gf32::Fe32> for &bech32::primiti
 impl core::ops::arith::Add<&bech32::primitives::gf32::Fe32> for bech32::primitives::gf32::Fe32
 impl core::ops::arith::Add<bech32::primitives::gf32::Fe32> for &bech32::primitives::gf32::Fe32
 impl core::ops::arith::AddAssign for bech32::primitives::gf32::Fe32
+impl core::ops::arith::AddAssign<&bech32::primitives::gf32::Fe32> for bech32::primitives::gf32::Fe32
 impl core::ops::arith::Div for bech32::primitives::gf32::Fe32
 impl core::ops::arith::Div<&bech32::primitives::gf32::Fe32> for &bech32::primitives::gf32::Fe32
 impl core::ops::arith::Div<&bech32::primitives::gf32::Fe32> for bech32::primitives::gf32::Fe32
 impl core::ops::arith::Div<bech32::primitives::gf32::Fe32> for &bech32::primitives::gf32::Fe32
 impl core::ops::arith::DivAssign for bech32::primitives::gf32::Fe32
+impl core::ops::arith::DivAssign<&bech32::primitives::gf32::Fe32> for bech32::primitives::gf32::Fe32
 impl core::ops::arith::Mul for bech32::primitives::gf32::Fe32
 impl core::ops::arith::Mul<&bech32::primitives::gf32::Fe32> for &bech32::primitives::gf32::Fe32
 impl core::ops::arith::Mul<&bech32::primitives::gf32::Fe32> for bech32::primitives::gf32::Fe32
 impl core::ops::arith::Mul<bech32::primitives::gf32::Fe32> for &bech32::primitives::gf32::Fe32
 impl core::ops::arith::MulAssign for bech32::primitives::gf32::Fe32
+impl core::ops::arith::MulAssign<&bech32::primitives::gf32::Fe32> for bech32::primitives::gf32::Fe32
+impl core::ops::arith::Neg for bech32::primitives::gf32::Fe32
 impl core::ops::arith::Sub for bech32::primitives::gf32::Fe32
 impl core::ops::arith::Sub<&bech32::primitives::gf32::Fe32> for &bech32::primitives::gf32::Fe32
 impl core::ops::arith::Sub<&bech32::primitives::gf32::Fe32> for bech32::primitives::gf32::Fe32
 impl core::ops::arith::Sub<bech32::primitives::gf32::Fe32> for &bech32::primitives::gf32::Fe32
 impl core::ops::arith::SubAssign for bech32::primitives::gf32::Fe32
+impl core::ops::arith::SubAssign<&bech32::primitives::gf32::Fe32> for bech32::primitives::gf32::Fe32
 impl core::ops::bit::BitXor for bech32::primitives::checksum::PackedNull
 impl core::panic::unwind_safe::RefUnwindSafe for bech32::EncodeError
 impl core::panic::unwind_safe::RefUnwindSafe for bech32::primitives::Bech32
@@ -556,6 +562,14 @@ pub const bech32::primitives::Bech32m::CHECKSUM_LENGTH: usize
 pub const bech32::primitives::Bech32m::CODE_LENGTH: usize
 pub const bech32::primitives::Bech32m::GENERATOR_SH: [u32; 5]
 pub const bech32::primitives::Bech32m::TARGET_RESIDUE: u32
+pub const bech32::primitives::ExtensionField::DEGREE: usize
+pub const bech32::primitives::ExtensionField::EXT_ELEM: Self
+pub const bech32::primitives::ExtensionField::POLYNOMIAL: Self
+pub const bech32::primitives::Field::GENERATOR: Self
+pub const bech32::primitives::Field::MULTIPLICATIVE_ORDER: usize
+pub const bech32::primitives::Field::MULTIPLICATIVE_ORDER_FACTORS: &'static [usize]
+pub const bech32::primitives::Field::ONE: Self
+pub const bech32::primitives::Field::ZERO: Self
 pub const bech32::primitives::NoChecksum::CHECKSUM_LENGTH: usize
 pub const bech32::primitives::NoChecksum::CODE_LENGTH: usize
 pub const bech32::primitives::NoChecksum::GENERATOR_SH: [bech32::primitives::checksum::PackedNull; 5]
@@ -573,12 +587,16 @@ pub const bech32::primitives::gf32::Fe32::D: bech32::primitives::gf32::Fe32
 pub const bech32::primitives::gf32::Fe32::E: bech32::primitives::gf32::Fe32
 pub const bech32::primitives::gf32::Fe32::F: bech32::primitives::gf32::Fe32
 pub const bech32::primitives::gf32::Fe32::G: bech32::primitives::gf32::Fe32
+pub const bech32::primitives::gf32::Fe32::GENERATOR: Self
 pub const bech32::primitives::gf32::Fe32::H: bech32::primitives::gf32::Fe32
 pub const bech32::primitives::gf32::Fe32::J: bech32::primitives::gf32::Fe32
 pub const bech32::primitives::gf32::Fe32::K: bech32::primitives::gf32::Fe32
 pub const bech32::primitives::gf32::Fe32::L: bech32::primitives::gf32::Fe32
 pub const bech32::primitives::gf32::Fe32::M: bech32::primitives::gf32::Fe32
+pub const bech32::primitives::gf32::Fe32::MULTIPLICATIVE_ORDER: usize
+pub const bech32::primitives::gf32::Fe32::MULTIPLICATIVE_ORDER_FACTORS: &'static [usize]
 pub const bech32::primitives::gf32::Fe32::N: bech32::primitives::gf32::Fe32
+pub const bech32::primitives::gf32::Fe32::ONE: Self
 pub const bech32::primitives::gf32::Fe32::P: bech32::primitives::gf32::Fe32
 pub const bech32::primitives::gf32::Fe32::Q: bech32::primitives::gf32::Fe32
 pub const bech32::primitives::gf32::Fe32::R: bech32::primitives::gf32::Fe32
@@ -590,6 +608,7 @@ pub const bech32::primitives::gf32::Fe32::W: bech32::primitives::gf32::Fe32
 pub const bech32::primitives::gf32::Fe32::X: bech32::primitives::gf32::Fe32
 pub const bech32::primitives::gf32::Fe32::Y: bech32::primitives::gf32::Fe32
 pub const bech32::primitives::gf32::Fe32::Z: bech32::primitives::gf32::Fe32
+pub const bech32::primitives::gf32::Fe32::ZERO: Self
 pub const bech32::primitives::gf32::Fe32::_0: bech32::primitives::gf32::Fe32
 pub const bech32::primitives::gf32::Fe32::_2: bech32::primitives::gf32::Fe32
 pub const bech32::primitives::gf32::Fe32::_3: bech32::primitives::gf32::Fe32
@@ -648,6 +667,14 @@ pub fn bech32::primitives::Bech32m::cmp(&self, other: &bech32::primitives::Bech3
 pub fn bech32::primitives::Bech32m::eq(&self, other: &bech32::primitives::Bech32m) -> bool
 pub fn bech32::primitives::Bech32m::hash<__H: core::hash::Hasher>(&self, state: &mut __H)
 pub fn bech32::primitives::Bech32m::partial_cmp(&self, other: &bech32::primitives::Bech32m) -> core::option::Option<core::cmp::Ordering>
+pub fn bech32::primitives::Field::_add(&self, other: &Self) -> Self
+pub fn bech32::primitives::Field::_div(&self, other: &Self) -> Self
+pub fn bech32::primitives::Field::_mul(&self, other: &Self) -> Self
+pub fn bech32::primitives::Field::_neg(self) -> Self
+pub fn bech32::primitives::Field::_sub(&self, other: &Self) -> Self
+pub fn bech32::primitives::Field::multiplicative_inverse(self) -> Self
+pub fn bech32::primitives::Field::multiplicative_order(&self) -> usize
+pub fn bech32::primitives::Field::powi(&self, n: i64) -> Self
 pub fn bech32::primitives::NoChecksum::clone(&self) -> bech32::primitives::NoChecksum
 pub fn bech32::primitives::NoChecksum::cmp(&self, other: &bech32::primitives::NoChecksum) -> core::cmp::Ordering
 pub fn bech32::primitives::NoChecksum::eq(&self, other: &bech32::primitives::NoChecksum) -> bool
@@ -761,13 +788,20 @@ pub fn bech32::primitives::encode::Fe32Iter<'hrp, I, Ck>::size_hint(&self) -> (u
 pub fn bech32::primitives::encode::WitnessVersionIter<I>::new(witness_version: core::option::Option<bech32::primitives::gf32::Fe32>, iter: I) -> Self
 pub fn bech32::primitives::encode::WitnessVersionIter<I>::next(&mut self) -> core::option::Option<bech32::primitives::gf32::Fe32>
 pub fn bech32::primitives::encode::WitnessVersionIter<I>::size_hint(&self) -> (usize, core::option::Option<usize>)
+pub fn bech32::primitives::gf32::Fe32::_add(&self, other: &bech32::primitives::gf32::Fe32) -> bech32::primitives::gf32::Fe32
+pub fn bech32::primitives::gf32::Fe32::_div(&self, other: &bech32::primitives::gf32::Fe32) -> bech32::primitives::gf32::Fe32
+pub fn bech32::primitives::gf32::Fe32::_mul(&self, other: &bech32::primitives::gf32::Fe32) -> bech32::primitives::gf32::Fe32
+pub fn bech32::primitives::gf32::Fe32::_neg(self) -> Self
+pub fn bech32::primitives::gf32::Fe32::_sub(&self, other: &bech32::primitives::gf32::Fe32) -> bech32::primitives::gf32::Fe32
 pub fn bech32::primitives::gf32::Fe32::add(self, other: &bech32::primitives::gf32::Fe32) -> bech32::primitives::gf32::Fe32
 pub fn bech32::primitives::gf32::Fe32::add(self, other: bech32::primitives::gf32::Fe32) -> bech32::primitives::gf32::Fe32
+pub fn bech32::primitives::gf32::Fe32::add_assign(&mut self, other: &bech32::primitives::gf32::Fe32)
 pub fn bech32::primitives::gf32::Fe32::add_assign(&mut self, other: bech32::primitives::gf32::Fe32)
 pub fn bech32::primitives::gf32::Fe32::as_ref(&self) -> &u8
 pub fn bech32::primitives::gf32::Fe32::clone(&self) -> bech32::primitives::gf32::Fe32
 pub fn bech32::primitives::gf32::Fe32::div(self, other: &bech32::primitives::gf32::Fe32) -> bech32::primitives::gf32::Fe32
 pub fn bech32::primitives::gf32::Fe32::div(self, other: bech32::primitives::gf32::Fe32) -> bech32::primitives::gf32::Fe32
+pub fn bech32::primitives::gf32::Fe32::div_assign(&mut self, other: &bech32::primitives::gf32::Fe32)
 pub fn bech32::primitives::gf32::Fe32::div_assign(&mut self, other: bech32::primitives::gf32::Fe32)
 pub fn bech32::primitives::gf32::Fe32::eq(&self, other: &bech32::primitives::gf32::Fe32) -> bool
 pub fn bech32::primitives::gf32::Fe32::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
@@ -777,9 +811,13 @@ pub fn bech32::primitives::gf32::Fe32::hash<__H: core::hash::Hasher>(&self, stat
 pub fn bech32::primitives::gf32::Fe32::iter_alpha() -> impl core::iter::traits::iterator::Iterator<Item = bech32::primitives::gf32::Fe32>
 pub fn bech32::primitives::gf32::Fe32::mul(self, other: &bech32::primitives::gf32::Fe32) -> bech32::primitives::gf32::Fe32
 pub fn bech32::primitives::gf32::Fe32::mul(self, other: bech32::primitives::gf32::Fe32) -> bech32::primitives::gf32::Fe32
+pub fn bech32::primitives::gf32::Fe32::mul_assign(&mut self, other: &bech32::primitives::gf32::Fe32)
 pub fn bech32::primitives::gf32::Fe32::mul_assign(&mut self, other: bech32::primitives::gf32::Fe32)
+pub fn bech32::primitives::gf32::Fe32::multiplicative_inverse(self) -> Self
+pub fn bech32::primitives::gf32::Fe32::neg(self) -> Self
 pub fn bech32::primitives::gf32::Fe32::sub(self, other: &bech32::primitives::gf32::Fe32) -> bech32::primitives::gf32::Fe32
 pub fn bech32::primitives::gf32::Fe32::sub(self, other: bech32::primitives::gf32::Fe32) -> bech32::primitives::gf32::Fe32
+pub fn bech32::primitives::gf32::Fe32::sub_assign(&mut self, other: &bech32::primitives::gf32::Fe32)
 pub fn bech32::primitives::gf32::Fe32::sub_assign(&mut self, other: bech32::primitives::gf32::Fe32)
 pub fn bech32::primitives::gf32::Fe32::to_char(self) -> char
 pub fn bech32::primitives::gf32::Fe32::to_u8(self) -> u8
@@ -916,6 +954,8 @@ pub struct bech32::primitives::iter::FesToBytes<I: core::iter::traits::iterator:
 pub trait bech32::ByteIterExt: core::marker::Sized + core::iter::traits::iterator::Iterator<Item = u8>
 pub trait bech32::Checksum
 pub trait bech32::Fe32IterExt: core::marker::Sized + core::iter::traits::iterator::Iterator<Item = bech32::primitives::gf32::Fe32>
+pub trait bech32::primitives::ExtensionField: bech32::primitives::Field + core::convert::From<Self::BaseField>
+pub trait bech32::primitives::Field: core::marker::Sized + core::cmp::PartialEq + core::cmp::Eq + core::clone::Clone + core::hash::Hash + core::fmt::Debug + core::fmt::Display + core::ops::arith::Add<Self, Output = Self> + core::ops::arith::Sub<Self, Output = Self> + core::ops::arith::AddAssign + core::ops::arith::SubAssign + core::ops::arith::Mul<Self, Output = Self> + core::ops::arith::MulAssign + core::ops::arith::Div<Self, Output = Self> + core::ops::arith::DivAssign + for<'a> core::ops::arith::Add<&'a Self, Output = Self> + for<'a> core::ops::arith::AddAssign<&'a Self> + for<'a> core::ops::arith::Sub<&'a Self, Output = Self> + for<'a> core::ops::arith::SubAssign<&'a Self> + for<'a> core::ops::arith::Mul<&'a Self, Output = Self> + for<'a> core::ops::arith::MulAssign<&'a Self> + for<'a> core::ops::arith::Div<&'a Self, Output = Self> + for<'a> core::ops::arith::DivAssign<&'a Self> + core::ops::arith::Neg
 pub trait bech32::primitives::checksum::Checksum
 pub trait bech32::primitives::checksum::PackedFe32: core::marker::Copy + core::cmp::PartialEq + core::cmp::Eq + core::ops::bit::BitXor<Self, Output = Self>
 pub trait bech32::primitives::iter::ByteIterExt: core::marker::Sized + core::iter::traits::iterator::Iterator<Item = u8>
@@ -924,6 +964,7 @@ pub type &bech32::primitives::gf32::Fe32::Output = bech32::primitives::gf32::Fe3
 pub type bech32::Checksum::MidstateRepr: bech32::primitives::checksum::PackedFe32
 pub type bech32::primitives::Bech32::MidstateRepr = u32
 pub type bech32::primitives::Bech32m::MidstateRepr = u32
+pub type bech32::primitives::ExtensionField::BaseField: bech32::primitives::Field
 pub type bech32::primitives::NoChecksum::MidstateRepr = bech32::primitives::checksum::PackedNull
 pub type bech32::primitives::checksum::Checksum::MidstateRepr: bech32::primitives::checksum::PackedFe32
 pub type bech32::primitives::checksum::HrpFe32Iter<'hrp>::Item = bech32::primitives::gf32::Fe32

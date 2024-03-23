@@ -13,7 +13,7 @@
 //! [BIP-173]: <https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki>
 
 use core::convert::{Infallible, TryFrom};
-use core::{fmt, num, ops};
+use core::{fmt, num};
 
 #[cfg(all(test, mutate))]
 use mutagen::mutate;
@@ -215,35 +215,6 @@ impl Fe32 {
     /// of the polynomial representation.
     #[inline]
     pub fn to_u8(self) -> u8 { self.0 }
-
-    fn _add(self, other: Fe32) -> Fe32 { Fe32(self.0 ^ other.0) }
-
-    // Subtraction is the same as addition in a char-2 field.
-    fn _sub(self, other: Fe32) -> Fe32 { self + other }
-
-    #[cfg_attr(all(test, mutate), mutate)]
-    fn _mul(self, other: Fe32) -> Fe32 {
-        if self.0 == 0 || other.0 == 0 {
-            Fe32(0)
-        } else {
-            let log1 = LOG[self.0 as usize];
-            let log2 = LOG[other.0 as usize];
-            Fe32(LOG_INV[((log1 + log2) % 31) as usize])
-        }
-    }
-
-    #[cfg_attr(all(test, mutate), mutate)]
-    fn _div(self, other: Fe32) -> Fe32 {
-        if self.0 == 0 {
-            Fe32(0)
-        } else if other.0 == 0 {
-            panic!("Attempt to divide {} by 0 in GF32", self);
-        } else {
-            let log1 = LOG[self.0 as usize];
-            let log2 = LOG[other.0 as usize];
-            Fe32(LOG_INV[((31 + log1 - log2) % 31) as usize])
-        }
-    }
 }
 
 impl fmt::Display for Fe32 {
@@ -285,58 +256,45 @@ impl AsRef<u8> for Fe32 {
     fn as_ref(&self) -> &u8 { &self.0 }
 }
 
-/// Implements $op for the 2x2 matrix of type by ref to type
-macro_rules! impl_op_matrix {
-    ($op:ident, $op_fn:ident, $call_fn:ident) => {
-        impl ops::$op<Fe32> for Fe32 {
-            type Output = Fe32;
-            #[inline]
-            fn $op_fn(self, other: Fe32) -> Fe32 { self.$call_fn(other) }
+impl super::Field for Fe32 {
+    const ZERO: Self = Fe32::Q;
+    const ONE: Self = Fe32::P;
+    const GENERATOR: Self = Fe32::Z;
+    const MULTIPLICATIVE_ORDER: usize = 31;
+    const MULTIPLICATIVE_ORDER_FACTORS: &'static [usize] = &[1, 31];
+
+    fn _add(&self, other: &Fe32) -> Fe32 { Fe32(self.0 ^ other.0) }
+    // Subtraction is the same as addition in a characteristic-2 field
+    fn _sub(&self, other: &Fe32) -> Fe32 { self._add(other) }
+    fn _mul(&self, other: &Fe32) -> Fe32 {
+        if self.0 == 0 || other.0 == 0 {
+            Fe32(0)
+        } else {
+            let log1 = LOG[self.0 as usize];
+            let log2 = LOG[other.0 as usize];
+            let mult_order = Self::MULTIPLICATIVE_ORDER as isize;
+            Fe32(LOG_INV[((log1 + log2) % mult_order) as usize])
         }
-
-        impl ops::$op<Fe32> for &Fe32 {
-            type Output = Fe32;
-            #[inline]
-            fn $op_fn(self, other: Fe32) -> Fe32 { self.$call_fn(other) }
+    }
+    fn _div(&self, other: &Fe32) -> Fe32 {
+        if self.0 == 0 {
+            Fe32(0)
+        } else if other.0 == 0 {
+            panic!("Attempt to divide {} by 0 in GF32", self);
+        } else {
+            let log1 = LOG[self.0 as usize];
+            let log2 = LOG[other.0 as usize];
+            let mult_order = Self::MULTIPLICATIVE_ORDER as isize;
+            Fe32(LOG_INV[((mult_order + log1 - log2) % mult_order) as usize])
         }
+    }
 
-        impl ops::$op<&Fe32> for Fe32 {
-            type Output = Fe32;
-            #[inline]
-            fn $op_fn(self, other: &Fe32) -> Fe32 { self.$call_fn(*other) }
-        }
+    fn _neg(self) -> Self { self }
 
-        impl ops::$op<&Fe32> for &Fe32 {
-            type Output = Fe32;
-            #[inline]
-            fn $op_fn(self, other: &Fe32) -> Fe32 { self.$call_fn(*other) }
-        }
-    };
-}
-impl_op_matrix!(Add, add, _add);
-impl_op_matrix!(Sub, sub, _sub);
-impl_op_matrix!(Mul, mul, _mul);
-impl_op_matrix!(Div, div, _div);
-
-impl ops::AddAssign for Fe32 {
-    #[inline]
-    fn add_assign(&mut self, other: Fe32) { *self = *self + other; }
+    fn multiplicative_inverse(self) -> Self { Self::ONE._div(&self) }
 }
 
-impl ops::SubAssign for Fe32 {
-    #[inline]
-    fn sub_assign(&mut self, other: Fe32) { *self = *self - other; }
-}
-
-impl ops::MulAssign for Fe32 {
-    #[inline]
-    fn mul_assign(&mut self, other: Fe32) { *self = *self * other; }
-}
-
-impl ops::DivAssign for Fe32 {
-    #[inline]
-    fn div_assign(&mut self, other: Fe32) { *self = *self / other; }
-}
+super::impl_ops_for_fe!(impl for Fe32);
 
 /// A galois field error when converting from a character.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -506,7 +464,7 @@ mod tests {
     fn mul_zero() {
         for c in &CHARS_LOWER[..] {
             let fe = Fe32::from_char(*c).unwrap();
-            assert_eq!(fe._mul(Fe32::Q), Fe32::Q) // Fe32::Q == Fe32(0)
+            assert_eq!(fe * Fe32::Q, Fe32::Q) // Fe32::Q == Fe32(0)
         }
     }
 
