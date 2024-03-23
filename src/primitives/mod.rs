@@ -10,11 +10,15 @@ pub mod gf32;
 pub mod gf32_ext;
 pub mod hrp;
 pub mod iter;
+#[cfg(feature = "alloc")]
+mod polynomial;
 pub mod segwit;
 
 use checksum::{Checksum, PackedNull};
 use field::impl_ops_for_fe;
 pub use field::{ExtensionField, Field};
+#[cfg(feature = "alloc")]
+use polynomial::Polynomial;
 
 /// The "null checksum" used on bech32 strings for which we want to do no checksum checking.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
