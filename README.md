@@ -14,7 +14,7 @@ Bitcoin-specific address encoding is handled by the `bitcoin-bech32` crate.
 
 ## MSRV
 
-This library should always compile with any combination of features on **Rust 1.48.0**.
+This library should always compile with any combination of features on **Rust 1.56.1**.
 
 
 ## Githooks
