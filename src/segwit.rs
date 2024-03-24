@@ -44,6 +44,7 @@
 use alloc::{string::String, vec::Vec};
 use core::fmt;
 
+#[cfg(feature = "alloc")]
 use crate::error::write_err;
 use crate::primitives::decode::SegwitCodeLengthError;
 #[cfg(feature = "alloc")]
@@ -51,11 +52,9 @@ use crate::primitives::decode::{SegwitHrpstring, SegwitHrpstringError};
 use crate::primitives::gf32::Fe32;
 use crate::primitives::hrp::Hrp;
 use crate::primitives::iter::{ByteIterExt, Fe32IterExt};
+use crate::primitives::segwit::MAX_STRING_LENGTH;
 #[cfg(feature = "alloc")]
-use crate::primitives::segwit;
-use crate::primitives::segwit::{
-    InvalidWitnessVersionError, WitnessLengthError, MAX_STRING_LENGTH,
-};
+use crate::primitives::segwit::{self, InvalidWitnessVersionError, WitnessLengthError};
 use crate::primitives::{Bech32, Bech32m};
 
 #[rustfmt::skip]                // Keep public re-exports separate.

@@ -9,7 +9,7 @@
 //!
 //! ref: [BIP-173](https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki#user-content-Bech32)
 
-#[cfg(feature = "alloc")]
+#[cfg(all(feature = "alloc", not(feature = "std"), not(test)))]
 use alloc::string::String;
 use core::cmp::Ordering;
 use core::fmt::{self, Write};
