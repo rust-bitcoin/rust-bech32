@@ -154,6 +154,18 @@ pub trait PackedFe32: Copy + PartialEq + Eq + ops::BitXor<Self, Output = Self> {
     /// The number of fe32s that can fit into the type; computed as floor(bitwidth / 5).
     const WIDTH: usize = mem::size_of::<Self>() * 8 / 5;
 
+    /// Takes an iterator of `u8`s (or [`Fe32`]s converted to `u8`s) and packs
+    /// them into a [`Self`].
+    ///
+    /// For sequences representing polynomials, the iterator should yield the
+    /// coefficients in little-endian order, i.e. the 0th coefficien first.
+    ///
+    /// # Panics
+    ///
+    /// May panic if the iterator yields more items than can fit into the bit-packed
+    /// type.
+    fn pack<I: Iterator<Item = u8>>(iter: I) -> Self;
+
     /// Extracts the coefficient of the x^n from the packed polynomial.
     fn unpack(&self, n: usize) -> u8;
 
@@ -183,6 +195,14 @@ impl PackedFe32 for PackedNull {
     fn unpack(&self, _: usize) -> u8 { 0 }
     #[inline]
     fn mul_by_x_then_add(&mut self, _: usize, _: u8) -> u8 { 0 }
+
+    #[inline]
+    fn pack<I: Iterator<Item = u8>>(mut iter: I) -> Self {
+        if iter.next().is_some() {
+            panic!("Cannot pack anything into a PackedNull");
+        }
+        Self
+    }
 }
 
 macro_rules! impl_packed_fe32 {
@@ -205,6 +225,18 @@ macro_rules! impl_packed_fe32 {
                 *self &= !(0x1f << ((degree - 1) * 5));
                 *self <<= 5;
                 *self |= Self::from(add);
+                ret
+            }
+
+            #[inline]
+            fn pack<I: Iterator<Item = u8>>(iter: I) -> Self {
+                let mut ret: Self = 0;
+                for (n, elem) in iter.enumerate() {
+                    debug_assert!(elem < 32);
+                    debug_assert!(n < Self::WIDTH);
+                    ret <<= 5;
+                    ret |= Self::from(elem);
+                }
                 ret
             }
         }
@@ -274,5 +306,25 @@ impl<'hrp> Iterator for HrpFe32Iter<'hrp> {
         let max = high.1.zip(low.1).map(|(high, low)| high + 1 + low);
 
         (min, max)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pack_unpack() {
+        let packed = u128::pack([0, 0, 0, 1].iter().copied());
+        assert_eq!(packed, 1);
+        assert_eq!(packed.unpack(0), 1);
+        assert_eq!(packed.unpack(3), 0);
+
+        let packed = u128::pack([1, 2, 3, 4].iter().copied());
+        assert_eq!(packed, 0b00001_00010_00011_00100);
+        assert_eq!(packed.unpack(0), 4);
+        assert_eq!(packed.unpack(1), 3);
+        assert_eq!(packed.unpack(2), 2);
+        assert_eq!(packed.unpack(3), 1);
     }
 }

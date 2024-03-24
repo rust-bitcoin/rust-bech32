@@ -810,12 +810,14 @@ pub fn bech32::primitives::checksum::HrpFe32Iter<'hrp>::new(hrp: &'hrp bech32::p
 pub fn bech32::primitives::checksum::HrpFe32Iter<'hrp>::next(&mut self) -> core::option::Option<bech32::primitives::gf32::Fe32>
 pub fn bech32::primitives::checksum::HrpFe32Iter<'hrp>::size_hint(&self) -> (usize, core::option::Option<usize>)
 pub fn bech32::primitives::checksum::PackedFe32::mul_by_x_then_add(&mut self, degree: usize, add: u8) -> u8
+pub fn bech32::primitives::checksum::PackedFe32::pack<I: core::iter::traits::iterator::Iterator<Item = u8>>(iter: I) -> Self
 pub fn bech32::primitives::checksum::PackedFe32::unpack(&self, n: usize) -> u8
 pub fn bech32::primitives::checksum::PackedNull::bitxor(self, bech32::primitives::checksum::PackedNull) -> bech32::primitives::checksum::PackedNull
 pub fn bech32::primitives::checksum::PackedNull::clone(&self) -> bech32::primitives::checksum::PackedNull
 pub fn bech32::primitives::checksum::PackedNull::eq(&self, other: &bech32::primitives::checksum::PackedNull) -> bool
 pub fn bech32::primitives::checksum::PackedNull::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn bech32::primitives::checksum::PackedNull::mul_by_x_then_add(&mut self, usize, u8) -> u8
+pub fn bech32::primitives::checksum::PackedNull::pack<I: core::iter::traits::iterator::Iterator<Item = u8>>(iter: I) -> Self
 pub fn bech32::primitives::checksum::PackedNull::unpack(&self, usize) -> u8
 pub fn bech32::primitives::decode::AsciiToFe32Iter<'s>::len(&self) -> usize
 pub fn bech32::primitives::decode::AsciiToFe32Iter<'s>::next(&mut self) -> core::option::Option<bech32::primitives::gf32::Fe32>
@@ -1064,10 +1066,13 @@ pub fn bech32::segwit::encode_v0(hrp: bech32::primitives::hrp::Hrp, witness_prog
 pub fn bech32::segwit::encode_v1(hrp: bech32::primitives::hrp::Hrp, witness_program: &[u8]) -> core::result::Result<alloc::string::String, bech32::segwit::EncodeError>
 pub fn bech32::segwit::encoded_length(hrp: bech32::primitives::hrp::Hrp, _witness_version: bech32::primitives::gf32::Fe32, witness_program: &[u8]) -> core::result::Result<usize, bech32::primitives::decode::SegwitCodeLengthError>
 pub fn u128::mul_by_x_then_add(&mut self, degree: usize, add: u8) -> u8
+pub fn u128::pack<I: core::iter::traits::iterator::Iterator<Item = u8>>(iter: I) -> Self
 pub fn u128::unpack(&self, n: usize) -> u8
 pub fn u32::mul_by_x_then_add(&mut self, degree: usize, add: u8) -> u8
+pub fn u32::pack<I: core::iter::traits::iterator::Iterator<Item = u8>>(iter: I) -> Self
 pub fn u32::unpack(&self, n: usize) -> u8
 pub fn u64::mul_by_x_then_add(&mut self, degree: usize, add: u8) -> u8
+pub fn u64::pack<I: core::iter::traits::iterator::Iterator<Item = u8>>(iter: I) -> Self
 pub fn u64::unpack(&self, n: usize) -> u8
 pub fn u8::from(v: bech32::primitives::gf32::Fe32) -> u8
 pub mod bech32
