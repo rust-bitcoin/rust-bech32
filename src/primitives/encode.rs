@@ -40,7 +40,6 @@
 //! }
 //! ```
 
-use core::iter::Iterator;
 use core::marker::PhantomData;
 
 use crate::primitives::checksum::HrpFe32Iter;
