@@ -166,6 +166,8 @@ pub use {
     crate::primitives::iter::{ByteIterExt, Fe32IterExt},
     crate::primitives::{Bech32, Bech32m, NoChecksum},
 };
+#[cfg(feature = "alloc")]
+pub use crate::primitives::checksum::PrintImpl;
 
 // Write to fmt buffer, small during testing to exercise full code path.
 #[cfg(not(test))]

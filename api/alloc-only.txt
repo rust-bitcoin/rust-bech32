@@ -409,6 +409,14 @@ impl core::panic::unwind_safe::UnwindSafe for bech32::primitives::segwit::Invali
 impl core::panic::unwind_safe::UnwindSafe for bech32::primitives::segwit::WitnessLengthError
 impl core::panic::unwind_safe::UnwindSafe for bech32::segwit::DecodeError
 impl core::panic::unwind_safe::UnwindSafe for bech32::segwit::EncodeError
+impl<'a, ExtField> bech32::primitives::checksum::PrintImpl<'a, ExtField>
+impl<'a, ExtField> core::fmt::Display for bech32::primitives::checksum::PrintImpl<'a, ExtField> where ExtField: bech32::primitives::ExtensionField + core::convert::From<bech32::primitives::gf32::Fe32>
+impl<'a, ExtField> core::marker::Freeze for bech32::primitives::checksum::PrintImpl<'a, ExtField>
+impl<'a, ExtField> core::marker::Send for bech32::primitives::checksum::PrintImpl<'a, ExtField> where ExtField: core::marker::Send
+impl<'a, ExtField> core::marker::Sync for bech32::primitives::checksum::PrintImpl<'a, ExtField> where ExtField: core::marker::Sync
+impl<'a, ExtField> core::marker::Unpin for bech32::primitives::checksum::PrintImpl<'a, ExtField> where ExtField: core::marker::Unpin
+impl<'a, ExtField> core::panic::unwind_safe::RefUnwindSafe for bech32::primitives::checksum::PrintImpl<'a, ExtField> where ExtField: core::panic::unwind_safe::RefUnwindSafe
+impl<'a, ExtField> core::panic::unwind_safe::UnwindSafe for bech32::primitives::checksum::PrintImpl<'a, ExtField> where ExtField: core::panic::unwind_safe::UnwindSafe
 impl<'a, I, Ck> core::iter::traits::iterator::Iterator for bech32::primitives::encode::ByteIter<'a, I, Ck> where I: core::iter::traits::iterator::Iterator<Item = bech32::primitives::gf32::Fe32>, Ck: bech32::primitives::checksum::Checksum
 impl<'a, I, Ck> core::iter::traits::iterator::Iterator for bech32::primitives::encode::CharIter<'a, I, Ck> where I: core::iter::traits::iterator::Iterator<Item = bech32::primitives::gf32::Fe32>, Ck: bech32::primitives::checksum::Checksum
 impl<'b> core::iter::traits::double_ended::DoubleEndedIterator for bech32::primitives::hrp::ByteIter<'b>
@@ -853,6 +861,8 @@ pub fn bech32::primitives::checksum::PackedNull::fmt(&self, f: &mut core::fmt::F
 pub fn bech32::primitives::checksum::PackedNull::mul_by_x_then_add(&mut self, usize, u8) -> u8
 pub fn bech32::primitives::checksum::PackedNull::pack<I: core::iter::traits::iterator::Iterator<Item = u8>>(iter: I) -> Self
 pub fn bech32::primitives::checksum::PackedNull::unpack(&self, usize) -> u8
+pub fn bech32::primitives::checksum::PrintImpl<'a, ExtField>::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn bech32::primitives::checksum::PrintImpl<'a, ExtField>::new(name: &'a str, generator: &'a [bech32::primitives::gf32::Fe32], target: &'a [bech32::primitives::gf32::Fe32]) -> Self
 pub fn bech32::primitives::decode::AsciiToFe32Iter<'s>::len(&self) -> usize
 pub fn bech32::primitives::decode::AsciiToFe32Iter<'s>::next(&mut self) -> core::option::Option<bech32::primitives::gf32::Fe32>
 pub fn bech32::primitives::decode::AsciiToFe32Iter<'s>::size_hint(&self) -> (usize, core::option::Option<usize>)
@@ -1136,10 +1146,12 @@ pub mod bech32::primitives::iter
 pub mod bech32::primitives::segwit
 pub mod bech32::segwit
 pub struct bech32::Hrp
+pub struct bech32::PrintImpl<'a, ExtField>
 pub struct bech32::hrp::Hrp
 pub struct bech32::primitives::checksum::Engine<Ck: bech32::primitives::checksum::Checksum>
 pub struct bech32::primitives::checksum::HrpFe32Iter<'hrp>
 pub struct bech32::primitives::checksum::PackedNull
+pub struct bech32::primitives::checksum::PrintImpl<'a, ExtField>
 pub struct bech32::primitives::decode::AsciiToFe32Iter<'s>
 pub struct bech32::primitives::decode::ByteIter<'s>
 pub struct bech32::primitives::decode::CheckedHrpstring<'s>
