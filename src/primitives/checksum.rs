@@ -556,4 +556,35 @@ mod tests {
         #[cfg(feature = "std")]
         println!("{}", _s);
     }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn descriptor() {
+        // This magic constant came from Bitcoin Core, src/script/descriptor.cpp.
+        //
+        // Note that this generator polynomial has degree 8, not 6, reflected
+        // in the initial range being (0..8).
+        let unpacked_poly = (0..8)
+            .rev() // Note .rev() to convert from BE integer literal to LE polynomial!
+            .map(|i| 0xf5dee51989u64.unpack(i))
+            .map(|u| Fe32::try_from(u).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            unpacked_poly,
+            [Fe32::_7, Fe32::H, Fe32::_0, Fe32::W, Fe32::_2, Fe32::X, Fe32::V, Fe32::F],
+        );
+
+        // Run with -- --nocapture to see the output of this. This unit test
+        // does not check the exact output because it is not deterministic,
+        // and cannot check the code semantics because Rust does not have
+        // any sort of `eval`, but you can manually check the output works.
+        let _s = PrintImpl::<crate::Fe32768>::new(
+            "DescriptorChecksum",
+            &[Fe32::_7, Fe32::H, Fe32::_0, Fe32::W, Fe32::_2, Fe32::X, Fe32::V, Fe32::F],
+            &[Fe32::Q, Fe32::Q, Fe32::Q, Fe32::Q, Fe32::Q, Fe32::Q, Fe32::Q, Fe32::P],
+        )
+        .to_string();
+        #[cfg(feature = "std")]
+        println!("{}", _s);
+    }
 }
