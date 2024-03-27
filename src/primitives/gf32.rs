@@ -52,7 +52,7 @@ const CHARS_LOWER: [char; 32] = [
 
 /// Mapping from bech32 character (either case) to numeric value.
 ///
-/// E.g., 'z' is CHARS_LOWER[2] and is ASCII value 122 so CHARS_INV[122] == 2
+/// E.g., 'z' is `CHARS_LOWER[2]` and is ASCII value 122 so `CHARS_INV[122]` == 2
 #[rustfmt::skip]
 const CHARS_INV: [i8; 128] = [
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
