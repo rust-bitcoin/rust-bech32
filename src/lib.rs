@@ -161,10 +161,13 @@ use crate::primitives::decode::{ChecksumError, UncheckedHrpstring, UncheckedHrps
 pub use {
     crate::primitives::checksum::Checksum,
     crate::primitives::gf32::Fe32,
+    crate::primitives::gf32_ext::{Fe1024, Fe32768},
     crate::primitives::hrp::Hrp,
     crate::primitives::iter::{ByteIterExt, Fe32IterExt},
     crate::primitives::{Bech32, Bech32m, NoChecksum},
 };
+#[cfg(feature = "alloc")]
+pub use crate::primitives::checksum::PrintImpl;
 
 // Write to fmt buffer, small during testing to exercise full code path.
 #[cfg(not(test))]
