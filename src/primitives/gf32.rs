@@ -285,6 +285,15 @@ impl Bech32Field for Fe32 {
     }
 
     fn _neg(self) -> Self { self }
+
+    fn format_as_rust_code(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let ch = self.to_char().to_ascii_uppercase();
+        if ch.is_ascii_digit() {
+            write!(f, "Fe32::_{}", ch)
+        } else {
+            write!(f, "Fe32::{}", ch)
+        }
+    }
 }
 
 impl Field for Fe32 {

@@ -152,6 +152,9 @@ pub trait Bech32Field: private::Sealed + Sized {
 
     /// Computes the additive inverse of an element.
     fn _neg(self) -> Self;
+
+    /// Utility method to format a field element as Rust code.
+    fn format_as_rust_code(&self, f: &mut fmt::Formatter) -> fmt::Result;
 }
 
 macro_rules! impl_ops_for_fe {

@@ -124,6 +124,14 @@ impl Bech32Field for Fe1024 {
 
     #[inline]
     fn _neg(self) -> Self { self }
+
+    fn format_as_rust_code(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("Fe1024::new([")?;
+        self.inner[0].format_as_rust_code(f)?;
+        f.write_str(", ")?;
+        self.inner[1].format_as_rust_code(f)?;
+        f.write_str("])")
+    }
 }
 
 impl Field for Fe1024 {
@@ -203,6 +211,16 @@ impl Bech32Field for Fe32768 {
 
     #[inline]
     fn _neg(self) -> Self { self }
+
+    fn format_as_rust_code(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("Fe32768::new([")?;
+        self.inner[0].format_as_rust_code(f)?;
+        f.write_str(", ")?;
+        self.inner[1].format_as_rust_code(f)?;
+        f.write_str(", ")?;
+        self.inner[2].format_as_rust_code(f)?;
+        f.write_str("])")
+    }
 }
 
 impl Field for Fe32768 {
