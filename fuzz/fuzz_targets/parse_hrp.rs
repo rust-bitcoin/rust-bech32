@@ -1,6 +1,5 @@
-extern crate bech32;
-
 use bech32::Hrp;
+use honggfuzz::fuzz;
 
 fn do_test(data: &[u8]) {
     let s = String::from_utf8_lossy(data);
@@ -10,19 +9,6 @@ fn do_test(data: &[u8]) {
     let _ = Hrp::parse(&s);
 }
 
-#[cfg(feature = "afl")]
-extern crate afl;
-#[cfg(feature = "afl")]
-fn main() {
-    afl::read_stdio_bytes(|data| {
-        do_test(&data);
-    });
-}
-
-#[cfg(feature = "honggfuzz")]
-#[macro_use]
-extern crate honggfuzz;
-#[cfg(feature = "honggfuzz")]
 fn main() {
     loop {
         fuzz!(|data| {
@@ -38,9 +24,9 @@ mod tests {
         for (idx, c) in hex.as_bytes().iter().filter(|&&c| c != b'\n').enumerate() {
             b <<= 4;
             match *c {
-                b'A'...b'F' => b |= c - b'A' + 10,
-                b'a'...b'f' => b |= c - b'a' + 10,
-                b'0'...b'9' => b |= c - b'0',
+                b'A'..=b'F' => b |= c - b'A' + 10,
+                b'a'..=b'f' => b |= c - b'a' + 10,
+                b'0'..=b'9' => b |= c - b'0',
                 _ => panic!("Bad hex"),
             }
             if (idx & 1) == 1 {
