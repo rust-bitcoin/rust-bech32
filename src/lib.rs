@@ -580,7 +580,6 @@ impl From<std::io::Error> for EncodeIoError {
 #[cfg(feature = "alloc")]
 mod tests {
     use super::*;
-    use crate::{Bech32, Bech32m};
 
     // Tests below using this data, are based on the test vector (from BIP-173):
     // BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4: 0014751e76e8199196d454941c45d1b3a323f1433bd6
