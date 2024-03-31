@@ -3,9 +3,11 @@
 //! Provides the internal nuts and bolts that enable bech32 encoding/decoding.
 
 pub mod checksum;
+pub mod correction;
 pub mod decode;
 pub mod encode;
 mod field;
+mod fieldvec;
 pub mod gf32;
 pub mod gf32_ext;
 pub mod hrp;
