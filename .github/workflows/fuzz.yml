@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        fuzz_target: [decode_rnd, encode_decode, parse_hrp]
+        fuzz_target: [berlekamp_massey, decode_rnd, encode_decode, parse_hrp]
     steps:
       - name: Install test dependencies
         run: sudo apt-get update -y && sudo apt-get install -y binutils-dev libunwind8-dev libcurl4-openssl-dev libelf-dev libdw-dev cmake gcc libiberty-dev

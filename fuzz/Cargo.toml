@@ -18,6 +18,10 @@ bech32 = { path = ".." }
 members = ["."]
 
 [[bin]]
+name = "berlekamp_massey"
+path = "fuzz_targets/berlekamp_massey.rs"
+
+[[bin]]
 name = "decode_rnd"
 path = "fuzz_targets/decode_rnd.rs"
 

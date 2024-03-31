@@ -12,6 +12,7 @@ pub mod gf32;
 pub mod gf32_ext;
 pub mod hrp;
 pub mod iter;
+mod lfsr;
 mod polynomial;
 pub mod segwit;
 
@@ -19,6 +20,7 @@ use checksum::{Checksum, PackedNull};
 use field::impl_ops_for_fe;
 pub use field::{Bech32Field, ExtensionField, Field};
 use fieldvec::FieldVec;
+pub use lfsr::LfsrIter;
 use polynomial::Polynomial;
 
 use crate::{Fe1024, Fe32};
