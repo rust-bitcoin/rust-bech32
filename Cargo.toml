@@ -18,3 +18,7 @@ alloc = []
 
 [target.'cfg(mutate)'.dev-dependencies]
 mutagen = { git = "https://github.com/llogiq/mutagen" }
+
+[[example]]
+name = "errors"
+required-features = ["alloc"]
