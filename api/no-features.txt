@@ -545,9 +545,9 @@ pub const bech32::Checksum::CHECKSUM_LENGTH: usize
 pub const bech32::Checksum::CODE_LENGTH: usize
 pub const bech32::Checksum::GENERATOR_SH: [Self::MidstateRepr; 5]
 pub const bech32::Checksum::TARGET_RESIDUE: Self::MidstateRepr
-pub const bech32::hrp::BC: _
-pub const bech32::hrp::BCRT: _
-pub const bech32::hrp::TB: _
+pub const bech32::hrp::BC: bech32::primitives::hrp::Hrp
+pub const bech32::hrp::BCRT: bech32::primitives::hrp::Hrp
+pub const bech32::hrp::TB: bech32::primitives::hrp::Hrp
 pub const bech32::primitives::Bech32::CHECKSUM_LENGTH: usize
 pub const bech32::primitives::Bech32::CODE_LENGTH: usize
 pub const bech32::primitives::Bech32::GENERATOR_SH: [u32; 5]
@@ -599,14 +599,14 @@ pub const bech32::primitives::gf32::Fe32::_6: bech32::primitives::gf32::Fe32
 pub const bech32::primitives::gf32::Fe32::_7: bech32::primitives::gf32::Fe32
 pub const bech32::primitives::gf32::Fe32::_8: bech32::primitives::gf32::Fe32
 pub const bech32::primitives::gf32::Fe32::_9: bech32::primitives::gf32::Fe32
-pub const bech32::primitives::hrp::BC: _
-pub const bech32::primitives::hrp::BCRT: _
-pub const bech32::primitives::hrp::TB: _
-pub const bech32::primitives::segwit::MAX_STRING_LENGTH: usize = 90usize
-pub const bech32::primitives::segwit::VERSION_0: Fe32::Q
-pub const bech32::primitives::segwit::VERSION_1: Fe32::P
-pub const bech32::segwit::VERSION_0: Fe32::Q
-pub const bech32::segwit::VERSION_1: Fe32::P
+pub const bech32::primitives::hrp::BC: bech32::primitives::hrp::Hrp
+pub const bech32::primitives::hrp::BCRT: bech32::primitives::hrp::Hrp
+pub const bech32::primitives::hrp::TB: bech32::primitives::hrp::Hrp
+pub const bech32::primitives::segwit::MAX_STRING_LENGTH: usize
+pub const bech32::primitives::segwit::VERSION_0: bech32::primitives::gf32::Fe32
+pub const bech32::primitives::segwit::VERSION_1: bech32::primitives::gf32::Fe32
+pub const bech32::segwit::VERSION_0: bech32::primitives::gf32::Fe32
+pub const bech32::segwit::VERSION_1: bech32::primitives::gf32::Fe32
 pub const fn bech32::primitives::hrp::Hrp::parse_unchecked(hrp: &str) -> Self
 pub const u128::ONE: Self
 pub const u32::ONE: Self
