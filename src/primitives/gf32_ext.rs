@@ -183,6 +183,95 @@ impl ExtensionField for Fe1024 {
     const EXT_ELEM: Self = Self::new([Fe32::Q, Fe32::P]);
 }
 
+/// The field of order 32768.
+pub type Fe32768 = Fe32Ext<3>;
+
+impl Field for Fe32768 {
+    /// The zero element of the field.
+    const ZERO: Self = Self::new([Fe32::Q, Fe32::Q, Fe32::Q]);
+
+    /// The one element of the field.
+    const ONE: Self = Self::new([Fe32::P, Fe32::Q, Fe32::Q]);
+
+    // Chosen somewhat arbitrarily, by just guessing values until one came
+    // out with the correct order.
+    /// A generator of the field.
+    const GENERATOR: Self = Self::new([Fe32::A, Fe32::C, Fe32::Q]);
+
+    /// The order of the multiplicative group of the field.
+    ///
+    /// This constant also serves as a compile-time check that we can count
+    /// the entire field using a `usize` as a counter.
+    const MULTIPLICATIVE_ORDER: usize = 32767;
+
+    const MULTIPLICATIVE_ORDER_FACTORS: &'static [usize] = &[1, 7, 31, 151, 217, 1057, 4681, 32767];
+
+    #[inline]
+    fn _add(&self, other: &Self) -> Self {
+        Self::new([
+            self.inner[0] + other.inner[0],
+            self.inner[1] + other.inner[1],
+            self.inner[2] + other.inner[2],
+        ])
+    }
+
+    #[inline]
+    fn _sub(&self, other: &Self) -> Self { self._add(other) }
+
+    #[inline]
+    fn _mul(&self, other: &Self) -> Self { self.mul_by_elem(other) }
+
+    #[inline]
+    fn _div(&self, other: &Self) -> Self { other.multiplicative_inverse() * self }
+
+    #[inline]
+    fn _neg(self) -> Self { self }
+
+    fn multiplicative_inverse(self) -> Self {
+        // Unlike in the GF1024 case we don't bother being generic over
+        // arbitrary values of POLYNOMIAL, since doing so means a ton
+        // of extra work for everybody (me, the reviewer, and the CPU
+        // that has to do a bunch of mulitplications by values that
+        // turn out to always be 0).
+        debug_assert_eq!(Self::POLYNOMIAL, Self::new([Fe32::P, Fe32::P, Fe32::Q]));
+        // Aliases to make the below equations easier to read
+        let a0 = self.inner[0];
+        let a1 = self.inner[1];
+        let a2 = self.inner[2];
+
+        let a0_2 = a0 * a0;
+        let a1_2 = a1 * a1;
+        let a2_2 = a2 * a2;
+
+        let a0a1 = a0 * a1;
+        let a0a2 = a0 * a2;
+        let a1a2 = a1 * a2;
+
+        // Inverse of the 3x3 multiplication matrix defined by a0, a1, a2.
+        let det = (a0_2 * a0) + a1_2 * (a0 + a1) + a2_2 * (a0 + a1 + a2) + (a0 * a1a2);
+        Self::new([
+            (a0_2 + a1_2 + a2_2 + a1a2) / det,
+            (a2_2 + a0a1) / det,
+            (a1_2 + a2_2 + a0a2) / det,
+        ])
+    }
+}
+super::impl_ops_for_fe!(impl for Fe32768);
+
+impl ExtensionField for Fe32768 {
+    type BaseField = Fe32;
+
+    const DEGREE: usize = 3;
+
+    // Arbitrary irreducible polynomial x^3 = x + 1
+    const POLYNOMIAL: Self = Self::new([Fe32::P, Fe32::P, Fe32::Q]);
+
+    /// The element zeta such that the extension field is defined as `GF32[zeta]`.
+    ///
+    /// Alternately, the image of x in the mapping `GF32[x]/p(x) -> <the field>`
+    const EXT_ELEM: Self = Self::new([Fe32::Q, Fe32::P, Fe32::Q]);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -268,5 +357,38 @@ mod tests {
         assert_eq!(elem.multiplicative_order(), 1023);
         assert_eq!(elem.powi(3).multiplicative_order(), 341);
         assert_eq!(elem.powi(341).multiplicative_order(), 3);
+    }
+
+    #[test]
+    fn gf32768_mult_inverse() {
+        assert_eq!(Fe32768::ONE.multiplicative_inverse(), Fe32768::ONE);
+
+        for i in 0..32 {
+            for j in 0..32 {
+                for k in 0..32 {
+                    if i != 0 || j != 0 || k != 0 {
+                        let fe32768 = Fe32768::new([Fe32(i), Fe32(j), Fe32(k)]);
+                        assert_eq!(
+                            fe32768.multiplicative_inverse().multiplicative_inverse(),
+                            fe32768,
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn gf32768_powi() {
+        // A "random" element
+        let elem = Fe32768::new([Fe32::A, Fe32::C, Fe32::Q]);
+        assert_eq!(elem.powi(2), elem * elem);
+        assert_eq!(elem.powi(3), elem * elem * elem);
+        assert_eq!(elem.powi(0), Fe32768::ONE);
+        assert_eq!(elem.powi(-1), elem.multiplicative_inverse());
+
+        assert_eq!(elem.multiplicative_order(), 32767);
+        assert_eq!(elem.powi(7).multiplicative_order(), 4681);
+        assert_eq!(elem.powi(341).multiplicative_order(), 1057);
     }
 }
