@@ -720,19 +720,6 @@ impl<'s> ExactSizeIterator for ByteIter<'s> {
     fn len(&self) -> usize { self.iter.len() }
 }
 
-/// An iterator over a parsed HRP string data as field elements.
-pub struct Fe32Iter<'s> {
-    iter: AsciiToFe32Iter<'s>,
-}
-
-impl<'s> Iterator for Fe32Iter<'s> {
-    type Item = Fe32;
-    #[inline]
-    fn next(&mut self) -> Option<Fe32> { self.iter.next() }
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
-}
-
 /// Iterator adaptor that maps an iterator of valid bech32 character ASCII bytes to an
 /// iterator of field elements.
 ///
