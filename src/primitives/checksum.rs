@@ -4,10 +4,20 @@
 //!
 //! [BCH]: <https://en.wikipedia.org/wiki/BCH_code>
 
+#[cfg(all(feature = "alloc", not(feature = "std"), not(test)))]
+use alloc::vec::Vec;
+#[cfg(feature = "alloc")]
+use core::fmt;
+#[cfg(feature = "alloc")]
+use core::marker::PhantomData;
 use core::{mem, ops};
 
-use crate::primitives::gf32::Fe32;
+#[cfg(feature = "alloc")]
+use super::Polynomial;
 use crate::primitives::hrp::Hrp;
+#[cfg(feature = "alloc")]
+use crate::Fe1024;
+use crate::Fe32;
 
 /// Trait defining a particular checksum.
 ///
@@ -49,7 +59,7 @@ pub trait Checksum {
     ///
     /// These cannot be usefully pre-computed because of Rust's limited constfn support
     /// as of 1.67, so they must be specified manually for each checksum. To check the
-    /// values for consistency, run `Self::sanity_check()`.
+    /// values for consistency, run [`Self::sanity_check`].
     const GENERATOR_SH: [Self::MidstateRepr; 5];
 
     /// The residue, modulo the generator polynomial, that a valid codeword will have.
@@ -80,6 +90,184 @@ pub trait Checksum {
                 );
             }
         }
+    }
+}
+
+/// Given a polynomial representation for your generator polynomial and your
+/// target residue, outputs a `impl Checksum` block.
+///
+/// You must specify an extension field. You should try [`crate::Fe1024`], and if
+/// you get an error about a polynomial not splitting, try [`crate::Fe32768`].
+///
+/// Used like
+///
+/// ```
+/// # #[cfg(feature = "alloc")] {
+/// use core::convert::TryFrom;
+///
+/// use bech32::{Fe32, Fe1024, PrintImpl};
+/// use bech32::primitives::checksum::PackedFe32;
+///
+/// // In codes specified in BIPs, the code generator polynomial and residue
+/// // are often only given indirectly, in the reference code which encodes
+/// // it in a packed form (shifted multiple times).
+/// //
+/// // For example in the BIP173 Python reference code you will see an array
+/// // called `generator` whose first entry is 0x3b6a57b2. This first entry
+/// // is the generator polynomial in packed form.
+/// //
+/// // To get the expanded polynomial form you can use `u128::unpack` like so:
+/// let unpacked_poly = (0..6)
+///     .rev() // Note .rev() to convert from BE integer literal to LE polynomial!
+///     .map(|i| 0x3b6a57b2u128.unpack(i))
+///     .map(|u| Fe32::try_from(u).unwrap())
+///     .collect::<Vec<_>>();
+/// let unpacked_residue = (0..6)
+///     .rev()
+///     .map(|i| 0x1u128.unpack(i))
+///     .map(|u| Fe32::try_from(u).unwrap())
+///     .collect::<Vec<_>>();
+/// println!(
+///     "{}",
+///     PrintImpl::<Fe1024>::new(
+///         "Bech32",
+///         &unpacked_poly,
+///         &unpacked_residue,
+///     ),
+/// );
+/// # }
+/// ```
+///
+/// The awkward API is to allow this type to be used in the widest set of
+/// circumstances, including in nostd settings. (However, the underlying
+/// polynomial math requires the `alloc` feature.)
+///
+/// Both polynomial representations should be in little-endian order, so that
+/// the coefficient of x^i appears in the ith slot. The generator polynomial
+/// should be a monic polynomial but you should not include the monic term,
+/// so that both `generator` and `target` are arrays of the same length.
+///
+/// **This function should never need to be called by users, but will be helpful
+/// for developers.**
+///
+/// In general, when defining a checksum, it is best to call this method (and
+/// to add a unit test that calls [`Checksum::sanity_check`] rather than trying
+/// to compute the values yourself. The reason is that the specific values
+/// used depend on the representation of extension fields, which may differ
+/// between implementations (and between specifications) of your BCH code.
+#[cfg(feature = "alloc")]
+pub struct PrintImpl<'a, ExtField = Fe1024> {
+    name: &'a str,
+    generator: &'a [Fe32],
+    target: &'a [Fe32],
+    bit_len: usize,
+    hex_width: usize,
+    midstate_repr: &'static str,
+    phantom: PhantomData<ExtField>,
+}
+
+#[cfg(feature = "alloc")]
+impl<'a, ExtField> PrintImpl<'a, ExtField> {
+    /// Constructor for an object to print an impl-block for the [`Checksum`] trait.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any of the input values fail various sanity checks.
+    pub fn new(name: &'a str, generator: &'a [Fe32], target: &'a [Fe32]) -> Self {
+        // Sanity checks.
+        assert_ne!(name.len(), 0, "type name cannot be the empty string",);
+        assert_ne!(
+            generator.len(),
+            0,
+            "generator polynomial cannot be the empty string (constant 1)"
+        );
+        assert_ne!(target.len(), 0, "target residue cannot be the empty string");
+        if generator.len() != target.len() {
+            let hint = if generator.len() == target.len() + 1 {
+                " (you should not include the monic term of the generator polynomial"
+            } else if generator.len() > target.len() {
+                " (you may need to zero-pad your target residue)"
+            } else {
+                ""
+            };
+            panic!(
+                "Generator length {} does not match target residue length {}{}",
+                generator.len(),
+                target.len(),
+                hint
+            );
+        }
+
+        let bit_len = 5 * target.len();
+        let (hex_width, midstate_repr) = if bit_len <= 32 {
+            (8, "u32")
+        } else if bit_len <= 64 {
+            (16, "u64")
+        } else if bit_len <= 128 {
+            (32, "u128")
+        } else {
+            panic!("Generator length {} cannot exceed 25, as we cannot represent it by packing bits into a Rust numeric type", generator.len());
+        };
+        // End sanity checks.
+        PrintImpl {
+            name,
+            generator,
+            target,
+            bit_len,
+            hex_width,
+            midstate_repr,
+            phantom: PhantomData,
+        }
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a, ExtField> fmt::Display for PrintImpl<'a, ExtField>
+where
+    ExtField: super::ExtensionField + From<Fe32>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Generator polynomial as a polynomial over GF1024
+        let gen_poly = {
+            let mut v = Vec::with_capacity(self.generator.len() + 1);
+            v.push(ExtField::ONE);
+            v.extend(self.generator.iter().cloned().map(ExtField::from));
+            Polynomial::new(v)
+        };
+        let (_gen, length, _exponents) = gen_poly.bch_generator_primitive_element();
+
+        write!(f, "// Code block generated by Checksum::print_impl polynomial ")?;
+        for fe in self.generator {
+            write!(f, "{}", fe)?;
+        }
+        write!(f, " target ")?;
+        for fe in self.target {
+            write!(f, "{}", fe)?;
+        }
+        f.write_str("\n")?;
+        writeln!(f, "impl Checksum for {} {{", self.name)?;
+        writeln!(
+            f,
+            "    type MidstateRepr = {}; // checksum packs into {} bits",
+            self.midstate_repr, self.bit_len
+        )?;
+        writeln!(f, "    const CODE_LENGTH: usize = {};", length)?;
+        writeln!(f, "    const CHECKSUM_LENGTH: usize = {};", gen_poly.degree())?;
+        writeln!(f, "    const GENERATOR_SH: [{}; 5] = [", self.midstate_repr)?;
+        let mut gen5 = self.generator.to_vec();
+        for _ in 0..5 {
+            let gen_packed = u128::pack(gen5.iter().copied().map(From::from));
+            writeln!(f, "        0x{:0width$x},", gen_packed, width = self.hex_width)?;
+            gen5.iter_mut().for_each(|x| *x *= Fe32::Z);
+        }
+        writeln!(f, "    ];")?;
+        writeln!(
+            f,
+            "    const TARGET_RESIDUE: {} = {:?};",
+            self.midstate_repr,
+            u128::pack(self.target.iter().copied().map(From::from))
+        )?;
+        f.write_str("}")
     }
 }
 
@@ -154,6 +342,18 @@ pub trait PackedFe32: Copy + PartialEq + Eq + ops::BitXor<Self, Output = Self> {
     /// The number of fe32s that can fit into the type; computed as floor(bitwidth / 5).
     const WIDTH: usize = mem::size_of::<Self>() * 8 / 5;
 
+    /// Takes an iterator of `u8`s (or [`Fe32`]s converted to `u8`s) and packs
+    /// them into a [`Self`].
+    ///
+    /// For sequences representing polynomials, the iterator should yield the
+    /// coefficients in little-endian order, i.e. the 0th coefficien first.
+    ///
+    /// # Panics
+    ///
+    /// May panic if the iterator yields more items than can fit into the bit-packed
+    /// type.
+    fn pack<I: Iterator<Item = u8>>(iter: I) -> Self;
+
     /// Extracts the coefficient of the x^n from the packed polynomial.
     fn unpack(&self, n: usize) -> u8;
 
@@ -183,6 +383,14 @@ impl PackedFe32 for PackedNull {
     fn unpack(&self, _: usize) -> u8 { 0 }
     #[inline]
     fn mul_by_x_then_add(&mut self, _: usize, _: u8) -> u8 { 0 }
+
+    #[inline]
+    fn pack<I: Iterator<Item = u8>>(mut iter: I) -> Self {
+        if iter.next().is_some() {
+            panic!("Cannot pack anything into a PackedNull");
+        }
+        Self
+    }
 }
 
 macro_rules! impl_packed_fe32 {
@@ -205,6 +413,18 @@ macro_rules! impl_packed_fe32 {
                 *self &= !(0x1f << ((degree - 1) * 5));
                 *self <<= 5;
                 *self |= Self::from(add);
+                ret
+            }
+
+            #[inline]
+            fn pack<I: Iterator<Item = u8>>(iter: I) -> Self {
+                let mut ret: Self = 0;
+                for (n, elem) in iter.enumerate() {
+                    debug_assert!(elem < 32);
+                    debug_assert!(n < Self::WIDTH);
+                    ret <<= 5;
+                    ret |= Self::from(elem);
+                }
                 ret
             }
         }
@@ -274,5 +494,97 @@ impl<'hrp> Iterator for HrpFe32Iter<'hrp> {
         let max = high.1.zip(low.1).map(|(high, low)| high + 1 + low);
 
         (min, max)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(feature = "alloc")]
+    use core::convert::TryFrom;
+
+    use super::*;
+
+    #[test]
+    fn pack_unpack() {
+        let packed = u128::pack([0, 0, 0, 1].iter().copied());
+        assert_eq!(packed, 1);
+        assert_eq!(packed.unpack(0), 1);
+        assert_eq!(packed.unpack(3), 0);
+
+        let packed = u128::pack([1, 2, 3, 4].iter().copied());
+        assert_eq!(packed, 0b00001_00010_00011_00100);
+        assert_eq!(packed.unpack(0), 4);
+        assert_eq!(packed.unpack(1), 3);
+        assert_eq!(packed.unpack(2), 2);
+        assert_eq!(packed.unpack(3), 1);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn bech32() {
+        // In codes that Pieter specifies typically the generator polynomial is
+        // only given indirectly, in the reference code which encodes it in a
+        // packed form (shifted multiple times).
+        //
+        // For example in the BIP173 Python reference code you will see an array
+        // called `generator` whose first entry is 0x3b6a57b2. This first entry
+        // is the generator polynomial in packed form.
+        //
+        // To get the expanded polynomial form you can use `u128::unpack` like so:
+        let unpacked_poly = (0..6)
+            .rev() // Note .rev() to convert from BE integer literal to LE polynomial!
+            .map(|i| 0x3b6a57b2u128.unpack(i))
+            .map(|u| Fe32::try_from(u).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(unpacked_poly, [Fe32::A, Fe32::K, Fe32::_5, Fe32::_4, Fe32::A, Fe32::J],);
+        // To get a version of the above with bech32 chars instead of Fe32s, which
+        // can be a bit hard to print, just stick a `.map(Fe32::to_char)` into the
+        // above iterator chain.
+
+        // Ok, exposition over. The actual unit test follows.
+
+        // Run with -- --nocapture to see the output of this. This unit test
+        // does not check the exact output because it is not deterministic,
+        // and cannot check the code semantics because Rust does not have
+        // any sort of `eval`, but you can manually check the output works.
+        let _s = PrintImpl::<Fe1024>::new(
+            "Bech32",
+            &[Fe32::A, Fe32::K, Fe32::_5, Fe32::_4, Fe32::A, Fe32::J],
+            &[Fe32::Q, Fe32::Q, Fe32::Q, Fe32::Q, Fe32::Q, Fe32::P],
+        )
+        .to_string();
+        #[cfg(feature = "std")]
+        println!("{}", _s);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn descriptor() {
+        // This magic constant came from Bitcoin Core, src/script/descriptor.cpp.
+        //
+        // Note that this generator polynomial has degree 8, not 6, reflected
+        // in the initial range being (0..8).
+        let unpacked_poly = (0..8)
+            .rev() // Note .rev() to convert from BE integer literal to LE polynomial!
+            .map(|i| 0xf5dee51989u64.unpack(i))
+            .map(|u| Fe32::try_from(u).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            unpacked_poly,
+            [Fe32::_7, Fe32::H, Fe32::_0, Fe32::W, Fe32::_2, Fe32::X, Fe32::V, Fe32::F],
+        );
+
+        // Run with -- --nocapture to see the output of this. This unit test
+        // does not check the exact output because it is not deterministic,
+        // and cannot check the code semantics because Rust does not have
+        // any sort of `eval`, but you can manually check the output works.
+        let _s = PrintImpl::<crate::Fe32768>::new(
+            "DescriptorChecksum",
+            &[Fe32::_7, Fe32::H, Fe32::_0, Fe32::W, Fe32::_2, Fe32::X, Fe32::V, Fe32::F],
+            &[Fe32::Q, Fe32::Q, Fe32::Q, Fe32::Q, Fe32::Q, Fe32::Q, Fe32::Q, Fe32::P],
+        )
+        .to_string();
+        #[cfg(feature = "std")]
+        println!("{}", _s);
     }
 }
