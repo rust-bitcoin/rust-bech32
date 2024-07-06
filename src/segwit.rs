@@ -441,7 +441,6 @@ impl From<fmt::Error> for EncodeError {
 #[cfg(all(test, feature = "alloc"))]
 mod tests {
     use super::*;
-    use crate::primitives::decode::{SegwitCodeLengthError, SegwitHrpstringError};
     use crate::primitives::hrp;
 
     #[test]

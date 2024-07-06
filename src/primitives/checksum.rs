@@ -588,3 +588,40 @@ mod tests {
         println!("{}", _s);
     }
 }
+
+#[cfg(bench)]
+mod benches {
+    use std::io::{sink, Write};
+
+    use test::{black_box, Bencher};
+
+    use crate::{Fe1024, Fe32, Fe32768, PrintImpl};
+
+    #[bench]
+    fn compute_bech32_params(bh: &mut Bencher) {
+        bh.iter(|| {
+            let im = PrintImpl::<Fe1024>::new(
+                "Bech32",
+                &[Fe32::A, Fe32::K, Fe32::_5, Fe32::_4, Fe32::A, Fe32::J],
+                &[Fe32::Q, Fe32::Q, Fe32::Q, Fe32::Q, Fe32::Q, Fe32::P],
+            );
+            let res = write!(sink(), "{}", im);
+            black_box(&im);
+            black_box(&res);
+        })
+    }
+
+    #[bench]
+    fn compute_descriptor_params(bh: &mut Bencher) {
+        bh.iter(|| {
+            let im = PrintImpl::<Fe32768>::new(
+                "DescriptorChecksum",
+                &[Fe32::_7, Fe32::H, Fe32::_0, Fe32::W, Fe32::_2, Fe32::X, Fe32::V, Fe32::F],
+                &[Fe32::Q, Fe32::Q, Fe32::Q, Fe32::Q, Fe32::Q, Fe32::Q, Fe32::Q, Fe32::P],
+            );
+            let res = write!(sink(), "{}", im);
+            black_box(&im);
+            black_box(&res);
+        })
+    }
+}
