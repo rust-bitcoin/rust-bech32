@@ -463,7 +463,7 @@ impl<'hrp> Iterator for HrpFe32Iter<'hrp> {
                 Some(high) => return Some(Fe32(high >> 5)),
                 None => {
                     self.high_iter = None;
-                    return Some(Fe32::Q);
+                    return Some(Fe32::ZERO);
                 }
             }
         }

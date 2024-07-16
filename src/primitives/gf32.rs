@@ -71,6 +71,9 @@ const CHARS_INV: [i8; 128] = [
 pub struct Fe32(pub(crate) u8);
 
 impl Fe32 {
+    /// The Zero element is 0 numeric (character 'Q')
+    pub const ZERO: Fe32 = Fe32(0);
+
     // These are a little gratuitous for a reference implementation, but it makes me happy to do it.
     /// Numeric value maps to bech32 character: 0 == "q".
     pub const Q: Fe32 = Fe32(0);
@@ -257,7 +260,7 @@ impl AsRef<u8> for Fe32 {
 }
 
 impl super::Field for Fe32 {
-    const ZERO: Self = Fe32::Q;
+    const ZERO: Self = Fe32::ZERO;
     const ONE: Self = Fe32::P;
     const GENERATOR: Self = Fe32::Z;
     const MULTIPLICATIVE_ORDER: usize = 31;
@@ -486,6 +489,12 @@ mod tests {
             let fe = Fe32::from_char(*c).unwrap();
             assert_eq!(fe * Fe32::P, fe) // Fe32::P == Fe32(1)
         }
+    }
+
+    #[test]
+    fn const_zero() {
+        assert_eq!(Fe32::ZERO.to_u8(), 0);
+        assert_eq!(Fe32::ZERO.to_char(), 'q');
     }
 }
 
