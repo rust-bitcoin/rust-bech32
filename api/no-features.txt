@@ -665,6 +665,7 @@ pub const bech32::primitives::gf32::Fe32::X: bech32::primitives::gf32::Fe32
 pub const bech32::primitives::gf32::Fe32::Y: bech32::primitives::gf32::Fe32
 pub const bech32::primitives::gf32::Fe32::Z: bech32::primitives::gf32::Fe32
 pub const bech32::primitives::gf32::Fe32::ZERO: Self
+pub const bech32::primitives::gf32::Fe32::ZERO: bech32::primitives::gf32::Fe32
 pub const bech32::primitives::gf32::Fe32::_0: bech32::primitives::gf32::Fe32
 pub const bech32::primitives::gf32::Fe32::_2: bech32::primitives::gf32::Fe32
 pub const bech32::primitives::gf32::Fe32::_3: bech32::primitives::gf32::Fe32
