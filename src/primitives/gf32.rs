@@ -66,7 +66,7 @@ const CHARS_INV: [i8; 128] = [
 ];
 
 /// An element in GF(32), the finite field containing elements `[0,31]` inclusive.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 #[repr(transparent)]
 pub struct Fe32(pub(crate) u8);
 
@@ -485,6 +485,33 @@ mod tests {
         for c in &CHARS_LOWER[..] {
             let fe = Fe32::from_char(*c).unwrap();
             assert_eq!(fe * Fe32::P, fe) // Fe32::P == Fe32(1)
+        }
+    }
+
+    #[test]
+    fn order() {
+        use core::cmp::Ordering;
+
+        assert_eq!(Fe32(0).cmp(&Fe32(0)), Ordering::Equal);
+        assert_eq!(Fe32(1).cmp(&Fe32(1)), Ordering::Equal);
+        assert_eq!(Fe32(0).cmp(&Fe32(1)), Ordering::Less);
+        assert_eq!(Fe32(0).cmp(&Fe32(31)), Ordering::Less);
+        assert_eq!(Fe32(1).cmp(&Fe32(0)), Ordering::Greater);
+        assert_eq!(Fe32(31).cmp(&Fe32(0)), Ordering::Greater);
+
+        assert_eq!(Fe32(0).partial_cmp(&Fe32(0)).unwrap(), Ordering::Equal);
+        assert_eq!(Fe32(1).partial_cmp(&Fe32(1)).unwrap(), Ordering::Equal);
+        assert_eq!(Fe32(0).partial_cmp(&Fe32(1)).unwrap(), Ordering::Less);
+        assert_eq!(Fe32(0).partial_cmp(&Fe32(31)).unwrap(), Ordering::Less);
+        assert_eq!(Fe32(1).partial_cmp(&Fe32(0)).unwrap(), Ordering::Greater);
+        assert_eq!(Fe32(31).partial_cmp(&Fe32(0)).unwrap(), Ordering::Greater);
+
+        // Compare for all variations that order is the same as the order of the inner
+        for i in Fe32::iter_alpha() {
+            for j in Fe32::iter_alpha() {
+                assert_eq!(i.cmp(&j), i.to_u8().cmp(&j.to_u8()));
+                assert_eq!(i.partial_cmp(&j), i.to_u8().partial_cmp(&j.to_u8()));
+            }
         }
     }
 }
