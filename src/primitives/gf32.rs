@@ -66,7 +66,7 @@ const CHARS_INV: [i8; 128] = [
 ];
 
 /// An element in GF(32), the finite field containing elements `[0,31]` inclusive.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct Fe32(pub(crate) u8);
 
@@ -486,6 +486,12 @@ mod tests {
             let fe = Fe32::from_char(*c).unwrap();
             assert_eq!(fe * Fe32::P, fe) // Fe32::P == Fe32(1)
         }
+    }
+
+    #[test]
+    fn default() {
+        assert_eq!(Fe32::default().to_u8(), 0);
+        assert_eq!(Fe32::default(), Fe32::Q);
     }
 }
 
