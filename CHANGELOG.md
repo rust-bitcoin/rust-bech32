@@ -1,3 +1,9 @@
+# 0.12.0 - 2024-09-18
+
+- Derive `Default` for `Fe32` [#184](https://github.com/rust-bitcoin/rust-bech32/pull/184/)
+- Introduce a `PrintImpl` object that can compute various code properties [#180](https://github.com/rust-bitcoin/rust-bech32/pull/180)
+- Add a `Hrp` constructor from an arbitrary `T: Display` [#196](https://github.com/rust-bitcoin/rust-bech32/pull/196)
+
 # 0.11.0 - 2024-02-23
 
 The `0.10.0` release contains API breaking changes compared to `0.10.0-beta` and because of semver
