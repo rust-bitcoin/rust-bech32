@@ -1,3 +1,8 @@
+# 0.12.0 - 2024-0731
+
+- Derive `Default` for `Fe32` [#184](https://github.com/rust-bitcoin/rust-bech32/pull/184/)
+- Implement `ordered::ArbitraryOrd` for `Fe32` [#190](https://github.com/rust-bitcoin/rust-bech32/pull/190)
+
 # 0.11.0 - 2024-02-23
 
 The `0.10.0` release contains API breaking changes compared to `0.10.0-beta` and because of semver
