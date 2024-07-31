@@ -139,6 +139,7 @@ impl core::convert::TryFrom<u16> for bech32::primitives::gf32::Fe32
 impl core::convert::TryFrom<u32> for bech32::primitives::gf32::Fe32
 impl core::convert::TryFrom<u64> for bech32::primitives::gf32::Fe32
 impl core::convert::TryFrom<u8> for bech32::primitives::gf32::Fe32
+impl core::default::Default for bech32::primitives::gf32::Fe32
 impl core::fmt::Debug for bech32::DecodeError
 impl core::fmt::Debug for bech32::EncodeError
 impl core::fmt::Debug for bech32::primitives::checksum::PackedNull
@@ -961,6 +962,7 @@ pub fn bech32::primitives::gf32::Fe32::add_assign(&mut self, other: &bech32::pri
 pub fn bech32::primitives::gf32::Fe32::add_assign(&mut self, other: bech32::primitives::gf32::Fe32)
 pub fn bech32::primitives::gf32::Fe32::as_ref(&self) -> &u8
 pub fn bech32::primitives::gf32::Fe32::clone(&self) -> bech32::primitives::gf32::Fe32
+pub fn bech32::primitives::gf32::Fe32::default() -> bech32::primitives::gf32::Fe32
 pub fn bech32::primitives::gf32::Fe32::div(self, other: &bech32::primitives::gf32::Fe32) -> bech32::primitives::gf32::Fe32
 pub fn bech32::primitives::gf32::Fe32::div(self, other: bech32::primitives::gf32::Fe32) -> bech32::primitives::gf32::Fe32
 pub fn bech32::primitives::gf32::Fe32::div_assign(&mut self, other: &bech32::primitives::gf32::Fe32)
