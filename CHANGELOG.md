@@ -1,3 +1,13 @@
+# 0.12.0 - 2024-10-27
+
+This release adds error correction.
+
+- Add support for error correction [#203](https://github.com/rust-bitcoin/rust-bech32/pull/203) [#204](https://github.com/rust-bitcoin/rust-bech32/pull/204) [#205](https://github.com/rust-bitcoin/rust-bech32/pull/205)
+- Alternative `fes_to_bytes_zeropad` with no dropping of last bits [#201](https://github.com/rust-bitcoin/rust-bech32/pull/)
+- Derive `Default` for `Fe32` [#184](https://github.com/rust-bitcoin/rust-bech32/pull/184/)
+- Introduce a `PrintImpl` object that can compute various code properties [#180](https://github.com/rust-bitcoin/rust-bech32/pull/180)
+- Add a `Hrp` constructor from an arbitrary `T: Display` [#196](https://github.com/rust-bitcoin/rust-bech32/pull/196)
+
 # 0.11.0 - 2024-02-23
 
 The `0.10.0` release contains API breaking changes compared to `0.10.0-beta` and because of semver
