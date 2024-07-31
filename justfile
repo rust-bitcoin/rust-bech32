@@ -30,7 +30,3 @@ clippy:
 # run `cargo clippy --fix` on everything
 clippy-fix:
   cargo clippy --locked --offline --workspace --all-targets --fix
-
-# Check for API changes.
-check-api:
- contrib/check-for-api-changes.sh
