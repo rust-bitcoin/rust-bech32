@@ -256,6 +256,12 @@ impl AsRef<u8> for Fe32 {
     fn as_ref(&self) -> &u8 { &self.0 }
 }
 
+/// Field elements do not have a natural order however some users may want to order them.
+#[cfg(feature = "ordered")]
+impl ordered::ArbitraryOrd for Fe32 {
+    fn arbitrary_cmp(&self, other: &Self) -> core::cmp::Ordering { self.0.cmp(&other.0) }
+}
+
 impl super::Field for Fe32 {
     const ZERO: Self = Fe32::Q;
     const ONE: Self = Fe32::P;
