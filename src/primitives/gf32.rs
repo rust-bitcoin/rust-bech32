@@ -270,8 +270,8 @@ impl super::Field for Fe32 {
         if self.0 == 0 || other.0 == 0 {
             Fe32(0)
         } else {
-            let log1 = LOG[self.0 as usize];
-            let log2 = LOG[other.0 as usize];
+            let log1 = LOG[usize::from(self.0)];
+            let log2 = LOG[usize::from(other.0)];
             let mult_order = Self::MULTIPLICATIVE_ORDER as isize;
             Fe32(LOG_INV[((log1 + log2) % mult_order) as usize])
         }
@@ -282,8 +282,8 @@ impl super::Field for Fe32 {
         } else if other.0 == 0 {
             panic!("Attempt to divide {} by 0 in GF32", self);
         } else {
-            let log1 = LOG[self.0 as usize];
-            let log2 = LOG[other.0 as usize];
+            let log1 = LOG[usize::from(self.0)];
+            let log2 = LOG[usize::from(other.0)];
             let mult_order = Self::MULTIPLICATIVE_ORDER as isize;
             Fe32(LOG_INV[((mult_order + log1 - log2) % mult_order) as usize])
         }
