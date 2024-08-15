@@ -119,6 +119,80 @@ impl Hrp {
         Ok(new)
     }
 
+    /// Parses the human-readable part from an object which can be formatted.
+    ///
+    /// The formatted form of the object is subject to all the same rules as [`Self::parse`].
+    /// This method is semantically equivalent to `Hrp::parse(&data.to_string())` but avoids
+    /// allocating an intermediate string.
+    pub fn parse_display<T: core::fmt::Display>(data: T) -> Result<Self, Error> {
+        use Error::*;
+
+        struct ByteFormatter {
+            arr: [u8; MAX_HRP_LEN],
+            index: usize,
+            error: Option<Error>,
+        }
+
+        impl core::fmt::Write for ByteFormatter {
+            fn write_str(&mut self, s: &str) -> fmt::Result {
+                let mut has_lower: bool = false;
+                let mut has_upper: bool = false;
+                for ch in s.chars() {
+                    let b = ch as u8; // cast ok, `b` unused until `ch` is checked to be ASCII
+
+                    // Break after finding an error so that we report the first invalid
+                    // character, not the last.
+                    if !ch.is_ascii() {
+                        self.error = Some(Error::NonAsciiChar(ch));
+                        break;
+                    } else if !(33..=126).contains(&b) {
+                        self.error = Some(InvalidAsciiByte(b));
+                        break;
+                    }
+
+                    if ch.is_ascii_lowercase() {
+                        if has_upper {
+                            self.error = Some(MixedCase);
+                            break;
+                        }
+                        has_lower = true;
+                    } else if ch.is_ascii_uppercase() {
+                        if has_lower {
+                            self.error = Some(MixedCase);
+                            break;
+                        }
+                        has_upper = true;
+                    };
+                }
+
+                // However, an invalid length error will take priority over an
+                // invalid character error.
+                if self.index + s.len() > self.arr.len() {
+                    self.error = Some(Error::TooLong(self.index + s.len()));
+                } else {
+                    // Only do the actual copy if we passed the index check.
+                    self.arr[self.index..self.index + s.len()].copy_from_slice(s.as_bytes());
+                }
+
+                // Unconditionally update self.index so that in the case of a too-long
+                // string, our error return will reflect the full length.
+                self.index += s.len();
+                Ok(())
+            }
+        }
+
+        let mut byte_formatter = ByteFormatter { arr: [0; MAX_HRP_LEN], index: 0, error: None };
+
+        write!(byte_formatter, "{}", data).expect("custom Formatter cannot fail");
+        if byte_formatter.index == 0 {
+            Err(Empty)
+        } else if let Some(err) = byte_formatter.error {
+            Err(err)
+        } else {
+            Ok(Self { buf: byte_formatter.arr, size: byte_formatter.index })
+        }
+    }
+
     /// Parses the human-readable part (see [`Hrp::parse`] for full docs).
     ///
     /// Does not check that `hrp` is valid according to BIP-173 but does check for valid ASCII
@@ -424,6 +498,7 @@ mod tests {
                 #[test]
                 fn $test_name() {
                     assert!(Hrp::parse($hrp).is_ok());
+                    assert!(Hrp::parse_display($hrp).is_ok());
                 }
             )*
         }
@@ -445,6 +520,7 @@ mod tests {
                 #[test]
                 fn $test_name() {
                     assert!(Hrp::parse($hrp).is_err());
+                    assert!(Hrp::parse_display($hrp).is_err());
                 }
             )*
         }
@@ -537,5 +613,46 @@ mod tests {
         let s = "arbitraryhrp";
         let hrp = Hrp::parse_unchecked(s);
         assert_eq!(hrp.as_bytes(), s.as_bytes());
+    }
+
+    #[test]
+    fn parse_display() {
+        let hrp = Hrp::parse_display(format_args!("{}_{}", 123, "abc")).unwrap();
+        assert_eq!(hrp.as_str(), "123_abc");
+
+        let hrp = Hrp::parse_display(format_args!("{:083}", 1)).unwrap();
+        assert_eq!(
+            hrp.as_str(),
+            "00000000000000000000000000000000000000000000000000000000000000000000000000000000001"
+        );
+
+        assert_eq!(Hrp::parse_display(format_args!("{:084}", 1)), Err(Error::TooLong(84)),);
+
+        assert_eq!(
+            Hrp::parse_display(format_args!("{:83}", 1)),
+            Err(Error::InvalidAsciiByte(b' ')),
+        );
+    }
+
+    #[test]
+    fn parse_non_ascii() {
+        assert_eq!(Hrp::parse("❤").unwrap_err(), Error::NonAsciiChar('❤'));
+    }
+
+    #[test]
+    fn parse_display_non_ascii() {
+        assert_eq!(Hrp::parse_display("❤").unwrap_err(), Error::NonAsciiChar('❤'));
+    }
+
+    #[test]
+    fn parse_display_returns_first_error() {
+        assert_eq!(Hrp::parse_display("❤ ").unwrap_err(), Error::NonAsciiChar('❤'));
+    }
+
+    // This test shows that the error does not contain heart.
+    #[test]
+    fn parse_display_iterates_chars() {
+        assert_eq!(Hrp::parse_display(" ❤").unwrap_err(), Error::InvalidAsciiByte(b' '));
+        assert_eq!(Hrp::parse_display("_❤").unwrap_err(), Error::NonAsciiChar('❤'));
     }
 }
