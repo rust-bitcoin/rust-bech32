@@ -78,14 +78,14 @@ impl Hrp {
     pub fn parse(hrp: &str) -> Result<Self, Error> {
         use Error::*;
 
-        let mut new = Hrp { buf: [0_u8; MAX_HRP_LEN], size: 0 };
-
         if hrp.is_empty() {
             return Err(Empty);
         }
         if hrp.len() > MAX_HRP_LEN {
             return Err(TooLong(hrp.len()));
         }
+
+        let mut new = Hrp { buf: [0_u8; MAX_HRP_LEN], size: 0 };
 
         let mut has_lower: bool = false;
         let mut has_upper: bool = false;
