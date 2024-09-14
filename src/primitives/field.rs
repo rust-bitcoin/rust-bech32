@@ -10,6 +10,7 @@ pub trait Field:
     + PartialEq
     + Eq
     + Clone
+    + Default
     + hash::Hash
     + fmt::Debug
     + fmt::Display

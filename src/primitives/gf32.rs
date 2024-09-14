@@ -308,6 +308,13 @@ impl Field for Fe32 {
 
 super::impl_ops_for_fe!(impl for Fe32);
 
+impl super::ExtensionField for Fe32 {
+    type BaseField = Self;
+    const DEGREE: usize = 1;
+    const POLYNOMIAL: Self = Fe32::Q;
+    const EXT_ELEM: Self = Fe32::P;
+}
+
 /// A galois field error when converting from a character.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 #[non_exhaustive]

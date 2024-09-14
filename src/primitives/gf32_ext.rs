@@ -24,6 +24,11 @@ pub struct Fe32Ext<const DEG: usize> {
     inner: [Fe32; DEG],
 }
 
+// For some reason this cannot be derived.
+impl<const DEG: usize> Default for Fe32Ext<DEG> {
+    fn default() -> Self { Fe32Ext { inner: [Fe32::Q; DEG] } }
+}
+
 impl<const DEG: usize> From<Fe32> for Fe32Ext<DEG> {
     fn from(fe: Fe32) -> Self {
         let mut ret = Self { inner: [Fe32::Q; DEG] };
