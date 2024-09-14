@@ -169,9 +169,11 @@ where
     }
 }
 
-/// Iterator adaptor which takes a stream of field elements, converts it to characters prefixed by
-/// an HRP (and separator), and suffixed by the checksum i.e., converts the data in a stream of
-/// field elements into stream of characters representing the encoded bech32 string.
+/// Iterator adaptor which converts a stream of field elements to an iterator over the
+/// characters of an HRP-string.
+///
+/// Does so by converting the field elements to characters, prefixing an HRP, and suffixing
+/// a checksum.
 pub struct CharIter<'hrp, I, Ck>
 where
     I: Iterator<Item = Fe32>,
