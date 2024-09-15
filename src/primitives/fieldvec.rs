@@ -59,10 +59,12 @@
 
 #[cfg(all(feature = "alloc", not(feature = "std")))]
 use alloc::vec::Vec;
-use core::{iter, mem, ops, slice};
+use core::{fmt, iter, mem, ops, slice};
 
+use super::checksum::PackedFe32;
 use super::Field;
 use crate::primitives::correction::NO_ALLOC_MAX_LENGTH;
+use crate::Fe32;
 
 /// A vector of field elements.
 ///
@@ -75,6 +77,12 @@ pub struct FieldVec<F> {
     len: usize,
     #[cfg(feature = "alloc")]
     inner_v: Vec<F>,
+}
+
+impl FieldVec<Fe32> {
+    pub fn from_residue<R: PackedFe32>(residue: R) -> Self {
+        (0..R::WIDTH).map(|i| Fe32(residue.unpack(i))).collect()
+    }
 }
 
 impl<F> FieldVec<F> {
@@ -275,6 +283,15 @@ impl<F: Clone + Default> iter::FromIterator<F> for FieldVec<F> {
                 inner_v: Vec::default(),
             }
         }
+    }
+}
+
+impl<F: fmt::Display> fmt::Display for FieldVec<F> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for fe in self.iter() {
+            fe.fmt(f)?;
+        }
+        Ok(())
     }
 }
 

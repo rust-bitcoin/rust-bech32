@@ -15,15 +15,15 @@ fn bip_350_checksum_calculated_with_uppercase_form() {
     // BIP-350 states reason for error should be: "checksum calculated with uppercase form of HRP".
     let s = "M1VUXWEZ";
 
-    assert_eq!(
+    assert!(matches!(
         CheckedHrpstring::new::<Bech32m>(s).unwrap_err(),
-        CheckedHrpstringError::Checksum(ChecksumError::InvalidResidue)
-    );
+        CheckedHrpstringError::Checksum(ChecksumError::InvalidResidue(..))
+    ));
 
-    assert_eq!(
+    assert!(matches!(
         SegwitHrpstring::new(s).unwrap_err(),
-        SegwitHrpstringError::Checksum(ChecksumError::InvalidResidue)
-    );
+        SegwitHrpstringError::Checksum(ChecksumError::InvalidResidue(..))
+    ));
 }
 
 macro_rules! check_valid_bech32m {
@@ -34,7 +34,7 @@ macro_rules! check_valid_bech32m {
                 let p = UncheckedHrpstring::new($valid_bech32m).unwrap();
                 p.validate_checksum::<Bech32m>().expect("valid bech32m");
                 // Valid bech32m strings are by definition invalid bech32.
-                assert_eq!(p.validate_checksum::<Bech32>().unwrap_err(), ChecksumError::InvalidResidue);
+                assert!(matches!(p.validate_checksum::<Bech32>().unwrap_err(), ChecksumError::InvalidResidue(..)));
             }
         )*
     }
