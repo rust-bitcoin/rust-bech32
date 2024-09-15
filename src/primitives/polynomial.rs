@@ -4,7 +4,9 @@
 
 use core::{fmt, iter, ops, slice};
 
+use super::checksum::PackedFe32;
 use super::{ExtensionField, Field, FieldVec};
+use crate::Fe32;
 
 /// A polynomial over some field.
 #[derive(PartialEq, Eq, Clone, Debug, Hash)]
@@ -12,6 +14,12 @@ pub struct Polynomial<F> {
     /// The coefficients of the polynomial, in "little-endian" order.
     /// That is the constant term is at index 0.
     inner: FieldVec<F>,
+}
+
+impl Polynomial<Fe32> {
+    pub fn from_residue<R: PackedFe32>(residue: R) -> Self {
+        (0..R::WIDTH).rev().map(|i| Fe32(residue.unpack(i))).collect()
+    }
 }
 
 impl<F: Field> Polynomial<F> {

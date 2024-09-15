@@ -218,13 +218,15 @@ const BUF_LENGTH: usize = 10;
 pub fn decode(s: &str) -> Result<(Hrp, Vec<u8>), DecodeError> {
     let unchecked = UncheckedHrpstring::new(s)?;
 
-    if let Err(e) = unchecked.validate_checksum::<Bech32m>() {
-        if !unchecked.has_valid_checksum::<Bech32>() {
+    match unchecked.validate_checksum::<Bech32m>() {
+        Ok(_) => {}
+        Err(ChecksumError::InvalidResidue(ref res_err)) if res_err.matches_bech32_checksum() => {}
+        Err(e) => {
             return Err(DecodeError::Checksum(e));
         }
-    };
-    // One of the checksums was valid, Ck is only for length and since
-    // they are both the same we can use either here.
+    }
+    // One of the checksums was valid. `Bech32m` is only used for its
+    // length and since it is the same as `Bech32` we can use either here.
     let checked = unchecked.remove_checksum::<Bech32m>();
 
     Ok((checked.hrp(), checked.byte_iter().collect()))

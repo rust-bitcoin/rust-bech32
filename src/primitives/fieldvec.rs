@@ -59,7 +59,7 @@
 
 #[cfg(all(feature = "alloc", not(feature = "std")))]
 use alloc::vec::Vec;
-use core::{iter, mem, ops, slice};
+use core::{fmt, iter, mem, ops, slice};
 
 use super::Field;
 use crate::primitives::correction::NO_ALLOC_MAX_LENGTH;
@@ -294,6 +294,15 @@ impl<F: Clone + Default> iter::FromIterator<F> for FieldVec<F> {
                 inner_v: Vec::default(),
             }
         }
+    }
+}
+
+impl<F: fmt::Display> fmt::Display for FieldVec<F> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for fe in self.iter() {
+            fe.fmt(f)?;
+        }
+        Ok(())
     }
 }
 

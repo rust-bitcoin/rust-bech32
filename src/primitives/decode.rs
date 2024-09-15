@@ -76,11 +76,12 @@
 use core::{fmt, iter, slice, str};
 
 use crate::error::write_err;
-use crate::primitives::checksum::{self, Checksum};
+use crate::primitives::checksum::{self, Checksum, PackedFe32};
 use crate::primitives::gf32::Fe32;
 use crate::primitives::hrp::{self, Hrp};
 use crate::primitives::iter::{Fe32IterExt, FesToBytes};
 use crate::primitives::segwit::{self, WitnessLengthError, VERSION_0};
+use crate::primitives::Polynomial;
 use crate::{Bech32, Bech32m};
 
 /// Separator between the hrp and payload (as defined by BIP-173).
@@ -277,8 +278,9 @@ impl<'s> UncheckedHrpstring<'s> {
             checksum_eng.input_fe(fe);
         }
 
-        if checksum_eng.residue() != &Ck::TARGET_RESIDUE {
-            return Err(InvalidResidue);
+        let residue = *checksum_eng.residue();
+        if residue != Ck::TARGET_RESIDUE {
+            return Err(InvalidResidue(InvalidResidueError::new(residue, Ck::TARGET_RESIDUE)));
         }
 
         Ok(())
@@ -952,7 +954,7 @@ pub enum ChecksumError {
     /// String exceeds maximum allowed length.
     CodeLength(CodeLengthError),
     /// The checksum residue is not valid for the data.
-    InvalidResidue,
+    InvalidResidue(InvalidResidueError),
     /// The checksummed string is not a valid length.
     InvalidLength,
 }
@@ -963,7 +965,7 @@ impl fmt::Display for ChecksumError {
 
         match *self {
             CodeLength(ref e) => write_err!(f, "string exceeds maximum allowed length"; e),
-            InvalidResidue => write!(f, "the checksum residue is not valid for the data"),
+            InvalidResidue(ref e) => write_err!(f, "checksum failed"; e),
             InvalidLength => write!(f, "the checksummed string is not a valid length"),
         }
     }
@@ -976,9 +978,54 @@ impl std::error::Error for ChecksumError {
 
         match *self {
             CodeLength(ref e) => Some(e),
-            InvalidResidue | InvalidLength => None,
+            InvalidResidue(ref e) => Some(e),
+            InvalidLength => None,
         }
     }
+}
+
+/// Residue mismatch validating the checksum. That is, "the checksum failed".
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InvalidResidueError {
+    actual: Polynomial<Fe32>,
+    target: Polynomial<Fe32>,
+}
+
+impl fmt::Display for InvalidResidueError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.actual.has_data() {
+            write!(f, "residue {} did not match target {}", self.actual, self.target)
+        } else {
+            f.write_str("residue mismatch")
+        }
+    }
+}
+
+impl InvalidResidueError {
+    /// Constructs a new "invalid residue" error.
+    fn new<F: PackedFe32>(residue: F, target_residue: F) -> Self {
+        Self {
+            actual: Polynomial::from_residue(residue),
+            target: Polynomial::from_residue(target_residue),
+        }
+    }
+
+    /// Whether this "invalid residue" error actually represents a valid residue
+    /// for the bech32 checksum.
+    ///
+    /// This method could in principle be made generic over the intended checksum,
+    /// but it is not clear what the purpose would be (checking bech32 vs bech32m
+    /// is a special case), and the method would necessarily panic if called with
+    /// too large a checksum without an allocator. We would like to better understand
+    /// the usecase for this before exposing such a footgun.
+    pub fn matches_bech32_checksum(&self) -> bool {
+        self.actual == Polynomial::from_residue(Bech32::TARGET_RESIDUE)
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for InvalidResidueError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> { None }
 }
 
 /// Encoding HRP and data into a bech32 string exceeds the checksum code length.
@@ -1065,6 +1112,9 @@ impl std::error::Error for PaddingError {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(all(feature = "alloc", not(feature = "std")))]
+    use alloc::vec::Vec;
+
     use super::*;
 
     #[test]
@@ -1117,7 +1167,7 @@ mod tests {
             .expect("string parses correctly")
             .validate_checksum::<Bech32>()
             .unwrap_err();
-        assert_eq!(err, InvalidResidue);
+        assert!(matches!(err, InvalidResidue(..)));
     }
 
     #[test]
@@ -1178,7 +1228,7 @@ mod tests {
             .unwrap()
             .validate_checksum::<Bech32m>()
             .unwrap_err();
-        assert_eq!(err, InvalidResidue);
+        assert!(matches!(err, InvalidResidue(..)));
     }
 
     #[test]
