@@ -59,7 +59,7 @@
 
 #[cfg(all(feature = "alloc", not(feature = "std")))]
 use alloc::vec::Vec;
-use core::{iter, ops, slice};
+use core::{iter, mem, ops, slice};
 
 use super::Field;
 use crate::primitives::correction::NO_ALLOC_MAX_LENGTH;
@@ -105,6 +105,22 @@ impl<F> FieldVec<F> {
     /// Whether the vector is empty
     #[inline]
     pub fn is_empty(&self) -> bool { self.len == 0 }
+
+    pub fn reverse(&mut self) {
+        self.assert_has_data();
+
+        #[cfg(not(feature = "alloc"))]
+        {
+            self.inner_a[..self.len].reverse();
+        }
+
+        #[cfg(feature = "alloc")]
+        if self.len > NO_ALLOC_MAX_LENGTH {
+            self.inner_v.reverse();
+        } else {
+            self.inner_a[..self.len].reverse();
+        }
+    }
 
     /// Returns an immutable iterator over the elements in the vector.
     ///
@@ -162,6 +178,59 @@ impl<F: Field> FieldVec<F> {
     /// field, via the inclusion map.
     pub fn lift<E: Field + From<F>>(&self) -> FieldVec<E> {
         self.iter().cloned().map(E::from).collect()
+    }
+}
+
+impl<F: Default> FieldVec<F> {
+    /// Pushes an item onto the end of the vector.
+    pub fn push(&mut self, item: F) {
+        self.len += 1;
+        self.assert_has_data();
+
+        #[cfg(not(feature = "alloc"))]
+        {
+            self.inner_a[self.len - 1] = item;
+        }
+
+        #[cfg(feature = "alloc")]
+        if self.len < NO_ALLOC_MAX_LENGTH + 1 {
+            self.inner_a[self.len - 1] = item;
+        } else {
+            if self.len == NO_ALLOC_MAX_LENGTH + 1 {
+                let inner_a = mem::take(&mut self.inner_a);
+                self.inner_v = inner_a.into();
+            }
+            self.inner_v.push(item);
+        }
+    }
+
+    /// Pops an item off the end of the vector.
+    pub fn pop(&mut self) -> Option<F> {
+        self.assert_has_data();
+        if self.len == 0 {
+            return None;
+        }
+
+        self.len -= 1;
+        #[cfg(not(feature = "alloc"))]
+        {
+            Some(mem::take(&mut self.inner_a[self.len]))
+        }
+
+        #[cfg(feature = "alloc")]
+        if self.len < NO_ALLOC_MAX_LENGTH {
+            Some(mem::take(&mut self.inner_a[self.len]))
+        } else {
+            use core::convert::TryFrom;
+
+            let ret = self.inner_v.pop();
+            let inner_v = mem::take(&mut self.inner_v);
+            match <[F; NO_ALLOC_MAX_LENGTH]>::try_from(inner_v) {
+                Ok(arr) => self.inner_a = arr,
+                Err(vec) => self.inner_v = vec,
+            }
+            ret
+        }
     }
 }
 
