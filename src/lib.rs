@@ -95,7 +95,7 @@
 //!
 //! ```
 //! # #[cfg(feature = "alloc")] {
-//! use bech32::Checksum;
+//! use bech32::{Checksum, Fe32, Fe1024};
 //!
 //! /// The codex32 checksum algorithm, defined in BIP-93.
 //! #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -103,6 +103,10 @@
 //!
 //! impl Checksum for Codex32 {
 //!     type MidstateRepr = u128;
+//!     type CorrectionField = bech32::primitives::gf32_ext::Fe32Ext<2>;
+//!     const ROOT_GENERATOR: Self::CorrectionField = Fe1024::new([Fe32::_9, Fe32::_9]);
+//!     const ROOT_EXPONENTS: core::ops::RangeInclusive<usize> = 77..=84;
+//!
 //!     const CHECKSUM_LENGTH: usize = 13;
 //!     const CODE_LENGTH: usize = 93;
 //!     // Copied from BIP-93
