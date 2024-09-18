@@ -66,8 +66,13 @@ pub trait Fe32IterExt: Sized + Iterator<Item = Fe32> {
 
     /// Adapts the `Fe32` iterator to output bytes instead.
     ///
-    /// If the total number of bits is not a multiple of 8, trailing bits
-    /// are padded with the needed amount of zeroes and converted.
+    /// Similar to `fes_to_bytes`, but in this variant trailing bits are kept.
+    ///
+    /// If the last bits do not fill up the last output byte completely, they
+    /// are not dropped, but kept, and the last byte is padded with zero bits.
+    /// In effect this is the same as if the input was padded with zero values
+    /// (1 or 2), such that there are enough zero bits to fill the last byte.
+    /// The output is either the same as of `fes_to_bytes`, or has 1 extra byte.
     #[inline]
     fn fes_to_bytes_zeropad(mut self) -> FesToBytes<Self> {
         FesToBytes {
