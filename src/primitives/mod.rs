@@ -16,7 +16,7 @@ pub mod segwit;
 
 use checksum::{Checksum, PackedNull};
 use field::impl_ops_for_fe;
-pub use field::{ExtensionField, Field};
+pub use field::{Bech32Field, ExtensionField, Field};
 #[cfg(feature = "alloc")]
 use polynomial::Polynomial;
 

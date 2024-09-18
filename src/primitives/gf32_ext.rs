@@ -13,7 +13,7 @@
 
 use core::{fmt, ops};
 
-use super::field::{ExtensionField, Field};
+use super::field::{Bech32Field, ExtensionField, Field};
 use crate::Fe32;
 
 /// An element of the extension field.
@@ -110,6 +110,22 @@ where
 /// The field of order 1024.
 pub type Fe1024 = Fe32Ext<2>;
 
+impl Bech32Field for Fe1024 {
+    #[inline]
+    fn _add(&self, other: &Self) -> Self {
+        Self::new([self.inner[0] + other.inner[0], self.inner[1] + other.inner[1]])
+    }
+
+    #[inline]
+    fn _mul(&self, other: &Self) -> Self { self.mul_by_elem(other) }
+
+    #[inline]
+    fn _div(&self, other: &Self) -> Self { other.multiplicative_inverse() * self }
+
+    #[inline]
+    fn _neg(self) -> Self { self }
+}
+
 impl Field for Fe1024 {
     /// The zero element of the field.
     const ZERO: Self = Self::new([Fe32::Q, Fe32::Q]);
@@ -128,23 +144,6 @@ impl Field for Fe1024 {
     const MULTIPLICATIVE_ORDER: usize = 1023;
 
     const MULTIPLICATIVE_ORDER_FACTORS: &'static [usize] = &[1, 3, 11, 31, 33, 93, 341, 1023];
-
-    #[inline]
-    fn _add(&self, other: &Self) -> Self {
-        Self::new([self.inner[0] + other.inner[0], self.inner[1] + other.inner[1]])
-    }
-
-    #[inline]
-    fn _sub(&self, other: &Self) -> Self { self._add(other) }
-
-    #[inline]
-    fn _mul(&self, other: &Self) -> Self { self.mul_by_elem(other) }
-
-    #[inline]
-    fn _div(&self, other: &Self) -> Self { other.multiplicative_inverse() * self }
-
-    #[inline]
-    fn _neg(self) -> Self { self }
 
     fn multiplicative_inverse(self) -> Self {
         // Aliases to make the below equations easier to read
@@ -186,6 +185,26 @@ impl ExtensionField for Fe1024 {
 /// The field of order 32768.
 pub type Fe32768 = Fe32Ext<3>;
 
+impl Bech32Field for Fe32768 {
+    #[inline]
+    fn _add(&self, other: &Self) -> Self {
+        Self::new([
+            self.inner[0] + other.inner[0],
+            self.inner[1] + other.inner[1],
+            self.inner[2] + other.inner[2],
+        ])
+    }
+
+    #[inline]
+    fn _mul(&self, other: &Self) -> Self { self.mul_by_elem(other) }
+
+    #[inline]
+    fn _div(&self, other: &Self) -> Self { other.multiplicative_inverse() * self }
+
+    #[inline]
+    fn _neg(self) -> Self { self }
+}
+
 impl Field for Fe32768 {
     /// The zero element of the field.
     const ZERO: Self = Self::new([Fe32::Q, Fe32::Q, Fe32::Q]);
@@ -205,27 +224,6 @@ impl Field for Fe32768 {
     const MULTIPLICATIVE_ORDER: usize = 32767;
 
     const MULTIPLICATIVE_ORDER_FACTORS: &'static [usize] = &[1, 7, 31, 151, 217, 1057, 4681, 32767];
-
-    #[inline]
-    fn _add(&self, other: &Self) -> Self {
-        Self::new([
-            self.inner[0] + other.inner[0],
-            self.inner[1] + other.inner[1],
-            self.inner[2] + other.inner[2],
-        ])
-    }
-
-    #[inline]
-    fn _sub(&self, other: &Self) -> Self { self._add(other) }
-
-    #[inline]
-    fn _mul(&self, other: &Self) -> Self { self.mul_by_elem(other) }
-
-    #[inline]
-    fn _div(&self, other: &Self) -> Self { other.multiplicative_inverse() * self }
-
-    #[inline]
-    fn _neg(self) -> Self { self }
 
     fn multiplicative_inverse(self) -> Self {
         // Unlike in the GF1024 case we don't bother being generic over
