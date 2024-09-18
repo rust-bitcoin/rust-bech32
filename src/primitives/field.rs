@@ -147,52 +147,38 @@ macro_rules! impl_ops_for_fe {
         impl core::ops::Add<$op> for $op {
             type Output = Self;
             #[inline]
-            fn add(self, other: $op) -> $op {
-                use $crate::primitives::Field as _;
-                self._add(&other)
-            }
+            fn add(self, other: $op) -> $op { $crate::primitives::Field::_add(&self, &other) }
         }
 
         impl core::ops::Add<&$op> for $op {
             type Output = Self;
             #[inline]
-            fn add(self, other: &$op) -> $op {
-                use $crate::primitives::Field as _;
-                self._add(other)
-            }
+            fn add(self, other: &$op) -> $op { $crate::primitives::Field::_add(&self, other) }
         }
 
         impl core::ops::Add<$op> for &$op {
             type Output = $op;
             #[inline]
-            fn add(self, other: $op) -> $op {
-                use $crate::primitives::Field as _;
-                self._add(&other)
-            }
+            fn add(self, other: $op) -> $op { $crate::primitives::Field::_add(self, &other) }
         }
 
         impl core::ops::Add<&$op> for &$op {
             type Output = $op;
             #[inline]
-            fn add(self, other: &$op) -> $op {
-                use $crate::primitives::Field as _;
-                self._add(other)
-            }
+            fn add(self, other: &$op) -> $op { $crate::primitives::Field::_add(self, other) }
         }
 
         impl core::ops::AddAssign for $op {
             #[inline]
             fn add_assign(&mut self, other: $op) {
-                use $crate::primitives::Field as _;
-                *self = self._add(&other)
+                *self = $crate::primitives::Field::_add(self, &other)
             }
         }
 
         impl core::ops::AddAssign<&$op> for $op {
             #[inline]
             fn add_assign(&mut self, other: &$op) {
-                use $crate::primitives::Field as _;
-                *self = self._add(other)
+                *self = $crate::primitives::Field::_add(self, other)
             }
         }
 
@@ -200,52 +186,38 @@ macro_rules! impl_ops_for_fe {
         impl core::ops::Sub<$op> for $op {
             type Output = Self;
             #[inline]
-            fn sub(self, other: $op) -> $op {
-                use $crate::primitives::Field as _;
-                self._sub(&other)
-            }
+            fn sub(self, other: $op) -> $op { $crate::primitives::Field::_sub(&self, &other) }
         }
 
         impl core::ops::Sub<&$op> for $op {
             type Output = Self;
             #[inline]
-            fn sub(self, other: &$op) -> $op {
-                use $crate::primitives::Field as _;
-                self._sub(other)
-            }
+            fn sub(self, other: &$op) -> $op { $crate::primitives::Field::_sub(&self, other) }
         }
 
         impl core::ops::Sub<$op> for &$op {
             type Output = $op;
             #[inline]
-            fn sub(self, other: $op) -> $op {
-                use $crate::primitives::Field as _;
-                self._sub(&other)
-            }
+            fn sub(self, other: $op) -> $op { $crate::primitives::Field::_sub(self, &other) }
         }
 
         impl core::ops::Sub<&$op> for &$op {
             type Output = $op;
             #[inline]
-            fn sub(self, other: &$op) -> $op {
-                use $crate::primitives::Field as _;
-                self._sub(other)
-            }
+            fn sub(self, other: &$op) -> $op { $crate::primitives::Field::_sub(self, other) }
         }
 
         impl core::ops::SubAssign for $op {
             #[inline]
             fn sub_assign(&mut self, other: $op) {
-                use $crate::primitives::Field as _;
-                *self = self._sub(&other)
+                *self = $crate::primitives::Field::_sub(self, &other)
             }
         }
 
         impl core::ops::SubAssign<&$op> for $op {
             #[inline]
             fn sub_assign(&mut self, other: &$op) {
-                use $crate::primitives::Field as _;
-                *self = self._sub(other)
+                *self = $crate::primitives::Field::_sub(self, other)
             }
         }
 
@@ -253,52 +225,38 @@ macro_rules! impl_ops_for_fe {
         impl core::ops::Mul<$op> for $op {
             type Output = Self;
             #[inline]
-            fn mul(self, other: $op) -> $op {
-                use $crate::primitives::Field as _;
-                self._mul(&other)
-            }
+            fn mul(self, other: $op) -> $op { $crate::primitives::Field::_mul(&self, &other) }
         }
 
         impl core::ops::Mul<&$op> for $op {
             type Output = Self;
             #[inline]
-            fn mul(self, other: &$op) -> $op {
-                use $crate::primitives::Field as _;
-                self._mul(other)
-            }
+            fn mul(self, other: &$op) -> $op { $crate::primitives::Field::_mul(&self, other) }
         }
 
         impl core::ops::Mul<$op> for &$op {
             type Output = $op;
             #[inline]
-            fn mul(self, other: $op) -> $op {
-                use $crate::primitives::Field as _;
-                self._mul(&other)
-            }
+            fn mul(self, other: $op) -> $op { $crate::primitives::Field::_mul(self, &other) }
         }
 
         impl core::ops::Mul<&$op> for &$op {
             type Output = $op;
             #[inline]
-            fn mul(self, other: &$op) -> $op {
-                use $crate::primitives::Field as _;
-                self._mul(other)
-            }
+            fn mul(self, other: &$op) -> $op { $crate::primitives::Field::_mul(self, other) }
         }
 
         impl core::ops::MulAssign for $op {
             #[inline]
             fn mul_assign(&mut self, other: $op) {
-                use $crate::primitives::Field as _;
-                *self = self._mul(&other)
+                *self = $crate::primitives::Field::_mul(self, &other)
             }
         }
 
         impl core::ops::MulAssign<&$op> for $op {
             #[inline]
             fn mul_assign(&mut self, other: &$op) {
-                use $crate::primitives::Field as _;
-                *self = self._mul(other)
+                *self = $crate::primitives::Field::_mul(self, other)
             }
         }
 
@@ -306,52 +264,38 @@ macro_rules! impl_ops_for_fe {
         impl core::ops::Div<$op> for $op {
             type Output = Self;
             #[inline]
-            fn div(self, other: $op) -> $op {
-                use $crate::primitives::Field as _;
-                self._div(&other)
-            }
+            fn div(self, other: $op) -> $op { $crate::primitives::Field::_div(&self, &other) }
         }
 
         impl core::ops::Div<&$op> for $op {
             type Output = Self;
             #[inline]
-            fn div(self, other: &$op) -> $op {
-                use $crate::primitives::Field as _;
-                self._div(other)
-            }
+            fn div(self, other: &$op) -> $op { $crate::primitives::Field::_div(&self, other) }
         }
 
         impl core::ops::Div<$op> for &$op {
             type Output = $op;
             #[inline]
-            fn div(self, other: $op) -> $op {
-                use $crate::primitives::Field as _;
-                self._div(&other)
-            }
+            fn div(self, other: $op) -> $op { $crate::primitives::Field::_div(self, &other) }
         }
 
         impl core::ops::Div<&$op> for &$op {
             type Output = $op;
             #[inline]
-            fn div(self, other: &$op) -> $op {
-                use $crate::primitives::Field as _;
-                self._div(other)
-            }
+            fn div(self, other: &$op) -> $op { $crate::primitives::Field::_div(self, other) }
         }
 
         impl core::ops::DivAssign for $op {
             #[inline]
             fn div_assign(&mut self, other: $op) {
-                use $crate::primitives::Field as _;
-                *self = self._div(&other)
+                *self = $crate::primitives::Field::_div(self, &other)
             }
         }
 
         impl core::ops::DivAssign<&$op> for $op {
             #[inline]
             fn div_assign(&mut self, other: &$op) {
-                use $crate::primitives::Field as _;
-                *self = self._div(other)
+                *self = $crate::primitives::Field::_div(self, other)
             }
         }
 
@@ -359,10 +303,7 @@ macro_rules! impl_ops_for_fe {
         impl core::ops::Neg for $op {
             type Output = Self;
             #[inline]
-            fn neg(self) -> Self {
-                use $crate::primitives::Field as _;
-                self._neg()
-            }
+            fn neg(self) -> Self { $crate::primitives::Field::_neg(self) }
         }
 
         // sum
