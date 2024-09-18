@@ -12,14 +12,13 @@ pub mod gf32;
 pub mod gf32_ext;
 pub mod hrp;
 pub mod iter;
-#[cfg(feature = "alloc")]
 mod polynomial;
 pub mod segwit;
 
 use checksum::{Checksum, PackedNull};
 use field::impl_ops_for_fe;
 pub use field::{Bech32Field, ExtensionField, Field};
-#[cfg(feature = "alloc")]
+use fieldvec::FieldVec;
 use polynomial::Polynomial;
 
 use crate::{Fe1024, Fe32};

@@ -2,27 +2,29 @@
 
 //! Polynomials over Finite Fields
 
-#[cfg(all(feature = "alloc", not(feature = "std"), not(test)))]
-use alloc::vec::Vec;
 use core::{iter, ops};
 
-use super::Field;
+use super::{ExtensionField, Field, FieldVec};
 
 /// A polynomial over some field.
 #[derive(PartialEq, Eq, Clone, Debug, Hash)]
 pub struct Polynomial<F> {
-    inner: Vec<F>,
-}
-
-impl<F> Polynomial<F> {
-    /// Constructor for a polynomial from a vector of coefficients.
-    ///
-    /// These coefficients are in "little endian" order. That is, the ith
-    /// coefficient is the one multiplied by x^i.
-    pub fn new(f: Vec<F>) -> Self { Self { inner: f } }
+    inner: FieldVec<F>,
 }
 
 impl<F: Field> Polynomial<F> {
+    /// Provide access to the underlying [`FieldVec`].
+    pub fn into_inner(self) -> FieldVec<F> { self.inner }
+
+    /// Provide access to the underlying [`FieldVec`].
+    pub fn as_inner(&self) -> &FieldVec<F> { &self.inner }
+
+    /// Constructs a polynomial from a slice of field elements, prepending
+    /// a 1 value to produce a monic polynomial.
+    pub fn with_monic_leading_term(coeffs: &[F]) -> Self {
+        Polynomial { inner: iter::once(F::ONE).chain(coeffs.iter().cloned()).collect() }
+    }
+
     /// The degree of the polynomial.
     ///
     /// For constants it will return zero, including for the constant zero.
@@ -44,63 +46,43 @@ impl<F: Field> Polynomial<F> {
         }
         F::ZERO
     }
-}
 
-impl<F: Field> Polynomial<F> {
-    /// Finds all roots of the polynomial in the given field, in
-    /// no particular order.
+    /// Whether 0 is a root of the polynomial. Equivalently, whether `x` is a
+    /// factor of the polynomial.
+    pub fn zero_is_root(&self) -> bool { self.inner.is_empty() || self.leading_term() == F::ZERO }
+
+    /// An iterator over the roots of the residue, when interpreted as a polynomial.
     ///
-    /// Does not consider multiplicity; it assumes there are no
-    /// repeated roots. (FIXME we really ought to do so, and
-    /// definitely should before exposing this function in the
-    /// public API.)
+    /// Takes a base element `base`. The roots of the residue will be yielded as
+    /// nonnegative integers between 0 and 1 less than the order of the base,
+    /// inclusive. If `base` is a primitive element of the extension field, then
+    /// all distinct roots (in the extension field) will be found.
     ///
-    /// If the polynomial does not split, then the returned vector
-    /// will have length strictly less than [`Self::degree`]. If
-    /// the polynomial _does_ split then the length will be equal.
+    /// Iterates via Chien search, which is a form of brute force. Internally it
+    /// will do as many iterations as the multiplicative order of `base`, regardless
+    /// of how many roots are actually found.
     ///
-    /// For constants, will return vec![0] for the constant 0 and the
-    /// empty vector for any other constant. Probably the caller wants
-    /// to check if they have a constant and special-case this.
-    pub fn find_distinct_roots(&self) -> Vec<F> {
-        // Implements Chien search
+    /// Only roots which are a power of `base` are returned, so if `base` is *not*
+    /// a primitive element then not all roots may be returned.
+    ///
+    /// This will **not** return 0 as a root under any circumstances. To check
+    /// whether zero is a root of the polynomial, run [`Self::zero_is_root`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if [`Self::has_data`] is false.
+    pub fn find_nonzero_distinct_roots<E: ExtensionField<BaseField = F>>(
+        &self,
+        base: E,
+    ) -> RootIter<E> {
+        self.inner.assert_has_data();
 
-        let mut ret = Vec::with_capacity(self.degree());
-        // Check if zero is a root
-        if self.inner.is_empty() || self.leading_term() == F::ZERO {
-            ret.push(F::ZERO);
+        RootIter {
+            idx: 0,
+            max_idx: base.multiplicative_order(),
+            base_powers: FieldVec::from_powers(base, self.inner.len() - 1),
+            polynomial: self.inner.lift(),
         }
-        // Special-case constants, which have 0 as a root iff they are the constant 0.
-        if self.degree() == 1 {
-            return ret;
-            // from here on out we know self.inner[0] won't panic
-        }
-
-        // Vector of [1, gen, gen^2, ...] up to the degree d.
-        debug_assert_eq!(F::GENERATOR.multiplicative_order(), F::MULTIPLICATIVE_ORDER);
-        let gen_power = iter::successors(Some(F::ONE), |gen| Some(F::GENERATOR * gen))
-            .take(self.degree() + 1)
-            .collect::<Vec<F>>();
-
-        // We special-cased 0 above. So now we can check every nonzero element
-        // to see if it is a root. We brute-force this using Chein's algorithm,
-        // which exploits the fact that we can go from f(alpha^i) to f(alpha^{i+1})
-        // pretty efficiently. So iterate through all the powers of the generator
-        // in this way.
-        let mut cand = F::ONE;
-        let mut eval = self.clone();
-        for _ in 0..F::MULTIPLICATIVE_ORDER {
-            if eval.inner.iter().sum::<F>() == F::ZERO {
-                ret.push(cand.clone());
-            }
-
-            for (i, gen_power) in gen_power.iter().enumerate() {
-                eval.inner[i] *= gen_power;
-            }
-            cand *= F::GENERATOR;
-        }
-
-        ret
     }
 
     /// Given a BCH generator polynomial, find an element alpha that maximizes the
@@ -132,11 +114,14 @@ impl<F: Field> Polynomial<F> {
     /// order, and therefore may return different values on consecutive runs. If
     /// there is a particular "elegant" value you are looking for, it may be
     /// worthwhile to run the function multiple times.
-    pub fn bch_generator_primitive_element(&self) -> (F, usize, ops::RangeInclusive<usize>) {
-        let roots = self.find_distinct_roots();
-        debug_assert!(roots.len() <= self.degree(),);
+    pub fn bch_generator_primitive_element<E: ExtensionField<BaseField = F>>(
+        &self,
+    ) -> (E, usize, ops::RangeInclusive<usize>) {
+        let roots: FieldVec<usize> = self.find_nonzero_distinct_roots(E::GENERATOR).collect();
+        debug_assert!(roots.len() <= self.degree());
+        // debug_assert!(roots.is_sorted()); // nightly only API
         assert_eq!(
-            self.degree(),
+            self.degree() + usize::from(self.zero_is_root()),
             roots.len(),
             "Found {} roots ({:?}) for a polynomial of degree {}; polynomial appears not to split.",
             roots.len(),
@@ -144,63 +129,122 @@ impl<F: Field> Polynomial<F> {
             self.degree(),
         );
 
-        // Brute-force (worst case n^3 in the length of the polynomial) the longest
+        // Brute-force (worst case n^3*log(n) in the length of the polynomial) the longest
         // geometric series within the set of roots. The common ratio between these
         // roots will be our primitive element.
         //
         // We also learn the length of the series and the first root in the series.
-        let mut max_length = 0;
-        let mut max_start = F::ZERO;
-        let mut max_ratio = F::ZERO;
-        for r1 in &roots {
-            for r2 in &roots {
-                if r1 == r2 {
+
+        let mut max_length = 0; // length of the max-length geometric series
+        let mut max_start = 0; // i such that the max-length series starts with gen^i
+        let mut max_ratio = 0; // i such that the ratio between terms is gen^i
+
+        for i in 0..roots.len() {
+            for j in 0..roots.len() {
+                if i == j {
                     continue;
                 }
-                let ratio = r2.clone() / r1;
+                let r1 = roots[i];
+                let mut r2 = roots[j];
 
-                let mut len = 1;
-                let mut elem = r1.clone();
-                while roots.contains(&(elem.clone() * &ratio)) {
+                let ratio = (E::MULTIPLICATIVE_ORDER + r2 - r1) % E::MULTIPLICATIVE_ORDER;
+                // To avoid needing alloc, we binary-search the slice rather than
+                // putting the roots into a HashSet or something so we can O(1)
+                // search them. In practice this doesn't matter because we have
+                // such a small number of roots (it may actually be faster than
+                // using a hashset) and because the root-finding takes such a
+                // long time that noboby can use this method in a loop anyway.
+                let mut len = 2;
+                while let Ok(k) = roots[..].binary_search(&((r2 + ratio) % E::MULTIPLICATIVE_ORDER))
+                {
                     len += 1;
-                    elem *= &ratio;
+                    r2 = roots[k];
                 }
+
                 if len > max_length {
                     max_length = len;
-                    max_start = r2.clone();
+                    max_start = roots[i];
                     max_ratio = ratio;
                 }
             }
         }
 
-        // We have the primitive element (max_ratio) and the first element in the
-        // series with that ratio (max_start). To get the actual exponents of the
-        // series, we need i such that max_start = max_ratio^i.
+        let prim_elem = E::GENERATOR.powi(max_ratio as i64);
+        let code_len = prim_elem.multiplicative_order();
+        // We have the primitive element (prim_elem) and the first element in the
+        // series with that ratio (GENERATOR ** max_start). But we want to know
+        // an exponent i such that GENERATOR ** max_start = prim_elem ** i.
         //
         // It may occur that no such i exists, if the entire series is in a coset
-        // of the group generated by max_ratio. In *theory* this means that we
+        // of the group generated by prim_elem. In *theory* this means that we
         // should go back and find the second-longest geometric series and try
         // that, because for a real-life BCH code this situation indicates that
         // something is wrong and we should just panic.
-        let code_len = max_ratio.multiplicative_order();
-
+        let initial_elem = E::GENERATOR.powi(max_start as i64);
         let mut min_index = None;
-        let mut base = F::ONE;
+        let mut base = E::ONE;
         for i in 0..code_len {
-            base *= &max_ratio;
-            if base == max_start {
+            if base == initial_elem {
                 min_index = Some(i);
             }
+            base *= &prim_elem;
         }
-
         let min_index = match min_index {
             Some(idx) => idx,
-            None => panic!("Found geometric series within roots starting from {} (ratio {} length {}), but this series does not consist of powers of any generator.", max_start, max_ratio, max_length),
+            None => panic!("Found geometric series within roots starting from {} (ratio {} length {}), but the series does not consist of powers of the ratio.", initial_elem, prim_elem, max_length),
         };
 
         // We write `a..=b - 1` instead of `a..b` because RangeInclusive is actually
         // a different type than Range, so the two syntaxes are not equivalent here.
-        (max_ratio, code_len, min_index..=min_index + max_length - 1)
+        (prim_elem, code_len, min_index..=min_index + max_length - 1)
+    }
+}
+
+impl<F: Field> iter::FromIterator<F> for Polynomial<F> {
+    #[inline]
+    fn from_iter<I>(iter: I) -> Self
+    where
+        I: IntoIterator<Item = F>,
+    {
+        Polynomial { inner: FieldVec::from_iter(iter) }
+    }
+}
+
+impl<F> From<FieldVec<F>> for Polynomial<F> {
+    fn from(inner: FieldVec<F>) -> Self { Self { inner } }
+}
+
+/// An iterator over the roots of a polynomial.
+///
+/// This iterator is constructed by the [`Polynomial::find_nonzero_distinct_roots`]
+/// method, which takes a field element as a base. The roots of the
+/// polynomial are yielded as exponents of the base. See the documentation
+/// of that method for more information.
+pub struct RootIter<F> {
+    idx: usize,
+    max_idx: usize,
+    base_powers: FieldVec<F>,
+    polynomial: FieldVec<F>,
+}
+
+impl<F: Field> Iterator for RootIter<F> {
+    type Item = usize;
+    fn next(&mut self) -> Option<usize> {
+        // A zero-length polynomial has no nonzero roots. Special-case this
+        // so that we can freely index the first coefficient of the polynomial.
+        if self.polynomial.is_empty() {
+            return None;
+        }
+
+        while self.idx < self.max_idx {
+            let sum = self.polynomial.iter().sum::<F>();
+            self.polynomial.mul_assign_pointwise(&self.base_powers);
+            self.idx += 1;
+            if sum == F::ZERO {
+                return Some(self.idx - 1);
+            }
+        }
+        None
     }
 }
 
@@ -210,33 +254,19 @@ mod tests {
     use crate::{Fe1024, Fe32};
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn roots() {
-        let bip93_poly = Polynomial::<Fe1024>::new(
-            [
-                Fe32::S,
-                Fe32::S,
-                Fe32::C,
-                Fe32::M,
-                Fe32::L,
-                Fe32::E,
-                Fe32::E,
-                Fe32::E,
-                Fe32::Q,
-                Fe32::G,
-                Fe32::_3,
-                Fe32::M,
-                Fe32::E,
-                Fe32::P,
-            ]
-            .iter()
-            .copied()
-            .map(Fe1024::from)
-            .collect(),
-        );
+        let bip93_poly: Polynomial<Fe32> = {
+            use Fe32 as F;
+            [F::S, F::S, F::C, F::M, F::L, F::E, F::E, F::E, F::Q, F::G, F::_3, F::M, F::E, F::P]
+        }
+        .iter()
+        .copied()
+        .collect();
 
         assert_eq!(bip93_poly.degree(), 13);
 
-        let (elem, order, root_indices) = bip93_poly.bch_generator_primitive_element();
+        let (elem, order, root_indices) = bip93_poly.bch_generator_primitive_element::<Fe1024>();
         // Basically, only the order and the length of the `root_indices` range are
         // guaranteed to be consistent across runs. There will be two possible ranges,
         // a "low" one (in this case 9..16) and a "high one" (77..84) whose generator
@@ -264,6 +294,11 @@ mod tests {
             Fe1024::new([Fe32::G, Fe32::G]).powi(77),
         );
         // ...and these ones are actual unit tests.
+        //
+        // (In the actual implementation, which is now deterministic, only one of
+        // these if branches will ever be taken (I think the first). But all of them
+        // are algebraically valid and we reserve the right to change which one we
+        // return.)
         if elem == Fe1024::new([Fe32::_9, Fe32::_9]) {
             assert_eq!(root_indices, 9..=16);
         } else if elem == Fe1024::new([Fe32::Q, Fe32::G]) {
@@ -272,6 +307,43 @@ mod tests {
             assert_eq!(root_indices, 9..=16);
         } else if elem == Fe1024::new([Fe32::G, Fe32::G]) {
             assert_eq!(root_indices, 77..=84);
+        } else {
+            panic!("Unexpected generator {}", elem);
+        }
+    }
+
+    #[test]
+    #[cfg(not(feature = "alloc"))]
+    fn roots() {
+        // Exactly the same test as above, but for bech32
+        let bech32_poly: Polynomial<Fe32> = {
+            use Fe32 as F;
+            //[F::A, F::K, F::_5, F::_4, F::A, F::J]
+            [F::J, F::A, F::_4, F::_5, F::K, F::A, F::P]
+        }
+        .iter()
+        .copied()
+        .collect();
+
+        assert_eq!(bech32_poly.degree(), 6);
+
+        let (elem, order, root_indices) = bech32_poly.bch_generator_primitive_element::<Fe1024>();
+        // As above, only the order and the length of the `root_indices` range are
+        // guaranteed to be consistent across runs. There will be two possible ranges,
+        // a "low" one (in this case 24..27) and a "high one" (997..1000) whose generator
+        // is the multiplicative inverse of the small one. These correspond to the
+        // fact that for any order-1023 element, e^x = (e^-1)^(1023 - x).
+        assert_eq!(order, 1023);
+        // This assertion just illustrate the above comment...
+        assert_eq!(
+            Fe1024::new([Fe32::P, Fe32::X]).multiplicative_inverse(),
+            Fe1024::new([Fe32::_7, Fe32::F]),
+        );
+        // ...and these ones are actual unit tests.
+        if elem == Fe1024::new([Fe32::P, Fe32::X]) {
+            assert_eq!(root_indices, 24..=26);
+        } else if elem == Fe1024::new([Fe32::_7, Fe32::F]) {
+            assert_eq!(root_indices, 997..=999);
         } else {
             panic!("Unexpected generator {}", elem);
         }
