@@ -2,6 +2,7 @@
 
 //! Generic Field Traits
 
+use core::iter::{Skip, Take};
 use core::{fmt, hash, iter, ops};
 
 /// A generic field.
@@ -87,6 +88,20 @@ pub trait Field:
         panic!(
             "bug: `ExtensionField::MULTIPLICATIVE_ORDER_FACTORS` did not include full group order"
         );
+    }
+
+    /// Constructs an iterator over all the powers of an element from 0 onward.
+    fn powers(self) -> Powers<Self> { Powers { base: self, next: Self::ONE } }
+
+    /// Constructs an iterator over all the powers of an element within a given range.
+    ///
+    /// # Panics
+    ///
+    /// Panics if given a range whose start is greater than its end, or whose range
+    /// is from 0 to `usize::MAX`. Its intended use is with [`crate::Checksum::ROOT_EXPONENTS`]
+    /// for which neither of these conditions should ever be true.
+    fn powers_range(self, range: ops::RangeInclusive<usize>) -> Take<Skip<Powers<Self>>> {
+        self.powers().skip(*range.start()).take(*range.end() - range.start() + 1)
     }
 }
 
@@ -338,3 +353,35 @@ macro_rules! impl_ops_for_fe {
     };
 }
 pub(super) use impl_ops_for_fe;
+
+/// An iterator over the powers of a field, starting from zero.
+///
+/// This iterator starts from 1, but has an optimized version of [`Iterator::nth`]
+/// which allows efficient construction.
+pub struct Powers<F: Field> {
+    base: F,
+    next: F,
+}
+
+impl<F: Field> Iterator for Powers<F> {
+    type Item = F;
+
+    fn next(&mut self) -> Option<F> {
+        let ret = Some(self.next.clone());
+        self.next *= &self.base;
+        ret
+    }
+
+    /// Compute next by calling `F::powi`.
+    ///
+    /// The default implementation of `nth` will simply call the iterator `n`
+    /// times, throwing away the result, which takes O(n) field multiplications.
+    /// For a power iterator we can do much better, taking O(log(n)) multiplications.
+    ///
+    /// This is important because this method is called internally by `Iterator::skip`.
+    fn nth(&mut self, n: usize) -> Option<F> {
+        let ni64 = (n % F::MULTIPLICATIVE_ORDER) as i64; // cast ok since modulus should be small
+        self.next *= self.base.powi(ni64);
+        self.next()
+    }
+}
