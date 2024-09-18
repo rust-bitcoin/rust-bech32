@@ -2,7 +2,7 @@
 
 //! Generic Field Traits
 
-use core::{fmt, hash, ops};
+use core::{fmt, hash, iter, ops};
 
 /// A generic field.
 pub trait Field:
@@ -13,6 +13,8 @@ pub trait Field:
     + hash::Hash
     + fmt::Debug
     + fmt::Display
+    + iter::Sum
+    + for<'a> iter::Sum<&'a Self>
     + ops::Add<Self, Output = Self>
     + ops::Sub<Self, Output = Self>
     + ops::AddAssign
@@ -29,7 +31,7 @@ pub trait Field:
     + for<'a> ops::MulAssign<&'a Self>
     + for<'a> ops::Div<&'a Self, Output = Self>
     + for<'a> ops::DivAssign<&'a Self>
-    + ops::Neg
+    + ops::Neg<Output = Self>
 {
     /// The zero constant of the field.
     const ZERO: Self;
@@ -360,6 +362,19 @@ macro_rules! impl_ops_for_fe {
             fn neg(self) -> Self {
                 use $crate::primitives::Field as _;
                 self._neg()
+            }
+        }
+
+        // sum
+        impl core::iter::Sum for $op {
+            fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+                iter.fold(crate::primitives::Field::ZERO, |i, acc| i + acc)
+            }
+        }
+
+        impl<'s> core::iter::Sum<&'s Self> for $op {
+            fn sum<I: Iterator<Item = &'s Self>>(iter: I) -> Self {
+                iter.fold(crate::primitives::Field::ZERO, |i, acc| i + acc)
             }
         }
     };

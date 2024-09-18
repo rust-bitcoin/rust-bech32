@@ -90,8 +90,7 @@ impl<F: Field> Polynomial<F> {
         let mut cand = F::ONE;
         let mut eval = self.clone();
         for _ in 0..F::MULTIPLICATIVE_ORDER {
-            let sum = eval.inner.iter().cloned().fold(F::ZERO, F::add);
-            if sum == F::ZERO {
+            if eval.inner.iter().sum::<F>() == F::ZERO {
                 ret.push(cand.clone());
             }
 
