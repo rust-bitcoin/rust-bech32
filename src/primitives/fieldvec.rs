@@ -186,6 +186,34 @@ impl<F: Field> FieldVec<F> {
     }
 }
 
+impl<F: Default> FieldVec<F> {
+    /// Pushes an item onto the end of the vector.
+    ///
+    /// # Panics
+    ///
+    /// Panics if [`Self::has_data`] is false, or if it would be false after the push.
+    pub fn push(&mut self, item: F) {
+        self.len += 1;
+        self.assert_has_data();
+
+        #[cfg(not(feature = "alloc"))]
+        {
+            self.inner_a[self.len - 1] = item;
+        }
+
+        #[cfg(feature = "alloc")]
+        if self.len < NO_ALLOC_MAX_LENGTH + 1 {
+            self.inner_a[self.len - 1] = item;
+        } else {
+            if self.len == NO_ALLOC_MAX_LENGTH + 1 {
+                let inner_a = core::mem::take(&mut self.inner_a);
+                self.inner_v = inner_a.into();
+            }
+            self.inner_v.push(item);
+        }
+    }
+}
+
 impl<F: Clone + Default> iter::FromIterator<F> for FieldVec<F> {
     /// Constructor from an iterator of elements.
     ///
