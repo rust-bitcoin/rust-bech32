@@ -166,6 +166,7 @@ use crate::primitives::decode::{ChecksumError, UncheckedHrpstring, UncheckedHrps
 #[doc(inline)]
 pub use {
     crate::primitives::checksum::Checksum,
+    crate::primitives::correction::CorrectableError,
     crate::primitives::gf32::Fe32,
     crate::primitives::gf32_ext::{Fe1024, Fe32768},
     crate::primitives::hrp::Hrp,
