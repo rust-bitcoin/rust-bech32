@@ -13,7 +13,7 @@
 
 use core::{fmt, ops};
 
-use super::field::{ExtensionField, Field};
+use super::field::{Bech32Field, ExtensionField, Field};
 use crate::Fe32;
 
 /// An element of the extension field.
@@ -22,6 +22,11 @@ pub struct Fe32Ext<const DEG: usize> {
     /// The polynomial representation of the element in "little-endian" order;
     /// that is, the element is the sum `inner[i] * EXT_ELEM^i`.
     inner: [Fe32; DEG],
+}
+
+// For some reason this cannot be derived.
+impl<const DEG: usize> Default for Fe32Ext<DEG> {
+    fn default() -> Self { Fe32Ext { inner: [Fe32::Q; DEG] } }
 }
 
 impl<const DEG: usize> From<Fe32> for Fe32Ext<DEG> {
@@ -110,6 +115,30 @@ where
 /// The field of order 1024.
 pub type Fe1024 = Fe32Ext<2>;
 
+impl Bech32Field for Fe1024 {
+    #[inline]
+    fn _add(&self, other: &Self) -> Self {
+        Self::new([self.inner[0] + other.inner[0], self.inner[1] + other.inner[1]])
+    }
+
+    #[inline]
+    fn _mul(&self, other: &Self) -> Self { self.mul_by_elem(other) }
+
+    #[inline]
+    fn _div(&self, other: &Self) -> Self { other.multiplicative_inverse() * self }
+
+    #[inline]
+    fn _neg(self) -> Self { self }
+
+    fn format_as_rust_code(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("Fe1024::new([")?;
+        self.inner[0].format_as_rust_code(f)?;
+        f.write_str(", ")?;
+        self.inner[1].format_as_rust_code(f)?;
+        f.write_str("])")
+    }
+}
+
 impl Field for Fe1024 {
     /// The zero element of the field.
     const ZERO: Self = Self::new([Fe32::Q, Fe32::Q]);
@@ -128,23 +157,6 @@ impl Field for Fe1024 {
     const MULTIPLICATIVE_ORDER: usize = 1023;
 
     const MULTIPLICATIVE_ORDER_FACTORS: &'static [usize] = &[1, 3, 11, 31, 33, 93, 341, 1023];
-
-    #[inline]
-    fn _add(&self, other: &Self) -> Self {
-        Self::new([self.inner[0] + other.inner[0], self.inner[1] + other.inner[1]])
-    }
-
-    #[inline]
-    fn _sub(&self, other: &Self) -> Self { self._add(other) }
-
-    #[inline]
-    fn _mul(&self, other: &Self) -> Self { self.mul_by_elem(other) }
-
-    #[inline]
-    fn _div(&self, other: &Self) -> Self { other.multiplicative_inverse() * self }
-
-    #[inline]
-    fn _neg(self) -> Self { self }
 
     fn multiplicative_inverse(self) -> Self {
         // Aliases to make the below equations easier to read
@@ -186,6 +198,36 @@ impl ExtensionField for Fe1024 {
 /// The field of order 32768.
 pub type Fe32768 = Fe32Ext<3>;
 
+impl Bech32Field for Fe32768 {
+    #[inline]
+    fn _add(&self, other: &Self) -> Self {
+        Self::new([
+            self.inner[0] + other.inner[0],
+            self.inner[1] + other.inner[1],
+            self.inner[2] + other.inner[2],
+        ])
+    }
+
+    #[inline]
+    fn _mul(&self, other: &Self) -> Self { self.mul_by_elem(other) }
+
+    #[inline]
+    fn _div(&self, other: &Self) -> Self { other.multiplicative_inverse() * self }
+
+    #[inline]
+    fn _neg(self) -> Self { self }
+
+    fn format_as_rust_code(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("Fe32768::new([")?;
+        self.inner[0].format_as_rust_code(f)?;
+        f.write_str(", ")?;
+        self.inner[1].format_as_rust_code(f)?;
+        f.write_str(", ")?;
+        self.inner[2].format_as_rust_code(f)?;
+        f.write_str("])")
+    }
+}
+
 impl Field for Fe32768 {
     /// The zero element of the field.
     const ZERO: Self = Self::new([Fe32::Q, Fe32::Q, Fe32::Q]);
@@ -205,27 +247,6 @@ impl Field for Fe32768 {
     const MULTIPLICATIVE_ORDER: usize = 32767;
 
     const MULTIPLICATIVE_ORDER_FACTORS: &'static [usize] = &[1, 7, 31, 151, 217, 1057, 4681, 32767];
-
-    #[inline]
-    fn _add(&self, other: &Self) -> Self {
-        Self::new([
-            self.inner[0] + other.inner[0],
-            self.inner[1] + other.inner[1],
-            self.inner[2] + other.inner[2],
-        ])
-    }
-
-    #[inline]
-    fn _sub(&self, other: &Self) -> Self { self._add(other) }
-
-    #[inline]
-    fn _mul(&self, other: &Self) -> Self { self.mul_by_elem(other) }
-
-    #[inline]
-    fn _div(&self, other: &Self) -> Self { other.multiplicative_inverse() * self }
-
-    #[inline]
-    fn _neg(self) -> Self { self }
 
     fn multiplicative_inverse(self) -> Self {
         // Unlike in the GF1024 case we don't bother being generic over

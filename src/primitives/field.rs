@@ -2,6 +2,7 @@
 
 //! Generic Field Traits
 
+use core::iter::{Skip, Take};
 use core::{fmt, hash, iter, ops};
 
 /// A generic field.
@@ -10,6 +11,7 @@ pub trait Field:
     + PartialEq
     + Eq
     + Clone
+    + Default
     + hash::Hash
     + fmt::Debug
     + fmt::Display
@@ -51,29 +53,6 @@ pub trait Field:
     /// prime factors which each appearing once, this array would have size `2^n`.
     const MULTIPLICATIVE_ORDER_FACTORS: &'static [usize];
 
-    /// Adds a value to `self`. This is a helper function for implementing the
-    /// [`ops::Add`] and [`ops::AddAssign`] traits, which should probably be called
-    /// instead of calling this.
-    fn _add(&self, other: &Self) -> Self;
-
-    /// Subtracts a value from `self`. This is a helper function for implementing the
-    /// [`ops::Sub`] and [`ops::SubAssign`] traits, which should probably be called
-    /// instead of calling this.
-    fn _sub(&self, other: &Self) -> Self;
-
-    /// Multiplies a value by `self`. This is a helper function for implementing the
-    /// [`ops::Mul`] and [`ops::MulAssign`] traits, which should probably be called
-    /// instead of calling this.
-    fn _mul(&self, other: &Self) -> Self;
-
-    /// Divides a value from `self`. This is a helper function for implementing the
-    /// [`ops::Div`] and [`ops::DivAssign`] traits, which should probably be called
-    /// instead of calling this.
-    fn _div(&self, other: &Self) -> Self;
-
-    /// Computes the additive inverse of an element.
-    fn _neg(self) -> Self;
-
     /// Computes the multiplicative inverse of an element.
     fn multiplicative_inverse(self) -> Self;
 
@@ -110,6 +89,20 @@ pub trait Field:
             "bug: `ExtensionField::MULTIPLICATIVE_ORDER_FACTORS` did not include full group order"
         );
     }
+
+    /// Constructs an iterator over all the powers of an element from 0 onward.
+    fn powers(self) -> Powers<Self> { Powers { base: self, next: Self::ONE } }
+
+    /// Constructs an iterator over all the powers of an element within a given range.
+    ///
+    /// # Panics
+    ///
+    /// Panics if given a range whose start is greater than its end, or whose range
+    /// is from 0 to `usize::MAX`. Its intended use is with [`crate::Checksum::ROOT_EXPONENTS`]
+    /// for which neither of these conditions should ever be true.
+    fn powers_range(self, range: ops::RangeInclusive<usize>) -> Take<Skip<Powers<Self>>> {
+        self.powers().skip(*range.start()).take(*range.end() - range.start() + 1)
+    }
 }
 
 /// Trait describing a simple extension field (field obtained from another by
@@ -141,58 +134,83 @@ pub trait ExtensionField: Field + From<Self::BaseField> {
     const EXT_ELEM: Self;
 }
 
+mod private {
+    /// Sealing trait.
+    pub trait Sealed {}
+
+    impl Sealed for crate::Fe32 {}
+    impl Sealed for crate::Fe1024 {}
+    impl Sealed for crate::Fe32768 {}
+}
+
+/// Sealed trait which extends [`Field`] with extra functionality
+/// needed internally to this library.
+///
+/// This trait should not be used directly by users of the library.
+pub trait Bech32Field: private::Sealed + Sized {
+    /// Adds a value to `self`. This is a helper function for implementing the
+    /// [`ops::Add`] and [`ops::AddAssign`] traits.
+    fn _add(&self, other: &Self) -> Self;
+
+    /// Subtracts a value from `self`. This is a helper function for implementing the
+    /// [`ops::Sub`] and [`ops::SubAssign`] traits.
+    fn _sub(&self, other: &Self) -> Self {
+        self._add(other) // all fields in this library are binary fields
+    }
+
+    /// Multiplies a value by `self`. This is a helper function for implementing the
+    /// [`ops::Mul`] and [`ops::MulAssign`] traits.
+    fn _mul(&self, other: &Self) -> Self;
+
+    /// Divides a value from `self`. This is a helper function for implementing the
+    /// [`ops::Div`] and [`ops::DivAssign`] traits.
+    fn _div(&self, other: &Self) -> Self;
+
+    /// Computes the additive inverse of an element.
+    fn _neg(self) -> Self;
+
+    /// Utility method to format a field element as Rust code.
+    fn format_as_rust_code(&self, f: &mut fmt::Formatter) -> fmt::Result;
+}
+
 macro_rules! impl_ops_for_fe {
     (impl for $op:ident) => {
         // add
         impl core::ops::Add<$op> for $op {
             type Output = Self;
             #[inline]
-            fn add(self, other: $op) -> $op {
-                use $crate::primitives::Field as _;
-                self._add(&other)
-            }
+            fn add(self, other: $op) -> $op { $crate::primitives::Bech32Field::_add(&self, &other) }
         }
 
         impl core::ops::Add<&$op> for $op {
             type Output = Self;
             #[inline]
-            fn add(self, other: &$op) -> $op {
-                use $crate::primitives::Field as _;
-                self._add(other)
-            }
+            fn add(self, other: &$op) -> $op { $crate::primitives::Bech32Field::_add(&self, other) }
         }
 
         impl core::ops::Add<$op> for &$op {
             type Output = $op;
             #[inline]
-            fn add(self, other: $op) -> $op {
-                use $crate::primitives::Field as _;
-                self._add(&other)
-            }
+            fn add(self, other: $op) -> $op { $crate::primitives::Bech32Field::_add(self, &other) }
         }
 
         impl core::ops::Add<&$op> for &$op {
             type Output = $op;
             #[inline]
-            fn add(self, other: &$op) -> $op {
-                use $crate::primitives::Field as _;
-                self._add(other)
-            }
+            fn add(self, other: &$op) -> $op { $crate::primitives::Bech32Field::_add(self, other) }
         }
 
         impl core::ops::AddAssign for $op {
             #[inline]
             fn add_assign(&mut self, other: $op) {
-                use $crate::primitives::Field as _;
-                *self = self._add(&other)
+                *self = $crate::primitives::Bech32Field::_add(self, &other)
             }
         }
 
         impl core::ops::AddAssign<&$op> for $op {
             #[inline]
             fn add_assign(&mut self, other: &$op) {
-                use $crate::primitives::Field as _;
-                *self = self._add(other)
+                *self = $crate::primitives::Bech32Field::_add(self, other)
             }
         }
 
@@ -200,52 +218,38 @@ macro_rules! impl_ops_for_fe {
         impl core::ops::Sub<$op> for $op {
             type Output = Self;
             #[inline]
-            fn sub(self, other: $op) -> $op {
-                use $crate::primitives::Field as _;
-                self._sub(&other)
-            }
+            fn sub(self, other: $op) -> $op { $crate::primitives::Bech32Field::_sub(&self, &other) }
         }
 
         impl core::ops::Sub<&$op> for $op {
             type Output = Self;
             #[inline]
-            fn sub(self, other: &$op) -> $op {
-                use $crate::primitives::Field as _;
-                self._sub(other)
-            }
+            fn sub(self, other: &$op) -> $op { $crate::primitives::Bech32Field::_sub(&self, other) }
         }
 
         impl core::ops::Sub<$op> for &$op {
             type Output = $op;
             #[inline]
-            fn sub(self, other: $op) -> $op {
-                use $crate::primitives::Field as _;
-                self._sub(&other)
-            }
+            fn sub(self, other: $op) -> $op { $crate::primitives::Bech32Field::_sub(self, &other) }
         }
 
         impl core::ops::Sub<&$op> for &$op {
             type Output = $op;
             #[inline]
-            fn sub(self, other: &$op) -> $op {
-                use $crate::primitives::Field as _;
-                self._sub(other)
-            }
+            fn sub(self, other: &$op) -> $op { $crate::primitives::Bech32Field::_sub(self, other) }
         }
 
         impl core::ops::SubAssign for $op {
             #[inline]
             fn sub_assign(&mut self, other: $op) {
-                use $crate::primitives::Field as _;
-                *self = self._sub(&other)
+                *self = $crate::primitives::Bech32Field::_sub(self, &other)
             }
         }
 
         impl core::ops::SubAssign<&$op> for $op {
             #[inline]
             fn sub_assign(&mut self, other: &$op) {
-                use $crate::primitives::Field as _;
-                *self = self._sub(other)
+                *self = $crate::primitives::Bech32Field::_sub(self, other)
             }
         }
 
@@ -253,52 +257,38 @@ macro_rules! impl_ops_for_fe {
         impl core::ops::Mul<$op> for $op {
             type Output = Self;
             #[inline]
-            fn mul(self, other: $op) -> $op {
-                use $crate::primitives::Field as _;
-                self._mul(&other)
-            }
+            fn mul(self, other: $op) -> $op { $crate::primitives::Bech32Field::_mul(&self, &other) }
         }
 
         impl core::ops::Mul<&$op> for $op {
             type Output = Self;
             #[inline]
-            fn mul(self, other: &$op) -> $op {
-                use $crate::primitives::Field as _;
-                self._mul(other)
-            }
+            fn mul(self, other: &$op) -> $op { $crate::primitives::Bech32Field::_mul(&self, other) }
         }
 
         impl core::ops::Mul<$op> for &$op {
             type Output = $op;
             #[inline]
-            fn mul(self, other: $op) -> $op {
-                use $crate::primitives::Field as _;
-                self._mul(&other)
-            }
+            fn mul(self, other: $op) -> $op { $crate::primitives::Bech32Field::_mul(self, &other) }
         }
 
         impl core::ops::Mul<&$op> for &$op {
             type Output = $op;
             #[inline]
-            fn mul(self, other: &$op) -> $op {
-                use $crate::primitives::Field as _;
-                self._mul(other)
-            }
+            fn mul(self, other: &$op) -> $op { $crate::primitives::Bech32Field::_mul(self, other) }
         }
 
         impl core::ops::MulAssign for $op {
             #[inline]
             fn mul_assign(&mut self, other: $op) {
-                use $crate::primitives::Field as _;
-                *self = self._mul(&other)
+                *self = $crate::primitives::Bech32Field::_mul(self, &other)
             }
         }
 
         impl core::ops::MulAssign<&$op> for $op {
             #[inline]
             fn mul_assign(&mut self, other: &$op) {
-                use $crate::primitives::Field as _;
-                *self = self._mul(other)
+                *self = $crate::primitives::Bech32Field::_mul(self, other)
             }
         }
 
@@ -306,52 +296,38 @@ macro_rules! impl_ops_for_fe {
         impl core::ops::Div<$op> for $op {
             type Output = Self;
             #[inline]
-            fn div(self, other: $op) -> $op {
-                use $crate::primitives::Field as _;
-                self._div(&other)
-            }
+            fn div(self, other: $op) -> $op { $crate::primitives::Bech32Field::_div(&self, &other) }
         }
 
         impl core::ops::Div<&$op> for $op {
             type Output = Self;
             #[inline]
-            fn div(self, other: &$op) -> $op {
-                use $crate::primitives::Field as _;
-                self._div(other)
-            }
+            fn div(self, other: &$op) -> $op { $crate::primitives::Bech32Field::_div(&self, other) }
         }
 
         impl core::ops::Div<$op> for &$op {
             type Output = $op;
             #[inline]
-            fn div(self, other: $op) -> $op {
-                use $crate::primitives::Field as _;
-                self._div(&other)
-            }
+            fn div(self, other: $op) -> $op { $crate::primitives::Bech32Field::_div(self, &other) }
         }
 
         impl core::ops::Div<&$op> for &$op {
             type Output = $op;
             #[inline]
-            fn div(self, other: &$op) -> $op {
-                use $crate::primitives::Field as _;
-                self._div(other)
-            }
+            fn div(self, other: &$op) -> $op { $crate::primitives::Bech32Field::_div(self, other) }
         }
 
         impl core::ops::DivAssign for $op {
             #[inline]
             fn div_assign(&mut self, other: $op) {
-                use $crate::primitives::Field as _;
-                *self = self._div(&other)
+                *self = $crate::primitives::Bech32Field::_div(self, &other)
             }
         }
 
         impl core::ops::DivAssign<&$op> for $op {
             #[inline]
             fn div_assign(&mut self, other: &$op) {
-                use $crate::primitives::Field as _;
-                *self = self._div(other)
+                *self = $crate::primitives::Bech32Field::_div(self, other)
             }
         }
 
@@ -359,10 +335,7 @@ macro_rules! impl_ops_for_fe {
         impl core::ops::Neg for $op {
             type Output = Self;
             #[inline]
-            fn neg(self) -> Self {
-                use $crate::primitives::Field as _;
-                self._neg()
-            }
+            fn neg(self) -> Self { $crate::primitives::Bech32Field::_neg(self) }
         }
 
         // sum
@@ -380,3 +353,35 @@ macro_rules! impl_ops_for_fe {
     };
 }
 pub(super) use impl_ops_for_fe;
+
+/// An iterator over the powers of a field, starting from zero.
+///
+/// This iterator starts from 1, but has an optimized version of [`Iterator::nth`]
+/// which allows efficient construction.
+pub struct Powers<F: Field> {
+    base: F,
+    next: F,
+}
+
+impl<F: Field> Iterator for Powers<F> {
+    type Item = F;
+
+    fn next(&mut self) -> Option<F> {
+        let ret = Some(self.next.clone());
+        self.next *= &self.base;
+        ret
+    }
+
+    /// Compute next by calling `F::powi`.
+    ///
+    /// The default implementation of `nth` will simply call the iterator `n`
+    /// times, throwing away the result, which takes O(n) field multiplications.
+    /// For a power iterator we can do much better, taking O(log(n)) multiplications.
+    ///
+    /// This is important because this method is called internally by `Iterator::skip`.
+    fn nth(&mut self, n: usize) -> Option<F> {
+        let ni64 = (n % F::MULTIPLICATIVE_ORDER) as i64; // cast ok since modulus should be small
+        self.next *= self.base.powi(ni64);
+        self.next()
+    }
+}

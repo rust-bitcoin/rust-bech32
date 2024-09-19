@@ -18,6 +18,7 @@ use core::{fmt, num};
 #[cfg(all(test, mutate))]
 use mutagen::mutate;
 
+use super::{Bech32Field, Field};
 use crate::error::write_err;
 
 /// Logarithm table of each bech32 element, as a power of alpha = Z.
@@ -256,16 +257,9 @@ impl AsRef<u8> for Fe32 {
     fn as_ref(&self) -> &u8 { &self.0 }
 }
 
-impl super::Field for Fe32 {
-    const ZERO: Self = Fe32::Q;
-    const ONE: Self = Fe32::P;
-    const GENERATOR: Self = Fe32::Z;
-    const MULTIPLICATIVE_ORDER: usize = 31;
-    const MULTIPLICATIVE_ORDER_FACTORS: &'static [usize] = &[1, 31];
-
+impl Bech32Field for Fe32 {
     fn _add(&self, other: &Fe32) -> Fe32 { Fe32(self.0 ^ other.0) }
-    // Subtraction is the same as addition in a characteristic-2 field
-    fn _sub(&self, other: &Fe32) -> Fe32 { self._add(other) }
+
     fn _mul(&self, other: &Fe32) -> Fe32 {
         if self.0 == 0 || other.0 == 0 {
             Fe32(0)
@@ -276,6 +270,7 @@ impl super::Field for Fe32 {
             Fe32(LOG_INV[((log1 + log2) % mult_order) as usize])
         }
     }
+
     fn _div(&self, other: &Fe32) -> Fe32 {
         if self.0 == 0 {
             Fe32(0)
@@ -291,10 +286,34 @@ impl super::Field for Fe32 {
 
     fn _neg(self) -> Self { self }
 
+    fn format_as_rust_code(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let ch = self.to_char().to_ascii_uppercase();
+        if ch.is_ascii_digit() {
+            write!(f, "Fe32::_{}", ch)
+        } else {
+            write!(f, "Fe32::{}", ch)
+        }
+    }
+}
+
+impl Field for Fe32 {
+    const ZERO: Self = Fe32::Q;
+    const ONE: Self = Fe32::P;
+    const GENERATOR: Self = Fe32::Z;
+    const MULTIPLICATIVE_ORDER: usize = 31;
+    const MULTIPLICATIVE_ORDER_FACTORS: &'static [usize] = &[1, 31];
+
     fn multiplicative_inverse(self) -> Self { Self::ONE._div(&self) }
 }
 
 super::impl_ops_for_fe!(impl for Fe32);
+
+impl super::ExtensionField for Fe32 {
+    type BaseField = Self;
+    const DEGREE: usize = 1;
+    const POLYNOMIAL: Self = Fe32::Q;
+    const EXT_ELEM: Self = Fe32::P;
+}
 
 /// A galois field error when converting from a character.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
