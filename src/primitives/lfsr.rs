@@ -39,6 +39,9 @@ impl<F: Field> LfsrIter<F> {
     /// Accessor for the coefficients used to compute the next element.
     pub fn coefficients(&self) -> &[F] { &self.coeffs.as_inner()[1..] }
 
+    /// Accessor for the coefficients used to compute the next element.
+    pub(super) fn coefficient_polynomial(&self) -> &Polynomial<F> { &self.coeffs }
+
     /// Create a minimal LFSR iterator that generates a set of initial
     /// contents, using Berlekamp's algorithm.
     ///
