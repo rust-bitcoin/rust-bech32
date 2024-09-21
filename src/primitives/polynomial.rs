@@ -9,19 +9,26 @@ use super::{ExtensionField, Field, FieldVec};
 use crate::Fe32;
 
 /// A polynomial over some field.
-#[derive(PartialEq, Eq, Clone, Debug, Hash)]
+#[derive(Clone, Debug)]
 pub struct Polynomial<F> {
     /// The coefficients of the polynomial, in "little-endian" order.
     /// That is the constant term is at index 0.
     inner: FieldVec<F>,
 }
 
+impl<F: Field> PartialEq for Polynomial<F> {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner[..self.degree()] == other.inner[..other.degree()]
+    }
+}
+
+impl<F: Field> Eq for Polynomial<F> {}
+
 impl Polynomial<Fe32> {
     pub fn from_residue<R: PackedFe32>(residue: R) -> Self {
         (0..R::WIDTH).rev().map(|i| Fe32(residue.unpack(i))).collect()
     }
 }
-
 impl<F: Field> Polynomial<F> {
     /// Determines whether the residue is representable, given the current
     /// compilation context.
