@@ -44,6 +44,11 @@ pub trait Field:
     /// A primitive element, i.e. a generator of the multiplicative group of the field.
     const GENERATOR: Self;
 
+    /// The smallest integer n such that 1 + ... + 1, n times, equals 0.
+    ///
+    /// If this is 0, this indicates that no such integer exists.
+    const CHARACTERISTIC: usize;
+
     /// The order of the multiplicative group of the field.
     const MULTIPLICATIVE_ORDER: usize;
 
@@ -55,6 +60,47 @@ pub trait Field:
 
     /// Computes the multiplicative inverse of an element.
     fn multiplicative_inverse(self) -> Self;
+
+    /// Takes the element times some integer.
+    fn muli(&self, mut n: i64) -> Self {
+        let base = if n >= 0 {
+            self.clone()
+        } else {
+            n *= -1;
+            self.clone().multiplicative_inverse()
+        };
+
+        let mut ret = Self::ZERO;
+        // Special case some particular characteristics
+        match Self::CHARACTERISTIC {
+            1 => unreachable!("no field has characteristic 1"),
+            2 => {
+                // Special-case 2 because it's easy and also the only characteristic used
+                // within the library. The compiler should prune away the other code.
+                if n % 2 == 0 {
+                    Self::ZERO
+                } else {
+                    self.clone()
+                }
+            }
+            x => {
+                // This is identical to powi below, but with * replaced by +.
+                if x > 0 {
+                    n %= x as i64;
+                }
+
+                let mut mask = x.next_power_of_two() as i64;
+                while mask > 0 {
+                    ret += ret.clone();
+                    if n & mask != 0 {
+                        ret += &base;
+                    }
+                    mask >>= 1;
+                }
+                ret
+            }
+        }
+    }
 
     /// Takes the element to the power of some integer.
     fn powi(&self, mut n: i64) -> Self {
@@ -71,7 +117,7 @@ pub trait Field:
         while mask > 0 {
             ret *= ret.clone();
             if n & mask != 0 {
-                ret *= base.clone();
+                ret *= &base;
             }
             mask >>= 1;
         }

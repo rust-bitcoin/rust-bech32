@@ -150,6 +150,8 @@ impl Field for Fe1024 {
     /// A generator of the field.
     const GENERATOR: Self = Self::new([Fe32::P, Fe32::H]);
 
+    const CHARACTERISTIC: usize = 2;
+
     /// The order of the multiplicative group of the field.
     ///
     /// This constant also serves as a compile-time check that we can count
@@ -234,6 +236,8 @@ impl Field for Fe32768 {
 
     /// The one element of the field.
     const ONE: Self = Self::new([Fe32::P, Fe32::Q, Fe32::Q]);
+
+    const CHARACTERISTIC: usize = 2;
 
     // Chosen somewhat arbitrarily, by just guessing values until one came
     // out with the correct order.
