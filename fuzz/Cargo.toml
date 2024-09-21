@@ -22,6 +22,14 @@ name = "berlekamp_massey"
 path = "fuzz_targets/berlekamp_massey.rs"
 
 [[bin]]
+name = "correct_bech32"
+path = "fuzz_targets/correct_bech32.rs"
+
+[[bin]]
+name = "correct_codex32"
+path = "fuzz_targets/correct_codex32.rs"
+
+[[bin]]
 name = "decode_rnd"
 path = "fuzz_targets/decode_rnd.rs"
 
