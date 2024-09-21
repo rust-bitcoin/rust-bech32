@@ -60,7 +60,7 @@ impl Checksum for Bech32 {
 
     type CorrectionField = Fe1024;
     const ROOT_GENERATOR: Self::CorrectionField = Fe1024::new([Fe32::P, Fe32::X]);
-    const ROOT_EXPONENTS: core::ops::RangeInclusive<usize> = 997..=999;
+    const ROOT_EXPONENTS: core::ops::RangeInclusive<usize> = 24..=26;
 
     const CODE_LENGTH: usize = 1023;
     const CHECKSUM_LENGTH: usize = 6;
@@ -73,7 +73,7 @@ impl Checksum for Bech32m {
 
     type CorrectionField = Fe1024;
     const ROOT_GENERATOR: Self::CorrectionField = Fe1024::new([Fe32::P, Fe32::X]);
-    const ROOT_EXPONENTS: core::ops::RangeInclusive<usize> = 997..=999;
+    const ROOT_EXPONENTS: core::ops::RangeInclusive<usize> = 24..=26;
 
     const CODE_LENGTH: usize = 1023;
     const CHECKSUM_LENGTH: usize = 6;
