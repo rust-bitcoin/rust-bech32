@@ -2,6 +2,7 @@
 
 //! Generic Field Traits
 
+use core::convert::TryInto;
 use core::iter::{Skip, Take};
 use core::{fmt, hash, iter, ops};
 
@@ -153,7 +154,7 @@ pub trait Field:
 
 /// Trait describing a simple extension field (field obtained from another by
 /// adjoining one element).
-pub trait ExtensionField: Field + From<Self::BaseField> {
+pub trait ExtensionField: Field + From<Self::BaseField> + TryInto<Self::BaseField> {
     /// The type of the base field.
     type BaseField: Field;
 
