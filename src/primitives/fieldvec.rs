@@ -59,7 +59,7 @@
 
 #[cfg(all(feature = "alloc", not(feature = "std")))]
 use alloc::vec::Vec;
-use core::{iter, ops, slice};
+use core::{iter, mem, ops, slice};
 
 use super::Field;
 use crate::primitives::correction::NO_ALLOC_MAX_LENGTH;
@@ -206,10 +206,43 @@ impl<F: Default> FieldVec<F> {
             self.inner_a[self.len - 1] = item;
         } else {
             if self.len == NO_ALLOC_MAX_LENGTH + 1 {
-                let inner_a = core::mem::take(&mut self.inner_a);
+                let inner_a = mem::take(&mut self.inner_a);
                 self.inner_v = inner_a.into();
             }
             self.inner_v.push(item);
+        }
+    }
+
+    /// Pops an item off the end of the vector.
+    ///
+    /// # Panics
+    ///
+    /// Panics if [`Self::has_data`] is false.
+    pub fn pop(&mut self) -> Option<F> {
+        self.assert_has_data();
+        if self.len == 0 {
+            return None;
+        }
+
+        self.len -= 1;
+        #[cfg(not(feature = "alloc"))]
+        {
+            Some(mem::take(&mut self.inner_a[self.len]))
+        }
+
+        #[cfg(feature = "alloc")]
+        if self.len < NO_ALLOC_MAX_LENGTH {
+            Some(mem::take(&mut self.inner_a[self.len]))
+        } else {
+            use core::convert::TryFrom;
+
+            let ret = self.inner_v.pop();
+            let inner_v = mem::take(&mut self.inner_v);
+            match <[F; NO_ALLOC_MAX_LENGTH]>::try_from(inner_v) {
+                Ok(arr) => self.inner_a = arr,
+                Err(vec) => self.inner_v = vec,
+            }
+            ret
         }
     }
 }

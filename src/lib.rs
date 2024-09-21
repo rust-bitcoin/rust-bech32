@@ -134,6 +134,8 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 // Coding conventions
 #![deny(missing_docs)]
+#![allow(clippy::suspicious_arithmetic_impl)] // this lint is literally always wrong
+#![allow(clippy::suspicious_op_assign_impl)] // ...and "always wrong" loves company
 
 #[cfg(bench)]
 extern crate test;

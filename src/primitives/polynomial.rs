@@ -2,7 +2,7 @@
 
 //! Polynomials over Finite Fields
 
-use core::{iter, ops};
+use core::{fmt, iter, ops, slice};
 
 use super::{ExtensionField, Field, FieldVec};
 
@@ -15,6 +15,13 @@ pub struct Polynomial<F> {
 }
 
 impl<F: Field> Polynomial<F> {
+    /// Determines whether the residue is representable, given the current
+    /// compilation context.
+    pub fn has_data(&self) -> bool { self.inner.has_data() }
+
+    /// Panics if [`Self::has_data`] is false, with an informative panic message.
+    pub fn assert_has_data(&self) { self.inner.assert_has_data() }
+
     /// Provides access to the underlying [`FieldVec`].
     pub fn into_inner(self) -> FieldVec<F> { self.inner }
 
@@ -39,6 +46,18 @@ impl<F: Field> Polynomial<F> {
         degree_without_leading_zeros - leading_zeros
     }
 
+    /// An iterator over the coefficients of the polynomial.
+    ///
+    /// Yields value in "little endian" order; that is, the constant term is returned first.
+    ///
+    /// # Panics
+    ///
+    /// Panics if [`Self::has_data`] is false.
+    pub fn iter(&self) -> slice::Iter<F> {
+        self.assert_has_data();
+        self.inner.iter()
+    }
+
     /// The leading term of the polynomial.
     ///
     /// For the constant 0 polynomial, will return 0.
@@ -55,7 +74,15 @@ impl<F: Field> Polynomial<F> {
     /// factor of the polynomial.
     pub fn zero_is_root(&self) -> bool { self.inner.is_empty() || self.leading_term() == F::ZERO }
 
-    /// An iterator over the roots of the residue, when interpreted as a polynomial.
+    /// Helper function to add leading 0 terms until the polynomial has a specified
+    /// length.
+    fn zero_pad_up_to(&mut self, len: usize) {
+        while self.inner.len() < len {
+            self.inner.push(F::default());
+        }
+    }
+
+    /// An iterator over the roots of the polynomial.
     ///
     /// Takes a base element `base`. The roots of the residue will be yielded as
     /// nonnegative integers between 0 and 1 less than the order of the base,
@@ -201,6 +228,19 @@ impl<F: Field> Polynomial<F> {
     }
 }
 
+impl<F: Field> fmt::Display for Polynomial<F> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.has_data() {
+            for fe in self.iter() {
+                write!(f, "{}", fe)?;
+            }
+            Ok(())
+        } else {
+            f.write_str("<residue>")
+        }
+    }
+}
+
 impl<F: Field> iter::FromIterator<F> for Polynomial<F> {
     #[inline]
     fn from_iter<I>(iter: I) -> Self
@@ -213,6 +253,59 @@ impl<F: Field> iter::FromIterator<F> for Polynomial<F> {
 
 impl<F> From<FieldVec<F>> for Polynomial<F> {
     fn from(inner: FieldVec<F>) -> Self { Self { inner } }
+}
+
+impl<F: Field> ops::Add<&Polynomial<F>> for Polynomial<F> {
+    type Output = Polynomial<F>;
+
+    fn add(mut self, other: &Polynomial<F>) -> Polynomial<F> {
+        self += other;
+        self
+    }
+}
+
+impl<F: Field> ops::Add<Polynomial<F>> for Polynomial<F> {
+    type Output = Polynomial<F>;
+    fn add(self, other: Polynomial<F>) -> Polynomial<F> { self + &other }
+}
+
+impl<F: Field> ops::Sub<&Polynomial<F>> for Polynomial<F> {
+    type Output = Polynomial<F>;
+    fn sub(mut self, other: &Polynomial<F>) -> Polynomial<F> {
+        self -= other;
+        self
+    }
+}
+
+impl<F: Field> ops::Sub<Polynomial<F>> for Polynomial<F> {
+    type Output = Polynomial<F>;
+    fn sub(self, other: Polynomial<F>) -> Polynomial<F> { self - &other }
+}
+
+impl<F: Field> ops::AddAssign<&Polynomial<F>> for Polynomial<F> {
+    fn add_assign(&mut self, other: &Self) {
+        self.zero_pad_up_to(other.inner.len());
+        for i in 0..other.inner.len() {
+            self.inner[i] += &other.inner[i];
+        }
+    }
+}
+
+impl<F: Field> ops::AddAssign for Polynomial<F> {
+    fn add_assign(&mut self, other: Polynomial<F>) { *self += &other; }
+}
+
+impl<F: Field> ops::SubAssign<&Polynomial<F>> for Polynomial<F> {
+    fn sub_assign(&mut self, other: &Polynomial<F>) {
+        self.zero_pad_up_to(other.inner.len());
+        for i in 0..other.inner.len() {
+            self.inner[i] -= &other.inner[i];
+        }
+    }
+}
+
+impl<F: Field> ops::SubAssign for Polynomial<F> {
+    fn sub_assign(&mut self, other: Polynomial<F>) { *self -= &other; }
 }
 
 /// An iterator over the roots of a polynomial.
