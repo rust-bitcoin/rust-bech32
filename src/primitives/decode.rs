@@ -1262,6 +1262,15 @@ mod tests {
         }
     }
 
+    #[test]
+    #[allow(clippy::assertions_on_constants)]
+    fn constant_sanity() {
+        assert!(
+            crate::primitives::correction::NO_ALLOC_MAX_LENGTH > 6,
+            "The NO_ALLOC_MAX_LENGTH constant must be > 6. See its documentation for why.",
+        );
+    }
+
     macro_rules! check_invalid_segwit_addresses {
         ($($test_name:ident, $reason:literal, $address:literal);* $(;)?) => {
             $(

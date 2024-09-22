@@ -434,3 +434,125 @@ impl<F> ops::IndexMut<ops::RangeFull> for FieldVec<F> {
         &mut self.inner_a[..self.len][index]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Fe1024, Fe32};
+
+    #[test]
+    fn push_pop() {
+        let mut x: FieldVec<_> = (0..NO_ALLOC_MAX_LENGTH).collect();
+        let x_1: FieldVec<_> = (0..NO_ALLOC_MAX_LENGTH - 1).collect();
+
+        assert_eq!(x.len(), NO_ALLOC_MAX_LENGTH);
+        assert!(!x.is_empty());
+
+        assert_eq!(x.pop(), Some(NO_ALLOC_MAX_LENGTH - 1));
+        assert_eq!(x, x_1);
+        x.push(NO_ALLOC_MAX_LENGTH - 1);
+
+        let mut y: FieldVec<_> = None.into_iter().collect();
+        for i in 0..NO_ALLOC_MAX_LENGTH {
+            y.push(i);
+            assert_eq!(y[i], i);
+            y[i] = i + 1;
+            assert_eq!(y[i], i + 1);
+            y[i] -= 1;
+        }
+        assert_eq!(x, y);
+
+        for i in (0..NO_ALLOC_MAX_LENGTH).rev() {
+            assert_eq!(y.pop(), Some(i));
+        }
+        assert_eq!(y.len(), 0);
+        assert!(y.is_empty());
+    }
+
+    #[test]
+    fn iter_slice() {
+        let mut x: FieldVec<_> = (0..NO_ALLOC_MAX_LENGTH).collect();
+        assert!(x.iter().copied().eq(0..NO_ALLOC_MAX_LENGTH));
+        assert!(x[..].iter().copied().eq(0..NO_ALLOC_MAX_LENGTH));
+        assert!(x[0..].iter().copied().eq(0..NO_ALLOC_MAX_LENGTH));
+        assert!(x[..NO_ALLOC_MAX_LENGTH].iter().copied().eq(0..NO_ALLOC_MAX_LENGTH));
+        assert!(x[1..].iter().copied().eq(1..NO_ALLOC_MAX_LENGTH));
+        assert!(x[..NO_ALLOC_MAX_LENGTH - 1].iter().copied().eq(0..NO_ALLOC_MAX_LENGTH - 1));
+        assert!(x[1..NO_ALLOC_MAX_LENGTH - 1].iter().copied().eq(1..NO_ALLOC_MAX_LENGTH - 1));
+
+        // mutable slicing
+        x[..].reverse();
+        assert!(x.iter().copied().eq((0..NO_ALLOC_MAX_LENGTH).rev()));
+        x[..NO_ALLOC_MAX_LENGTH].reverse();
+        assert!(x.iter().copied().eq(0..NO_ALLOC_MAX_LENGTH));
+        x[0..].reverse();
+        assert!(x.iter().copied().eq((0..NO_ALLOC_MAX_LENGTH).rev()));
+        x[0..NO_ALLOC_MAX_LENGTH].reverse();
+        assert!(x.iter().copied().eq(0..NO_ALLOC_MAX_LENGTH));
+
+        for elem in x.iter_mut() {
+            *elem += 1;
+        }
+        assert!(x.iter().copied().eq(1..NO_ALLOC_MAX_LENGTH + 1));
+    }
+
+    #[test]
+    fn field_ops() {
+        let qs: FieldVec<_> = FieldVec::from_powers(Fe32::Q, NO_ALLOC_MAX_LENGTH - 1);
+        let ps: FieldVec<_> = FieldVec::from_powers(Fe32::P, NO_ALLOC_MAX_LENGTH - 1);
+        let pzr: FieldVec<_> = FieldVec::from_powers(Fe32::Z, 3);
+
+        assert_eq!(qs.len(), NO_ALLOC_MAX_LENGTH);
+        assert_eq!(ps.len(), NO_ALLOC_MAX_LENGTH);
+        assert_eq!(pzr.len(), 4);
+
+        let pzr = pzr.lift::<Fe32>(); // should work and be a no-op
+
+        // This is somewhat weird behavior but mathematically reasonable. The
+        // `from_powers` constructor shouldn't ever be called with 0 as a base.
+        // If you need a particular different output from this call, feel free
+        // to change this test....but think twice about what you're doing.
+        assert!(qs.iter().copied().eq(Some(Fe32::P)
+            .into_iter()
+            .chain(iter::repeat(Fe32::Q).take(NO_ALLOC_MAX_LENGTH - 1))));
+        // These checks though are correct and unambiguous.
+        assert!(ps.iter().copied().eq(iter::repeat(Fe32::P).take(NO_ALLOC_MAX_LENGTH)));
+        assert_eq!(pzr.iter().copied().collect::<Vec<_>>(), [Fe32::P, Fe32::Z, Fe32::Y, Fe32::G,]);
+
+        let pow2 = pzr.clone().mul_pointwise(&pzr);
+        assert_eq!(pow2.iter().copied().collect::<Vec<_>>(), [Fe32::P, Fe32::Y, Fe32::S, Fe32::J,]);
+
+        let lifted = pzr.lift::<Fe1024>();
+        assert_eq!(
+            lifted.iter().copied().collect::<Vec<_>>(),
+            [
+                Fe1024::from(Fe32::P),
+                Fe1024::from(Fe32::Z),
+                Fe1024::from(Fe32::Y),
+                Fe1024::from(Fe32::G),
+            ]
+        );
+    }
+
+    #[test]
+    fn construct_too_far() {
+        let x: FieldVec<_> = (0..NO_ALLOC_MAX_LENGTH + 1).collect();
+        let y: FieldVec<_> = FieldVec::from_powers(Fe32::Q, NO_ALLOC_MAX_LENGTH);
+        assert_eq!(x.len(), NO_ALLOC_MAX_LENGTH + 1);
+        assert_eq!(y.len(), NO_ALLOC_MAX_LENGTH + 1);
+    }
+
+    #[test]
+    #[cfg_attr(not(feature = "alloc"), should_panic)]
+    fn access_too_far() {
+        let x: FieldVec<_> = (0..NO_ALLOC_MAX_LENGTH + 1).collect();
+        let _ = x[0];
+    }
+
+    #[test]
+    #[cfg_attr(not(feature = "alloc"), should_panic)]
+    fn push_too_far() {
+        let mut x: FieldVec<_> = (0..NO_ALLOC_MAX_LENGTH).collect();
+        x.push(100);
+    }
+}
