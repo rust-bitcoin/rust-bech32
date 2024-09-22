@@ -359,21 +359,24 @@ impl<F: Field> Iterator for RootIter<F> {
 
 #[cfg(test)]
 mod tests {
+    use Fe32 as F;
+
     use super::*;
     use crate::{Fe1024, Fe32};
 
     #[test]
     #[cfg(feature = "alloc")]
     fn roots() {
-        let bip93_poly: Polynomial<Fe32> = {
-            use Fe32 as F;
-            [F::S, F::S, F::C, F::M, F::L, F::E, F::E, F::E, F::Q, F::G, F::_3, F::M, F::E, F::P]
-        }
-        .iter()
-        .copied()
-        .collect();
+        #[rustfmt::skip]
+        let mut bip93_poly = Polynomial::with_monic_leading_term(
+            &[F::E, F::M, F::_3, F::G, F::Q, F::E, F::E, F::E, F::L, F::M, F::C, F::S, F::S]
+        );
 
+        assert_eq!(bip93_poly.leading_term(), F::P);
+        assert!(!bip93_poly.zero_is_root());
         assert_eq!(bip93_poly.degree(), 13);
+
+        bip93_poly.zero_pad_up_to(1000); // should have no visible effect
 
         let (elem, order, root_indices) = bip93_poly.bch_generator_primitive_element::<Fe1024>();
         // Basically, only the order and the length of the `root_indices` range are
@@ -422,18 +425,15 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "alloc"))]
-    fn roots() {
+    fn roots_bech32() {
         // Exactly the same test as above, but for bech32
-        let bech32_poly: Polynomial<Fe32> = {
-            use Fe32 as F;
-            [F::J, F::A, F::_4, F::_5, F::K, F::A, F::P]
-        }
-        .iter()
-        .copied()
-        .collect();
+        let bech32_poly =
+            Polynomial::with_monic_leading_term(&[F::A, F::K, F::_5, F::_4, F::A, F::J]);
 
-        assert_eq!(bech32_poly.degree(), 6);
+        assert_eq!(
+            bech32_poly.iter().copied().collect::<Vec<_>>(),
+            [F::J, F::A, F::_4, F::_5, F::K, F::A, F::P],
+        );
 
         let (elem, order, root_indices) = bech32_poly.bch_generator_primitive_element::<Fe1024>();
         // As above, only the order and the length of the `root_indices` range are
