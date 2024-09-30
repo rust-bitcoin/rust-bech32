@@ -17,9 +17,7 @@ pub struct Polynomial<F> {
 }
 
 impl<F: Field> PartialEq for Polynomial<F> {
-    fn eq(&self, other: &Self) -> bool {
-        self.inner[..self.degree()] == other.inner[..other.degree()]
-    }
+    fn eq(&self, other: &Self) -> bool { self.coefficients() == other.coefficients() }
 }
 
 impl<F: Field> Eq for Polynomial<F> {}
@@ -58,8 +56,15 @@ impl<F: Field> Polynomial<F> {
         debug_assert_ne!(self.inner.len(), 0, "polynomials never have no terms");
         let degree_without_leading_zeros = self.inner.len() - 1;
         let leading_zeros = self.inner.iter().rev().take_while(|el| **el == F::ZERO).count();
-        degree_without_leading_zeros - leading_zeros
+        degree_without_leading_zeros.saturating_sub(leading_zeros)
     }
+
+    /// Accessor for the coefficients of the polynomial, in "little endian" order.
+    ///
+    /// # Panics
+    ///
+    /// Panics if [`Self::has_data`] is false.
+    pub fn coefficients(&self) -> &[F] { &self.inner[..self.degree() + 1] }
 
     /// An iterator over the coefficients of the polynomial.
     ///
@@ -70,7 +75,7 @@ impl<F: Field> Polynomial<F> {
     /// Panics if [`Self::has_data`] is false.
     pub fn iter(&self) -> slice::Iter<F> {
         self.assert_has_data();
-        self.inner[..self.degree() + 1].iter()
+        self.coefficients().iter()
     }
 
     /// The leading term of the polynomial.
@@ -141,6 +146,24 @@ impl<F: Field> Polynomial<F> {
             res += E::from(fe.clone());
         }
         res
+    }
+
+    /// TODO
+    pub fn convolution(&self, syndromes: &Self) -> Self {
+        let mut ret = FieldVec::new();
+        let terms = (1 + syndromes.inner.len()).saturating_sub(1 + self.degree());
+        if terms == 0 {
+            ret.push(F::ZERO);
+            return Self::from(ret);
+        }
+
+        let n = 1 + self.degree();
+        for idx in 0..terms {
+            ret.push(
+                (0..n).map(|i| self.inner[n - i - 1].clone() * &syndromes.inner[idx + i]).sum(),
+            );
+        }
+        Self::from(ret)
     }
 
     /// Multiplies two polynomials modulo x^d, for some given `d`.
