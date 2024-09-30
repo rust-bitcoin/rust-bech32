@@ -134,6 +134,8 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 // Coding conventions
 #![deny(missing_docs)]
+#![allow(clippy::suspicious_arithmetic_impl)] // this lint is literally always wrong
+#![allow(clippy::suspicious_op_assign_impl)] // ...and "always wrong" loves company
 
 #[cfg(bench)]
 extern crate test;
@@ -164,6 +166,7 @@ use crate::primitives::decode::{ChecksumError, UncheckedHrpstring, UncheckedHrps
 #[doc(inline)]
 pub use {
     crate::primitives::checksum::Checksum,
+    crate::primitives::correction::CorrectableError,
     crate::primitives::gf32::Fe32,
     crate::primitives::gf32_ext::{Fe1024, Fe32768},
     crate::primitives::hrp::Hrp,
@@ -216,13 +219,15 @@ const BUF_LENGTH: usize = 10;
 pub fn decode(s: &str) -> Result<(Hrp, Vec<u8>), DecodeError> {
     let unchecked = UncheckedHrpstring::new(s)?;
 
-    if let Err(e) = unchecked.validate_checksum::<Bech32m>() {
-        if !unchecked.has_valid_checksum::<Bech32>() {
+    match unchecked.validate_checksum::<Bech32m>() {
+        Ok(_) => {}
+        Err(ChecksumError::InvalidResidue(ref res_err)) if res_err.matches_bech32_checksum() => {}
+        Err(e) => {
             return Err(DecodeError::Checksum(e));
         }
-    };
-    // One of the checksums was valid, Ck is only for length and since
-    // they are both the same we can use either here.
+    }
+    // One of the checksums was valid. `Bech32m` is only used for its
+    // length and since it is the same as `Bech32` we can use either here.
     let checked = unchecked.remove_checksum::<Bech32m>();
 
     Ok((checked.hrp(), checked.byte_iter().collect()))
