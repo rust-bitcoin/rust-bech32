@@ -107,6 +107,23 @@ impl<F> FieldVec<F> {
     #[inline]
     pub fn is_empty(&self) -> bool { self.len == 0 }
 
+    /// Reverses the contents of the vector in-place.
+    pub fn reverse(&mut self) {
+        self.assert_has_data();
+
+        #[cfg(not(feature = "alloc"))]
+        {
+            self.inner_a[..self.len].reverse();
+        }
+
+        #[cfg(feature = "alloc")]
+        if self.len > NO_ALLOC_MAX_LENGTH {
+            self.inner_v.reverse();
+        } else {
+            self.inner_a[..self.len].reverse();
+        }
+    }
+
     /// Returns an immutable iterator over the elements in the vector.
     ///
     /// # Panics
@@ -186,7 +203,48 @@ impl<F: Field> FieldVec<F> {
     }
 }
 
+impl<F: Default> Default for FieldVec<F> {
+    fn default() -> Self { Self::new() }
+}
+
 impl<F: Default> FieldVec<F> {
+    /// Constructs a new empty field vector.
+    pub fn new() -> Self {
+        FieldVec {
+            inner_a: Default::default(),
+            len: 0,
+            #[cfg(feature = "alloc")]
+            inner_v: Vec::new(),
+        }
+    }
+
+    /// Constructs a new field vector with the given capacity.
+    pub fn with_capacity(cap: usize) -> Self {
+        #[cfg(not(feature = "alloc"))]
+        {
+            let mut ret = Self::new();
+            ret.len = cap;
+            ret.assert_has_data();
+            ret.len = 0;
+            ret
+        }
+
+        #[cfg(feature = "alloc")]
+        if cap > NO_ALLOC_MAX_LENGTH {
+            let mut ret = Self::new();
+            ret.inner_v = Vec::with_capacity(cap);
+            ret
+        } else {
+            Self::new()
+        }
+    }
+
+    /// Pushes an item onto the end of the vector.
+    ///
+    /// Synonym for [`Self::push`] used to simplify code where a
+    /// [`FieldVec`] is used in place of a `VecDeque`.
+    pub fn push_back(&mut self, item: F) { self.push(item) }
+
     /// Pushes an item onto the end of the vector.
     ///
     /// # Panics
@@ -210,6 +268,38 @@ impl<F: Default> FieldVec<F> {
                 self.inner_v = inner_a.into();
             }
             self.inner_v.push(item);
+        }
+    }
+
+    /// Pops an item off the front of the vector.
+    ///
+    /// This operation is always O(n).
+    pub fn pop_front(&mut self) -> Option<F> {
+        self.assert_has_data();
+        if self.len == 0 {
+            return None;
+        }
+
+        #[cfg(not(feature = "alloc"))]
+        {
+            // Not the most efficient algorithm, but it is safe code,
+            // easily seen to be correct, and is only used with very
+            // small vectors.
+            self.reverse();
+            let ret = self.pop();
+            self.reverse();
+            ret
+        }
+
+        #[cfg(feature = "alloc")]
+        if self.len > NO_ALLOC_MAX_LENGTH + 1 {
+            self.len -= 1;
+            Some(self.inner_v.remove(0))
+        } else {
+            self.reverse();
+            let ret = self.pop();
+            self.reverse();
+            ret
         }
     }
 
