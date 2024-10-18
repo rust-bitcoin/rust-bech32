@@ -12,6 +12,7 @@ pub mod gf32;
 pub mod gf32_ext;
 pub mod hrp;
 pub mod iter;
+mod lfsr;
 mod polynomial;
 pub mod segwit;
 
@@ -19,6 +20,7 @@ use checksum::{Checksum, PackedNull};
 use field::impl_ops_for_fe;
 pub use field::{Bech32Field, ExtensionField, Field};
 use fieldvec::FieldVec;
+pub use lfsr::LfsrIter;
 use polynomial::Polynomial;
 
 use crate::{Fe1024, Fe32};
@@ -60,7 +62,7 @@ impl Checksum for Bech32 {
 
     type CorrectionField = Fe1024;
     const ROOT_GENERATOR: Self::CorrectionField = Fe1024::new([Fe32::P, Fe32::X]);
-    const ROOT_EXPONENTS: core::ops::RangeInclusive<usize> = 997..=999;
+    const ROOT_EXPONENTS: core::ops::RangeInclusive<usize> = 24..=26;
 
     const CODE_LENGTH: usize = 1023;
     const CHECKSUM_LENGTH: usize = 6;
@@ -73,7 +75,7 @@ impl Checksum for Bech32m {
 
     type CorrectionField = Fe1024;
     const ROOT_GENERATOR: Self::CorrectionField = Fe1024::new([Fe32::P, Fe32::X]);
-    const ROOT_EXPONENTS: core::ops::RangeInclusive<usize> = 997..=999;
+    const ROOT_EXPONENTS: core::ops::RangeInclusive<usize> = 24..=26;
 
     const CODE_LENGTH: usize = 1023;
     const CHECKSUM_LENGTH: usize = 6;

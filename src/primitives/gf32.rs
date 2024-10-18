@@ -300,6 +300,7 @@ impl Field for Fe32 {
     const ZERO: Self = Fe32::Q;
     const ONE: Self = Fe32::P;
     const GENERATOR: Self = Fe32::Z;
+    const CHARACTERISTIC: usize = 2;
     const MULTIPLICATIVE_ORDER: usize = 31;
     const MULTIPLICATIVE_ORDER_FACTORS: &'static [usize] = &[1, 31];
 

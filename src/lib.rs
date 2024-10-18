@@ -105,7 +105,7 @@
 //!     type MidstateRepr = u128;
 //!     type CorrectionField = bech32::primitives::gf32_ext::Fe32Ext<2>;
 //!     const ROOT_GENERATOR: Self::CorrectionField = Fe1024::new([Fe32::_9, Fe32::_9]);
-//!     const ROOT_EXPONENTS: core::ops::RangeInclusive<usize> = 77..=84;
+//!     const ROOT_EXPONENTS: core::ops::RangeInclusive<usize> = 9..=16;
 //!
 //!     const CHECKSUM_LENGTH: usize = 13;
 //!     const CODE_LENGTH: usize = 93;

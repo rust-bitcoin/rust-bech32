@@ -2,7 +2,7 @@
 
 //! Polynomials over Finite Fields
 
-use core::{fmt, iter, ops, slice};
+use core::{cmp, fmt, iter, ops, slice};
 
 use super::checksum::PackedFe32;
 use super::{ExtensionField, Field, FieldVec};
@@ -17,16 +17,14 @@ pub struct Polynomial<F> {
 }
 
 impl<F: Field> PartialEq for Polynomial<F> {
-    fn eq(&self, other: &Self) -> bool {
-        self.inner[..self.degree()] == other.inner[..other.degree()]
-    }
+    fn eq(&self, other: &Self) -> bool { self.coefficients() == other.coefficients() }
 }
 
 impl<F: Field> Eq for Polynomial<F> {}
 
 impl Polynomial<Fe32> {
     pub fn from_residue<R: PackedFe32>(residue: R) -> Self {
-        (0..R::WIDTH).rev().map(|i| Fe32(residue.unpack(i))).collect()
+        (0..R::WIDTH).map(|i| Fe32(residue.unpack(i))).collect()
     }
 }
 impl<F: Field> Polynomial<F> {
@@ -58,8 +56,15 @@ impl<F: Field> Polynomial<F> {
         debug_assert_ne!(self.inner.len(), 0, "polynomials never have no terms");
         let degree_without_leading_zeros = self.inner.len() - 1;
         let leading_zeros = self.inner.iter().rev().take_while(|el| **el == F::ZERO).count();
-        degree_without_leading_zeros - leading_zeros
+        degree_without_leading_zeros.saturating_sub(leading_zeros)
     }
+
+    /// Accessor for the coefficients of the polynomial, in "little endian" order.
+    ///
+    /// # Panics
+    ///
+    /// Panics if [`Self::has_data`] is false.
+    pub fn coefficients(&self) -> &[F] { &self.inner[..self.degree() + 1] }
 
     /// An iterator over the coefficients of the polynomial.
     ///
@@ -70,7 +75,7 @@ impl<F: Field> Polynomial<F> {
     /// Panics if [`Self::has_data`] is false.
     pub fn iter(&self) -> slice::Iter<F> {
         self.assert_has_data();
-        self.inner.iter()
+        self.coefficients().iter()
     }
 
     /// The leading term of the polynomial.
@@ -88,6 +93,11 @@ impl<F: Field> Polynomial<F> {
     /// Whether 0 is a root of the polynomial. Equivalently, whether `x` is a
     /// factor of the polynomial.
     pub fn zero_is_root(&self) -> bool { self.inner.is_empty() || self.leading_term() == F::ZERO }
+
+    /// Computes the formal derivative of the polynomial
+    pub fn formal_derivative(&self) -> Self {
+        self.iter().enumerate().map(|(n, fe)| fe.muli(n as i64)).skip(1).collect()
+    }
 
     /// Helper function to add leading 0 terms until the polynomial has a specified
     /// length.
@@ -126,6 +136,56 @@ impl<F: Field> Polynomial<F> {
             base_powers: FieldVec::from_powers(base, self.inner.len() - 1),
             polynomial: self.inner.lift(),
         }
+    }
+
+    /// Evaluate the polynomial at a given element.
+    pub fn evaluate<E: Field + From<F>>(&self, elem: &E) -> E {
+        let mut res = E::ZERO;
+        for fe in self.iter().rev() {
+            res *= elem;
+            res += E::from(fe.clone());
+        }
+        res
+    }
+
+    /// TODO
+    pub fn convolution(&self, syndromes: &Self) -> Self {
+        let mut ret = FieldVec::new();
+        let terms = (1 + syndromes.inner.len()).saturating_sub(1 + self.degree());
+        if terms == 0 {
+            ret.push(F::ZERO);
+            return Self::from(ret);
+        }
+
+        let n = 1 + self.degree();
+        for idx in 0..terms {
+            ret.push(
+                (0..n).map(|i| self.inner[n - i - 1].clone() * &syndromes.inner[idx + i]).sum(),
+            );
+        }
+        Self::from(ret)
+    }
+
+    /// Multiplies two polynomials modulo x^d, for some given `d`.
+    ///
+    /// Can be used to simply multiply two polynomials, by passing `usize::MAX` or
+    /// some other suitably large number as `d`.
+    pub fn mul_mod_x_d(&self, other: &Self, d: usize) -> Self {
+        if d == 0 {
+            return Self { inner: FieldVec::new() };
+        }
+
+        let sdeg = self.degree();
+        let odeg = other.degree();
+
+        let convolution_product = |exp: usize| {
+            let sidx = exp.saturating_sub(sdeg);
+            let eidx = cmp::min(exp, odeg);
+            (sidx..=eidx).map(|i| self.inner[exp - i].clone() * &other.inner[i]).sum()
+        };
+
+        let max_n = cmp::min(sdeg + odeg + 1, d - 1);
+        (0..=max_n).map(convolution_product).collect()
     }
 
     /// Given a BCH generator polynomial, find an element alpha that maximizes the
@@ -455,5 +515,41 @@ mod tests {
         } else {
             panic!("Unexpected generator {}", elem);
         }
+    }
+
+    #[test]
+    fn mul_mod() {
+        let x_minus_1: Polynomial<_> = [Fe32::P, Fe32::P].iter().copied().collect();
+        assert_eq!(
+            x_minus_1.mul_mod_x_d(&x_minus_1, 3),
+            [Fe32::P, Fe32::Q, Fe32::P].iter().copied().collect(),
+        );
+        assert_eq!(x_minus_1.mul_mod_x_d(&x_minus_1, 2), [Fe32::P].iter().copied().collect(),);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")] // needed since `mul_mod_x_d` produces extra 0 coefficients
+    fn factor_then_mul() {
+        let bech32_poly: Polynomial<Fe32> = {
+            use Fe32 as F;
+            [F::J, F::A, F::_4, F::_5, F::K, F::A, F::P]
+        }
+        .iter()
+        .copied()
+        .collect();
+
+        let bech32_poly_lift = Polynomial { inner: bech32_poly.inner.lift() };
+
+        let factors = bech32_poly
+            .find_nonzero_distinct_roots(Fe1024::GENERATOR)
+            .map(|idx| Fe1024::GENERATOR.powi(idx as i64))
+            .map(|root| [root, Fe1024::ONE].iter().copied().collect::<Polynomial<_>>())
+            .collect::<Vec<_>>();
+
+        let product = factors.iter().fold(
+            Polynomial::with_monic_leading_term(&[]),
+            |acc: Polynomial<_>, factor: &Polynomial<_>| acc.mul_mod_x_d(factor, 100),
+        );
+        assert_eq!(bech32_poly_lift, product);
     }
 }

@@ -37,6 +37,19 @@ impl<const DEG: usize> From<Fe32> for Fe32Ext<DEG> {
     }
 }
 
+impl<const DEG: usize> core::convert::TryFrom<Fe32Ext<DEG>> for Fe32 {
+    type Error = ();
+
+    fn try_from(ext: Fe32Ext<DEG>) -> Result<Self, Self::Error> {
+        for elem in &ext.inner[1..] {
+            if *elem != Fe32::Q {
+                return Err(());
+            }
+        }
+        Ok(ext.inner[0])
+    }
+}
+
 impl<const DEG: usize> fmt::Debug for Fe32Ext<DEG> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { fmt::Display::fmt(self, f) }
 }
@@ -150,6 +163,8 @@ impl Field for Fe1024 {
     /// A generator of the field.
     const GENERATOR: Self = Self::new([Fe32::P, Fe32::H]);
 
+    const CHARACTERISTIC: usize = 2;
+
     /// The order of the multiplicative group of the field.
     ///
     /// This constant also serves as a compile-time check that we can count
@@ -234,6 +249,8 @@ impl Field for Fe32768 {
 
     /// The one element of the field.
     const ONE: Self = Self::new([Fe32::P, Fe32::Q, Fe32::Q]);
+
+    const CHARACTERISTIC: usize = 2;
 
     // Chosen somewhat arbitrarily, by just guessing values until one came
     // out with the correct order.

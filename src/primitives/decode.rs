@@ -1021,6 +1021,17 @@ impl InvalidResidueError {
     pub fn matches_bech32_checksum(&self) -> bool {
         self.actual == Polynomial::from_residue(Bech32::TARGET_RESIDUE)
     }
+
+    /// Accessor for the invalid residue, less the target residue.
+    ///
+    /// Note that because the error type is not parameterized by a checksum (it
+    /// holds the target residue but this doesn't help), the caller will need
+    /// to obtain the checksum from somewhere else in order to make use of this.
+    ///
+    /// Not public because [`Polynomial`] is a private type, and because the
+    /// subtraction will panic if this is called without checking has_data
+    /// on the FieldVecs.
+    pub(super) fn residue(&self) -> Polynomial<Fe32> { self.actual.clone() - &self.target }
 }
 
 #[cfg(feature = "std")]
