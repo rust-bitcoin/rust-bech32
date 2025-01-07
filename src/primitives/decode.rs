@@ -114,7 +114,7 @@ const SEP: char = '1';
 /// ```
 #[derive(Debug)]
 pub struct UncheckedHrpstring<'s> {
-    /// The human-readable part, guaranteed to be lowercase ASCII characters.
+    /// The human-readable part, guaranteed to be ASCII characters and not mixed-case.
     hrp: Hrp,
     /// This is ASCII byte values of the parsed string, guaranteed to be valid bech32 characters.
     ///
@@ -332,7 +332,7 @@ impl<'s> UncheckedHrpstring<'s> {
 /// ```
 #[derive(Debug)]
 pub struct CheckedHrpstring<'s> {
-    /// The human-readable part, guaranteed to be lowercase ASCII characters.
+    /// The human-readable part, guaranteed to be ASCII characters and not mixed-case.
     hrp: Hrp,
     /// This is ASCII byte values of the parsed string, guaranteed to be valid bech32 characters.
     ///
