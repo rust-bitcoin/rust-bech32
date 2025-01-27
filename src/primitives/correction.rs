@@ -262,7 +262,7 @@ pub struct ErrorIterator<'c, Ck: Checksum> {
     c: usize,
 }
 
-impl<'c, Ck: Checksum> Iterator for ErrorIterator<'c, Ck> {
+impl<Ck: Checksum> Iterator for ErrorIterator<'_, Ck> {
     type Item = (usize, Fe32);
 
     fn next(&mut self) -> Option<Self::Item> {
