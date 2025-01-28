@@ -341,7 +341,7 @@ pub struct ByteIter<'b> {
     iter: slice::Iter<'b, u8>,
 }
 
-impl<'b> Iterator for ByteIter<'b> {
+impl Iterator for ByteIter<'_> {
     type Item = u8;
     #[inline]
     fn next(&mut self) -> Option<u8> { self.iter.next().copied() }
@@ -349,17 +349,17 @@ impl<'b> Iterator for ByteIter<'b> {
     fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
 }
 
-impl<'b> ExactSizeIterator for ByteIter<'b> {
+impl ExactSizeIterator for ByteIter<'_> {
     #[inline]
     fn len(&self) -> usize { self.iter.len() }
 }
 
-impl<'b> DoubleEndedIterator for ByteIter<'b> {
+impl DoubleEndedIterator for ByteIter<'_> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> { self.iter.next_back().copied() }
 }
 
-impl<'b> FusedIterator for ByteIter<'b> {}
+impl FusedIterator for ByteIter<'_> {}
 
 /// Iterator over ASCII characters of the human-readable part.
 ///
@@ -368,7 +368,7 @@ pub struct CharIter<'b> {
     iter: ByteIter<'b>,
 }
 
-impl<'b> Iterator for CharIter<'b> {
+impl Iterator for CharIter<'_> {
     type Item = char;
     #[inline]
     fn next(&mut self) -> Option<char> { self.iter.next().map(Into::into) }
@@ -376,24 +376,24 @@ impl<'b> Iterator for CharIter<'b> {
     fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
 }
 
-impl<'b> ExactSizeIterator for CharIter<'b> {
+impl ExactSizeIterator for CharIter<'_> {
     #[inline]
     fn len(&self) -> usize { self.iter.len() }
 }
 
-impl<'b> DoubleEndedIterator for CharIter<'b> {
+impl DoubleEndedIterator for CharIter<'_> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> { self.iter.next_back().map(Into::into) }
 }
 
-impl<'b> FusedIterator for CharIter<'b> {}
+impl FusedIterator for CharIter<'_> {}
 
 /// Iterator over lowercase bytes (ASCII characters) of the human-readable part.
 pub struct LowercaseByteIter<'b> {
     iter: ByteIter<'b>,
 }
 
-impl<'b> Iterator for LowercaseByteIter<'b> {
+impl Iterator for LowercaseByteIter<'_> {
     type Item = u8;
     #[inline]
     fn next(&mut self) -> Option<u8> {
@@ -403,26 +403,26 @@ impl<'b> Iterator for LowercaseByteIter<'b> {
     fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
 }
 
-impl<'b> ExactSizeIterator for LowercaseByteIter<'b> {
+impl ExactSizeIterator for LowercaseByteIter<'_> {
     #[inline]
     fn len(&self) -> usize { self.iter.len() }
 }
 
-impl<'b> DoubleEndedIterator for LowercaseByteIter<'b> {
+impl DoubleEndedIterator for LowercaseByteIter<'_> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         self.iter.next_back().map(|b| if is_ascii_uppercase(b) { b | 32 } else { b })
     }
 }
 
-impl<'b> FusedIterator for LowercaseByteIter<'b> {}
+impl FusedIterator for LowercaseByteIter<'_> {}
 
 /// Iterator over lowercase ASCII characters of the human-readable part.
 pub struct LowercaseCharIter<'b> {
     iter: LowercaseByteIter<'b>,
 }
 
-impl<'b> Iterator for LowercaseCharIter<'b> {
+impl Iterator for LowercaseCharIter<'_> {
     type Item = char;
     #[inline]
     fn next(&mut self) -> Option<char> { self.iter.next().map(Into::into) }
@@ -430,17 +430,17 @@ impl<'b> Iterator for LowercaseCharIter<'b> {
     fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
 }
 
-impl<'b> ExactSizeIterator for LowercaseCharIter<'b> {
+impl ExactSizeIterator for LowercaseCharIter<'_> {
     #[inline]
     fn len(&self) -> usize { self.iter.len() }
 }
 
-impl<'b> DoubleEndedIterator for LowercaseCharIter<'b> {
+impl DoubleEndedIterator for LowercaseCharIter<'_> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> { self.iter.next_back().map(Into::into) }
 }
 
-impl<'b> FusedIterator for LowercaseCharIter<'b> {}
+impl FusedIterator for LowercaseCharIter<'_> {}
 
 fn is_ascii_uppercase(b: u8) -> bool { (65..=90).contains(&b) }
 

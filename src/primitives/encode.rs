@@ -199,7 +199,7 @@ where
     }
 }
 
-impl<'a, I, Ck> Iterator for CharIter<'a, I, Ck>
+impl<I, Ck> Iterator for CharIter<'_, I, Ck>
 where
     I: Iterator<Item = Fe32>,
     Ck: Checksum,
@@ -269,7 +269,7 @@ where
     pub fn new(char_iter: CharIter<'hrp, I, Ck>) -> Self { Self { char_iter } }
 }
 
-impl<'a, I, Ck> Iterator for ByteIter<'a, I, Ck>
+impl<I, Ck> Iterator for ByteIter<'_, I, Ck>
 where
     I: Iterator<Item = Fe32>,
     Ck: Checksum,
@@ -311,7 +311,7 @@ where
     }
 }
 
-impl<'hrp, I, Ck> Iterator for Fe32Iter<'hrp, I, Ck>
+impl<I, Ck> Iterator for Fe32Iter<'_, I, Ck>
 where
     I: Iterator<Item = Fe32>,
     Ck: Checksum,

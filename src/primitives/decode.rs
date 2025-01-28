@@ -709,7 +709,7 @@ pub struct ByteIter<'s> {
     iter: FesToBytes<AsciiToFe32Iter<'s>>,
 }
 
-impl<'s> Iterator for ByteIter<'s> {
+impl Iterator for ByteIter<'_> {
     type Item = u8;
     #[inline]
     fn next(&mut self) -> Option<u8> { self.iter.next() }
@@ -717,7 +717,7 @@ impl<'s> Iterator for ByteIter<'s> {
     fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
 }
 
-impl<'s> ExactSizeIterator for ByteIter<'s> {
+impl ExactSizeIterator for ByteIter<'_> {
     #[inline]
     fn len(&self) -> usize { self.iter.len() }
 }
@@ -733,7 +733,7 @@ pub struct AsciiToFe32Iter<'s> {
     iter: iter::Copied<slice::Iter<'s, u8>>,
 }
 
-impl<'s> Iterator for AsciiToFe32Iter<'s> {
+impl Iterator for AsciiToFe32Iter<'_> {
     type Item = Fe32;
     #[inline]
     fn next(&mut self) -> Option<Fe32> { self.iter.next().map(Fe32::from_char_unchecked) }
@@ -744,7 +744,7 @@ impl<'s> Iterator for AsciiToFe32Iter<'s> {
     }
 }
 
-impl<'s> ExactSizeIterator for AsciiToFe32Iter<'s> {
+impl ExactSizeIterator for AsciiToFe32Iter<'_> {
     #[inline]
     fn len(&self) -> usize { self.iter.len() }
 }

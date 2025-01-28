@@ -227,7 +227,7 @@ impl<'a, ExtField> PrintImpl<'a, ExtField> {
     }
 }
 
-impl<'a, ExtField> fmt::Display for PrintImpl<'a, ExtField>
+impl<ExtField> fmt::Display for PrintImpl<'_, ExtField>
 where
     ExtField: super::Bech32Field + super::ExtensionField<BaseField = Fe32>,
 {
@@ -466,7 +466,7 @@ impl<'hrp> HrpFe32Iter<'hrp> {
     }
 }
 
-impl<'hrp> Iterator for HrpFe32Iter<'hrp> {
+impl Iterator for HrpFe32Iter<'_> {
     type Item = Fe32;
     #[inline]
     fn next(&mut self) -> Option<Fe32> {
