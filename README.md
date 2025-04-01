@@ -1,7 +1,7 @@
 Rust Bech32
 ===========
 
-[![Docs.rs badge](https://docs.rs/bech32/badge.svg)](https://docs.rs/bech32/)
+[![Docs.rs badge](https://img.shields.io/docsrs/bech32/latest)](https://docs.rs/bech32/)
 [![Continuous Integration](https://github.com/rust-bitcoin/rust-bech32/workflows/Continuous%20Integration/badge.svg)](https://github.com/rust-bitcoin/rust-bech32/actions?query=workflow%3A%22Continuous+Integration%22)
 
 Rust implementation of the Bech32 encoding format described in [BIP-0173](https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki)
