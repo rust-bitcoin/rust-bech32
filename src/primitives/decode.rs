@@ -135,7 +135,7 @@ impl<'s> UncheckedHrpstring<'s> {
 
         let ret = UncheckedHrpstring {
             hrp: Hrp::parse(hrp)?,
-            data_part_ascii: rest[1..].as_bytes(), // Skip the separator.
+            data_part_ascii: &rest.as_bytes()[1..], // Skip the separator.
             hrpstring_length: s.len(),
         };
 
