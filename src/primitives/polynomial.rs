@@ -73,7 +73,7 @@ impl<F: Field> Polynomial<F> {
     /// # Panics
     ///
     /// Panics if [`Self::has_data`] is false.
-    pub fn iter(&self) -> slice::Iter<F> {
+    pub fn iter(&self) -> slice::Iter<'_, F> {
         self.assert_has_data();
         self.coefficients().iter()
     }

@@ -175,7 +175,7 @@ impl<Ck: Checksum> Corrector<Ck> {
     ///
     /// If the input string has sufficiently many errors, this unique closest correct
     /// string may not actually be the intended string.
-    pub fn bch_errors(&self) -> Option<ErrorIterator<Ck>> {
+    pub fn bch_errors(&self) -> Option<ErrorIterator<'_, Ck>> {
         // 1. Compute all syndromes by evaluating the residue at each power of the generator.
         let syndromes: Polynomial<_> = Ck::ROOT_GENERATOR
             .powers_range(Ck::ROOT_EXPONENTS)
