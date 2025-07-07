@@ -129,7 +129,7 @@ impl<F> FieldVec<F> {
     /// # Panics
     ///
     /// Panics if [`Self::has_data`] is false.
-    pub fn iter(&self) -> slice::Iter<F> {
+    pub fn iter(&self) -> slice::Iter<'_, F> {
         if self.len > NO_ALLOC_MAX_LENGTH {
             self.assert_has_data();
             #[cfg(feature = "alloc")]
@@ -143,7 +143,7 @@ impl<F> FieldVec<F> {
     /// # Panics
     ///
     /// Panics if [`Self::has_data`] is false.
-    pub fn iter_mut(&mut self) -> slice::IterMut<F> {
+    pub fn iter_mut(&mut self) -> slice::IterMut<'_, F> {
         if self.len > NO_ALLOC_MAX_LENGTH {
             self.assert_has_data();
             #[cfg(feature = "alloc")]
