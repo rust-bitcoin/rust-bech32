@@ -3,6 +3,17 @@ on: [push, pull_request]
 name: Continuous Integration
 
 jobs:
+  Prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      nightly_version: ${{ steps.read_toolchain.outputs.nightly_version }}
+    steps:
+      - name: "Checkout repo"
+        uses: actions/checkout@v4
+      - name: "Read nightly version"
+        id: read_toolchain
+        run: echo "nightly_version=$(cat nightly-version)" >> $GITHUB_OUTPUT
+
   Stable:
     name: Test - stable toolchain
     runs-on: ubuntu-latest
@@ -10,7 +21,7 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout Crate
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Checkout Toolchain
         # https://github.com/dtolnay/rust-toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -28,7 +39,7 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout Crate
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Checkout Toolchain
         uses: dtolnay/rust-toolchain@beta
       - name: Running test script
@@ -38,14 +49,17 @@ jobs:
 
   Nightly:
     name: Test - nightly toolchain
+    needs: Prepare
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
     steps:
       - name: Checkout Crate
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Checkout Toolchain
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ needs.Prepare.outputs.nightly_version }}
       - name: Running test script
         env:
           DO_DOCSRS: true
@@ -60,7 +74,7 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout Crate
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Checkout Toolchain
         uses: dtolnay/rust-toolchain@1.56.1
       - name: Running test script
@@ -70,18 +84,20 @@ jobs:
 
   EmbeddedWithAlloc:
     name: no_std with alloc
+    needs: Prepare
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
     steps:
       - name: Checkout Crate
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up QEMU
         run: sudo apt update && sudo apt install -y qemu-system-arm gcc-arm-none-eabi
       - name: Checkout Toolchain
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain@v1
         with:
           targets: thumbv7m-none-eabi
+          toolchain: ${{ needs.Prepare.outputs.nightly_version }}
       - name: Run
         env:
           RUSTFLAGS: "-C link-arg=-Tlink.x"
@@ -90,18 +106,20 @@ jobs:
 
   EmbeddedNoAlloc:
     name: no_std no alloc
+    needs: Prepare
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
     steps:
       - name: Checkout Crate
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up QEMU
         run: sudo apt update && sudo apt install -y qemu-system-arm gcc-arm-none-eabi
       - name: Checkout Toolchain
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain@v1
         with:
           targets: thumbv7m-none-eabi
+          toolchain: ${{ needs.Prepare.outputs.nightly_version }}
       - name: Run
         env:
           RUSTFLAGS: "-C link-arg=-Tlink.x"
@@ -113,7 +131,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Crate
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Checkout Toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Add architecture i386
@@ -131,7 +149,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Crate
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Checkout Toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Install target

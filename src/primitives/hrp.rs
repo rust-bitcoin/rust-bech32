@@ -237,24 +237,24 @@ impl Hrp {
     /// If an uppercase HRP was parsed during object construction then this iterator will yield
     /// uppercase ASCII `char`s. For lowercase bytes see [`Self::lowercase_byte_iter`]
     #[inline]
-    pub fn byte_iter(&self) -> ByteIter { ByteIter { iter: self.buf[..self.size].iter() } }
+    pub fn byte_iter(&self) -> ByteIter<'_> { ByteIter { iter: self.buf[..self.size].iter() } }
 
     /// Creates a character iterator over the ASCII characters of this HRP.
     ///
     /// If an uppercase HRP was parsed during object construction then this iterator will yield
     /// uppercase ASCII `char`s. For lowercase bytes see [`Self::lowercase_char_iter`].
     #[inline]
-    pub fn char_iter(&self) -> CharIter { CharIter { iter: self.byte_iter() } }
+    pub fn char_iter(&self) -> CharIter<'_> { CharIter { iter: self.byte_iter() } }
 
     /// Creates a lowercase iterator over the byte values (ASCII characters) of this HRP.
     #[inline]
-    pub fn lowercase_byte_iter(&self) -> LowercaseByteIter {
+    pub fn lowercase_byte_iter(&self) -> LowercaseByteIter<'_> {
         LowercaseByteIter { iter: self.byte_iter() }
     }
 
     /// Creates a lowercase character iterator over the ASCII characters of this HRP.
     #[inline]
-    pub fn lowercase_char_iter(&self) -> LowercaseCharIter {
+    pub fn lowercase_char_iter(&self) -> LowercaseCharIter<'_> {
         LowercaseCharIter { iter: self.lowercase_byte_iter() }
     }
 
