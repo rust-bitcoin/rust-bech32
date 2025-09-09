@@ -141,7 +141,7 @@ impl<Ck: Checksum> Corrector<Ck> {
     /// A bound on the number of errors and erasures (errors with known location)
     /// can be corrected by this corrector.
     ///
-    /// Returns N such that, given E errors and X erasures, corection is possible
+    /// Returns N such that, given E errors and X erasures, correction is possible
     /// iff 2E + X <= N.
     pub fn singleton_bound(&self) -> usize {
         // d - 1, where d = [number of consecutive roots] + 2
@@ -243,7 +243,7 @@ impl<Ck: Checksum> Corrector<Ck> {
 /// Out-of-bound error locations will not occur "naturally", in the sense that they
 /// will happen with extremely low probability for a string with a valid HRP and a
 /// uniform error pattern. (The probability is 32^-n, where n is the size of the
-/// range [`Checksum::ROOT_EXPONENTS`], so it is not neglible but is very small for
+/// range [`Checksum::ROOT_EXPONENTS`], so it is not negligible but is very small for
 /// most checksums.) However, it is easy to construct adversarial inputs that will
 /// exhibit this behavior, so you must take it into account.
 ///
