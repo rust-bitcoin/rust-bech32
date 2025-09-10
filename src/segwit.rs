@@ -517,7 +517,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "std")]
-    fn encode_lower_to_writer_including_lowecaseing_hrp() {
+    fn encode_lower_to_writer_including_lowercasing_hrp() {
         let program = witness_program();
         let mut buf = Vec::new();
         let hrp = Hrp::parse_unchecked("BC");
