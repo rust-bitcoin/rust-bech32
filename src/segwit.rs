@@ -4,7 +4,7 @@
 //!
 //! [BIP-173] and [BIP-350] contain some complexity. This module aims to allow you to create modern
 //! Bitcoin addresses correctly and easily without intimate knowledge of the BIPs. However, if you
-//! do posses such knowledge and are doing unusual things you may prefer to use the `primitives`
+//! do possess such knowledge and are doing unusual things you may prefer to use the `primitives`
 //! submodules directly.
 //!
 //! # Examples
