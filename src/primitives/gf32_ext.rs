@@ -108,7 +108,7 @@ where
         }
     }
 
-    // We just use naive n^2 muliplication because this is easy to write in
+    // We just use naive n^2 multiplication because this is easy to write in
     // generic code, and because our GF32 implementation makes multiplication
     // (almost) as cheap as addition.
     //
@@ -269,7 +269,7 @@ impl Field for Fe32768 {
         // Unlike in the GF1024 case we don't bother being generic over
         // arbitrary values of POLYNOMIAL, since doing so means a ton
         // of extra work for everybody (me, the reviewer, and the CPU
-        // that has to do a bunch of mulitplications by values that
+        // that has to do a bunch of multiplications by values that
         // turn out to always be 0).
         debug_assert_eq!(Self::POLYNOMIAL, Self::new([Fe32::P, Fe32::P, Fe32::Q]));
         // Aliases to make the below equations easier to read
