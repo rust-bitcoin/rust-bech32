@@ -134,7 +134,7 @@ impl<'s> UncheckedHrpstring<'s> {
 
         let ret = UncheckedHrpstring {
             hrp: Hrp::parse(hrp)?,
-            data_part_ascii: rest[1..].as_bytes(), // Skip the separator.
+            data_part_ascii: &rest.as_bytes()[1..], // Skip the separator.
             hrpstring_length: s.len(),
         };
 
@@ -442,7 +442,7 @@ impl<'s> CheckedHrpstring<'s> {
     ///
     /// Converts the ASCII bytes representing field elements to the respective field elements.
     #[inline]
-    pub fn fe32_iter<I: Iterator<Item = u8>>(&self) -> AsciiToFe32Iter {
+    pub fn fe32_iter<I: Iterator<Item = u8>>(&self) -> AsciiToFe32Iter<'_> {
         AsciiToFe32Iter { iter: self.ascii.iter().copied() }
     }
 
@@ -451,7 +451,7 @@ impl<'s> CheckedHrpstring<'s> {
     /// Converts the ASCII bytes representing field elements to the respective field elements, then
     /// converts the stream of field elements to a stream of bytes.
     #[inline]
-    pub fn byte_iter(&self) -> ByteIter {
+    pub fn byte_iter(&self) -> ByteIter<'_> {
         ByteIter { iter: AsciiToFe32Iter { iter: self.ascii.iter().copied() }.fes_to_bytes() }
     }
 
@@ -661,7 +661,7 @@ impl<'s> SegwitHrpstring<'s> {
     ///
     /// Use `self.witness_version()` to get the witness version.
     #[inline]
-    pub fn byte_iter(&self) -> ByteIter {
+    pub fn byte_iter(&self) -> ByteIter<'_> {
         ByteIter { iter: AsciiToFe32Iter { iter: self.ascii.iter().copied() }.fes_to_bytes() }
     }
 }
