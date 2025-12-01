@@ -92,7 +92,7 @@ const SEP: char = '1';
 /// checksum in any way.
 ///
 /// Unless you are attempting to validate a string with multiple checksums then you likely do not
-/// want to use this type directly, instead use [`CheckedHrpstring::new(s)`].
+/// want to use this type directly, instead use [`CheckedHrpstring::new`]`(s)`.
 ///
 /// # Examples
 ///
