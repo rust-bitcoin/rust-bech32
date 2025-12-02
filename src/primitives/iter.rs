@@ -61,7 +61,9 @@ pub trait Fe32IterExt: Sized + Iterator<Item = Fe32> {
 
     /// Adapts the Fe32 iterator to encode the field elements into a bech32 address.
     #[inline]
-    fn with_checksum<Ck: Checksum>(self, hrp: &Hrp) -> Encoder<Self, Ck> { Encoder::new(self, hrp) }
+    fn with_checksum<Ck: Checksum>(self, hrp: &Hrp) -> Encoder<'_, Self, Ck> {
+        Encoder::new(self, hrp)
+    }
 }
 
 impl<I> Fe32IterExt for I where I: Iterator<Item = Fe32> {}
