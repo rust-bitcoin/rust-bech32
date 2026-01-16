@@ -131,7 +131,6 @@
 #![cfg_attr(all(not(feature = "std"), not(test)), no_std)]
 // Experimental features we need.
 #![cfg_attr(bench, feature(test))]
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 // Coding conventions
 #![deny(missing_docs)]
 #![allow(clippy::suspicious_arithmetic_impl)] // this lint is literally always wrong
