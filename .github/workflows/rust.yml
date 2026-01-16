@@ -2,90 +2,167 @@ on: [push, pull_request]
 
 name: Continuous Integration
 
+permissions: {}
+
 jobs:
   Prepare:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     outputs:
       nightly_version: ${{ steps.read_toolchain.outputs.nightly_version }}
+      maintainer_tools_version: ${{ steps.read_toolchain.outputs.maintainer_tools_version }}
     steps:
       - name: "Checkout repo"
-        uses: actions/checkout@v4
-      - name: "Read nightly version"
-        id: read_toolchain
-        run: echo "nightly_version=$(cat nightly-version)" >> $GITHUB_OUTPUT
-
-  Stable:
-    name: Test - stable toolchain
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-    steps:
-      - name: Checkout Crate
-        uses: actions/checkout@v4
-      - name: Checkout Toolchain
-        # https://github.com/dtolnay/rust-toolchain
-        uses: dtolnay/rust-toolchain@stable
-      - name: Running test script
-        env:
-          DO_LINT: true
-          DO_DOCS: true
-          DO_FEATURE_MATRIX: true
-        run: ./contrib/test.sh
-
-  Beta:
-    name: Test - beta toolchain
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-    steps:
-      - name: Checkout Crate
-        uses: actions/checkout@v4
-      - name: Checkout Toolchain
-        uses: dtolnay/rust-toolchain@beta
-      - name: Running test script
-        env:
-          DO_FEATURE_MATRIX: true
-        run: ./contrib/test.sh
-
-  Nightly:
-    name: Test - nightly toolchain
-    needs: Prepare
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-    steps:
-      - name: Checkout Crate
-        uses: actions/checkout@v4
-      - name: Checkout Toolchain
-        uses: dtolnay/rust-toolchain@v1
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          toolchain: ${{ needs.Prepare.outputs.nightly_version }}
-      - name: Running test script
-        env:
-          DO_DOCSRS: true
-          DO_FMT: true
-          DO_BENCH: true
-        run: ./contrib/test.sh
+          persist-credentials: false
+      - name: "Read workspace versions"
+        id: read_toolchain
+        run: |
+          echo "nightly_version=$(cat nightly-version)" >> $GITHUB_OUTPUT
+          echo "maintainer_tools_version=$(cat maintainer-tools-version)" >> $GITHUB_OUTPUT
 
-  MSRV:
-    name: Test - 1.56.1 toolchain
-    runs-on: ubuntu-latest
+  Stable:                       # 2 jobs, one per manifest.
+    name: Test - stable toolchain
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
+      matrix:
+        dep: [minimal, recent]
     steps:
-      - name: Checkout Crate
-        uses: actions/checkout@v4
-      - name: Checkout Toolchain
-        uses: dtolnay/rust-toolchain@1.56.1
-      - name: Running test script
-        env:
-          DO_FEATURE_MATRIX: true
-        run: ./contrib/test.sh
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/prepare
+        with:
+          toolchain: stable
+      - name: "Run tests"
+        run: cargo rbmt test stable --lock-file ${{ matrix.dep }}
+
+  Nightly:                      # 2 jobs, one per manifest.
+    name: Test - nightly toolchain
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        dep: [minimal, recent]
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/prepare
+        with:
+          toolchain: nightly
+      - name: "Run tests"
+        run: cargo rbmt test nightly --lock-file ${{ matrix.dep }}
+
+  MSRV:                         # 2 jobs, one per manifest.
+    name: Test - MSRV toolchain
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        dep: [minimal, recent]
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/prepare
+        with:
+          toolchain: "1.56.1"
+      - name: "Run tests"
+        run: cargo rbmt test msrv --lock-file ${{ matrix.dep }}
+
+  Lint:
+    name: Lint - nightly toolchain
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        dep: [recent]
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/prepare
+        with:
+          toolchain: nightly
+          components: clippy
+      - name: "Run lint"
+        run: cargo rbmt lint
+
+  Docs:
+    name: Docs - stable toolchain
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        dep: [recent]
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/prepare
+        with:
+          toolchain: stable
+      - name: "Build docs"
+        run: cargo rbmt docs
+
+  Docsrs:
+    name: Docs - nightly toolchain
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        dep: [recent]
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/prepare
+        with:
+          toolchain: nightly
+      - name: "Build docs.rs docs"
+        run: cargo rbmt docsrs
+
+  Bench:
+    name: Bench - nightly toolchain
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        dep: [recent]
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/prepare
+        with:
+          toolchain: nightly
+      - name: "Run benches"
+        run: cargo rbmt test nightly --lock-file ${{ matrix.dep }}
 
   EmbeddedWithAlloc:
     name: no_std with alloc
     needs: Prepare
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
     steps:
@@ -108,6 +185,8 @@ jobs:
     name: no_std no alloc
     needs: Prepare
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
     steps:
@@ -129,6 +208,8 @@ jobs:
   Arch32bit:
     name: Test 32-bit version
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout Crate
         uses: actions/checkout@v4
@@ -147,6 +228,8 @@ jobs:
     name: Cross test
     if: ${{ !github.event.act }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout Crate
         uses: actions/checkout@v4
