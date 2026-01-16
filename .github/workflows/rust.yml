@@ -68,7 +68,7 @@ jobs:
         run: ./contrib/test.sh
 
   MSRV:
-    name: Test - 1.56.1 toolchain
+    name: Test - 1.74.0 toolchain
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -76,7 +76,7 @@ jobs:
       - name: Checkout Crate
         uses: actions/checkout@v4
       - name: Checkout Toolchain
-        uses: dtolnay/rust-toolchain@1.56.1
+        uses: dtolnay/rust-toolchain@1.74.0
       - name: Running test script
         env:
           DO_FEATURE_MATRIX: true

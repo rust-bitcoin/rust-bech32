@@ -9,7 +9,8 @@ readme = "README.md"
 keywords = ["base32", "encoding", "bech32", "bitcoin", "cryptocurrency"]
 categories = ["encoding", "cryptography::cryptocurrencies"]
 license = "MIT"
-edition = "2018"
+edition = "2021"
+rust-version = "1.74.0"
 
 [features]
 default = ["std"]

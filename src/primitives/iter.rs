@@ -155,7 +155,7 @@ where
 /// The number of fes encoded by n bytes, rounded up because we pad the fes.
 fn bytes_len_to_fes_len(bytes: usize) -> usize {
     let bits = bytes * 8;
-    (bits + 4) / 5
+    bits.div_ceil(5)
 }
 
 impl<I> ExactSizeIterator for BytesToFes<I>
