@@ -444,7 +444,7 @@ impl<'s> CheckedHrpstring<'s> {
     ///
     /// Converts the ASCII bytes representing field elements to the respective field elements.
     #[inline]
-    pub fn fe32_iter(&self, _: u8) -> AsciiToFe32Iter<'_> {
+    pub fn fe32_iter(&self) -> AsciiToFe32Iter<'_> {
         AsciiToFe32Iter { iter: self.ascii.iter().copied() }
     }
 
