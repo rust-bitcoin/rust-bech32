@@ -494,6 +494,12 @@ impl From<UncheckedHrpstringError> for DecodeError {
     fn from(e: UncheckedHrpstringError) -> Self { Self::Parse(e) }
 }
 
+#[cfg(feature = "alloc")]
+impl From<ChecksumError> for DecodeError {
+    #[inline]
+    fn from(e: ChecksumError) -> Self { Self::Checksum(e) }
+}
+
 /// An error while encoding a bech32 string.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
