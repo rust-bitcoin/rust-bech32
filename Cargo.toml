@@ -16,8 +16,6 @@ default = ["std"]
 std = ["alloc"]
 alloc = []
 
-[target.'cfg(mutate)'.dev-dependencies]
-mutagen = { git = "https://github.com/llogiq/mutagen" }
 
 [lints.rust]
 unexpected_cfgs = { level = "deny", check-cfg = [ 'cfg(bench)', 'cfg(kani)', 'cfg(mutate)' ] }

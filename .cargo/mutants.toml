@@ -1,0 +1,7 @@
+additional_cargo_args = ["--all-features"]
+examine_globs = ["src/**/*.rs"]
+exclude_globs = [
+    "src/primitives/**/*.rs",#Causing Timeouts
+]
+exclude_re = [
+]
