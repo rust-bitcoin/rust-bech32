@@ -4,4 +4,15 @@ exclude_globs = [
     "src/primitives/**/*.rs",#Causing Timeouts
 ]
 exclude_re = [
+    #impls
+    "impl fmt::Display",
+    "impl std::error::Error",
+
+    #benchmarks
+    "benches::",
+
+    #unchecked
+    "_unchecked",
+    "encode_to_writer",
+    "encode_v1",
 ]
