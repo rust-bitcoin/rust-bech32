@@ -718,6 +718,19 @@ mod tests {
         let s = "abcd1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqrw9z3s";
         assert!(decode(s).is_ok());
     }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn encode_to_writer_writes_valid_output(){
+        let hrp=Hrp::parse_unchecked("test");
+        let mut buf=Vec::new();
+
+        encode_to_writer::<Bech32,_>(&mut buf, hrp, &DATA).expect("encode_to_writer failed.");
+        assert!(!buf.is_empty(),"encode_to_writer wrote nothing.");
+        let out=std::str::from_utf8(&buf).expect("ascii is valid utf8.");
+        let target=encode::<Bech32>(hrp,&DATA).expect("encode failed.");
+        assert_eq!(out,target);
+    }
 }
 #[cfg(bench)]
 mod benches {
