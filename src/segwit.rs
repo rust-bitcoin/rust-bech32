@@ -597,6 +597,7 @@ mod tests {
 
     //unchecked tests
     #[test]
+    #[cfg(feature = "std")]
     fn encode_upper_to_fmt_unchecked_writes_valid_output(){
         let program=witness_program();
         for version in [VERSION_0,VERSION_1]{
@@ -610,6 +611,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn encode_upper_to_writer_unchecked_writes_valid_output(){
         let program=witness_program();
         for version in [VERSION_0,VERSION_1]{
@@ -624,6 +626,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn encode_lower_to_writer_writes_valid_output(){
         let program=witness_program();
         
