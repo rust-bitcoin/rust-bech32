@@ -588,74 +588,75 @@ mod tests {
 
     //encode_v1 test
     #[test]
-    fn encode_v1_produces_valid_address(){
-        let program=witness_program();
-        let addr=encode_v1(hrp::BC, &program).unwrap();
-        let target=encode(hrp::BC, VERSION_1, &program).unwrap();
-        assert_eq!(addr,target);
+    fn encode_v1_produces_valid_address() {
+        let program = witness_program();
+        let addr = encode_v1(hrp::BC, &program).unwrap();
+        let target = encode(hrp::BC, VERSION_1, &program).unwrap();
+        assert_eq!(addr, target);
     }
 
     //unchecked tests
     #[test]
     #[cfg(feature = "std")]
-    fn encode_upper_to_fmt_unchecked_writes_valid_output(){
-        let program=witness_program();
-        for version in [VERSION_0,VERSION_1]{
-            let  mut buf=String::new();
-            encode_upper_to_fmt_unchecked(&mut buf, hrp::BC, version, &program).expect("fmt write failed");
-            let target=encode(hrp::BC, version, &program).unwrap().to_ascii_uppercase();
-            assert_eq!(buf,target);
-            let target_length=encoded_length(hrp::BC, version, &program).expect("valid length");
-            assert_eq!(buf.len(),target_length);
+    fn encode_upper_to_fmt_unchecked_writes_valid_output() {
+        let program = witness_program();
+        for version in [VERSION_0, VERSION_1] {
+            let mut buf = String::new();
+            encode_upper_to_fmt_unchecked(&mut buf, hrp::BC, version, &program)
+                .expect("fmt write failed");
+            let target = encode(hrp::BC, version, &program).unwrap().to_ascii_uppercase();
+            assert_eq!(buf, target);
+            let target_length = encoded_length(hrp::BC, version, &program).expect("valid length");
+            assert_eq!(buf.len(), target_length);
         }
     }
 
     #[test]
     #[cfg(feature = "std")]
-    fn encode_upper_to_writer_unchecked_writes_valid_output(){
-        let program=witness_program();
-        for version in [VERSION_0,VERSION_1]{
-            let mut buf=Vec::new();
-            encode_upper_to_writer_unchecked(&mut buf, hrp::BC, version, &program).expect("Writer Failed");
-            let out=std::str::from_utf8(&buf).expect("ascii");
-            let target=encode(hrp::BC, version, &program).unwrap().to_ascii_uppercase();
-            assert_eq!(out,target);
-            let target_length=encoded_length(hrp::BC, version, &program).expect("valid length");
-            assert_eq!(buf.len(),target_length);
+    fn encode_upper_to_writer_unchecked_writes_valid_output() {
+        let program = witness_program();
+        for version in [VERSION_0, VERSION_1] {
+            let mut buf = Vec::new();
+            encode_upper_to_writer_unchecked(&mut buf, hrp::BC, version, &program)
+                .expect("Writer Failed");
+            let out = std::str::from_utf8(&buf).expect("ascii");
+            let target = encode(hrp::BC, version, &program).unwrap().to_ascii_uppercase();
+            assert_eq!(out, target);
+            let target_length = encoded_length(hrp::BC, version, &program).expect("valid length");
+            assert_eq!(buf.len(), target_length);
         }
     }
 
     #[test]
     #[cfg(feature = "std")]
-    fn encode_lower_to_writer_writes_valid_output(){
-        let program=witness_program();
-        
-        for version in [VERSION_0,VERSION_1]{
-            let mut buf=Vec::new();
-            encode_lower_to_writer_unchecked(&mut buf, hrp::BC, version, &program).expect("writer failed");
-            let out=std::str::from_utf8(&buf).expect("ascii");
-            let target=encode(hrp::BC, version, &program).unwrap();
-            assert_eq!(out,target);
-            let target_length=encoded_length(hrp::BC, version, &program).expect("valid length");
-            assert_eq!(buf.len(),target_length);
+    fn encode_lower_to_writer_writes_valid_output() {
+        let program = witness_program();
+
+        for version in [VERSION_0, VERSION_1] {
+            let mut buf = Vec::new();
+            encode_lower_to_writer_unchecked(&mut buf, hrp::BC, version, &program)
+                .expect("writer failed");
+            let out = std::str::from_utf8(&buf).expect("ascii");
+            let target = encode(hrp::BC, version, &program).unwrap();
+            assert_eq!(out, target);
+            let target_length = encoded_length(hrp::BC, version, &program).expect("valid length");
+            assert_eq!(buf.len(), target_length);
         }
     }
 
     #[test]
     #[cfg(feature = "std")]
-    fn encode_to_writer_unchecked_writes_valid_output(){
-        let program=witness_program();
-        for version in[VERSION_0,VERSION_1]{
-            let mut buf=Vec::new();
-            encode_to_writer_unchecked(&mut buf, hrp::BC, version, &program).expect("encode_to_writer_unchecked failed");
-            let out=std::str::from_utf8(&buf).expect("ascii");
-            let target=encode(hrp::BC,version , &program).unwrap();
-            assert_eq!(out,target);
-            let target_length=encoded_length(hrp::BC, version, &program).expect("valid length");
-            assert_eq!(buf.len(),target_length);
-            
+    fn encode_to_writer_unchecked_writes_valid_output() {
+        let program = witness_program();
+        for version in [VERSION_0, VERSION_1] {
+            let mut buf = Vec::new();
+            encode_to_writer_unchecked(&mut buf, hrp::BC, version, &program)
+                .expect("encode_to_writer_unchecked failed");
+            let out = std::str::from_utf8(&buf).expect("ascii");
+            let target = encode(hrp::BC, version, &program).unwrap();
+            assert_eq!(out, target);
+            let target_length = encoded_length(hrp::BC, version, &program).expect("valid length");
+            assert_eq!(buf.len(), target_length);
         }
     }
-
-    
 }
