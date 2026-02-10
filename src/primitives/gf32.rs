@@ -15,9 +15,6 @@
 use core::convert::{Infallible, TryFrom};
 use core::{fmt, num};
 
-#[cfg(all(test, mutate))]
-use mutagen::mutate;
-
 use super::{Bech32Field, Field};
 use crate::error::write_err;
 
