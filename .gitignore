@@ -1,6 +1,8 @@
 **/target
 *.o
 /Cargo.lock
+**/mutants.out
+**/mutants.out.old
 
 /embedded/no-allocator/Cargo.lock
 /embedded/no-allocator/.cargo
