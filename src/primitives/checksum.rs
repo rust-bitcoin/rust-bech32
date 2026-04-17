@@ -502,8 +502,8 @@ impl Iterator for HrpFe32Iter<'_> {
             None => (0, Some(0)),
         };
 
-        let min = high.0 + 1 + low.0;
-        let max = high.1.zip(low.1).map(|(high, low)| high + 1 + low);
+        let min = high.0 + low.0;
+        let max = high.1.zip(low.1).map(|(high, low)| high + low);
 
         (min, max)
     }
@@ -598,6 +598,19 @@ mod tests {
         .to_string();
         #[cfg(feature = "std")]
         println!("{}", _s);
+    }
+
+    #[test]
+    fn hrp_fe32_iter_size_hint_matches_remaining_length() {
+        let hrp = Hrp::parse_unchecked("ab");
+        let mut iter = HrpFe32Iter::new(&hrp);
+
+        for remaining in (0..=(2 * hrp.len() + 1)).rev() {
+            assert_eq!(iter.size_hint(), (remaining, Some(remaining)));
+            if remaining > 0 {
+                iter.next().expect("iterator has more elements");
+            }
+        }
     }
 }
 
