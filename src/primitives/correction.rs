@@ -307,7 +307,9 @@ impl<Ck: Checksum> Iterator for ErrorIterator<'_, Ck> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::primitives::decode::SegwitHrpstring;
+    use crate::primitives::decode::{
+        CheckedHrpstringError, SegwitHrpstring, SegwitHrpstringError, UncheckedHrpstring,
+    };
     use crate::Bech32;
 
     #[test]
@@ -396,6 +398,42 @@ mod tests {
                 assert_eq!(iter.next(), Some((20, Fe32::_3)));
                 assert_eq!(iter.next(), None);
             }
+        }
+    }
+
+    #[test]
+    fn residue_error() {
+        let checksum_error = UncheckedHrpstring::new("A1G7SGD8")
+            .expect("vector should parse")
+            .validate_checksum::<Bech32>()
+            .expect_err("vector should have invalid checksum residue");
+        let residue =
+            checksum_error.residue_error().expect("checksum error should expose invalid residue");
+        assert!(residue.residue_error().is_some(), "invalid residue error should expose itself");
+
+        let checked_checksum = CheckedHrpstringError::Checksum(checksum_error.clone());
+        assert!(
+            checked_checksum.residue_error().is_some(),
+            "checked checksum errors should expose invalid residue"
+        );
+
+        let segwit_checksum = SegwitHrpstringError::Checksum(checksum_error.clone());
+        let segwit_no_data = SegwitHrpstringError::NoData;
+        assert!(segwit_no_data.residue_error().is_none(), "no-data errors are not correctable");
+
+        #[cfg(feature = "alloc")]
+        {
+            let segwit_decode = crate::segwit::DecodeError(segwit_checksum.clone());
+            assert!(
+                segwit_decode.residue_error().is_some(),
+                "segwit decode wrapper should expose invalid residue"
+            );
+
+            let decode_checksum = crate::DecodeError::Checksum(checksum_error.clone());
+            assert!(
+                decode_checksum.residue_error().is_some(),
+                "top-level decode checksum errors should expose invalid residue"
+            );
         }
     }
 }

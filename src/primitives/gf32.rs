@@ -390,6 +390,9 @@ impl From<Infallible> for TryFromError {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "std")]
+    use core::convert::TryFrom;
+
     use super::*;
 
     #[test]
@@ -509,6 +512,55 @@ mod tests {
     fn default() {
         assert_eq!(Fe32::default().to_u8(), 0);
         assert_eq!(Fe32::default(), Fe32::Q);
+    }
+
+    #[test]
+    fn iter_alpha() {
+        let elems: Vec<_> = Fe32::iter_alpha().collect();
+        assert_eq!(elems.len(), 32);
+        let mut seen = [false; 32];
+        for fe in &elems {
+            seen[fe.0 as usize] = true;
+        }
+    }
+
+    #[test]
+    fn field_arithmetic() {
+        assert_eq!(*Fe32::L.as_ref(), 31u8);
+
+        for i in 0..32 {
+            let fe = Fe32(i);
+            assert_eq!(-fe, fe);
+        }
+
+        for i in 1..32 {
+            let fe = Fe32(i);
+            let inv = fe.multiplicative_inverse();
+            assert_ne!(inv, Fe32::default(), "inverse of {} should not be default", i);
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn conversion_error_display_and_source() {
+        let invalid = Fe32::from_char('b').unwrap_err();
+        assert!(!invalid.to_string().is_empty());
+        assert!(std::error::Error::source(&invalid).is_none());
+
+        let not_a_byte = Fe32::try_from(256u32).unwrap_err();
+        assert!(!not_a_byte.to_string().is_empty());
+        assert!(std::error::Error::source(&not_a_byte).is_some());
+    }
+
+    #[test]
+    fn format_as_rust_code() {
+        struct RustCode(Fe32);
+        impl core::fmt::Display for RustCode {
+            fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+                Bech32Field::format_as_rust_code(&self.0, f)
+            }
+        }
+        assert_eq!(RustCode(Fe32::A).to_string(), "Fe32::A");
     }
 }
 

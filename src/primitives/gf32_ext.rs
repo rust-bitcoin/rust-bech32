@@ -429,4 +429,55 @@ mod tests {
         assert_eq!(elem.powi(7).multiplicative_order(), 4681);
         assert_eq!(elem.powi(341).multiplicative_order(), 1057);
     }
+
+    #[test]
+    fn display_debug_and_rust_code() {
+        let fe1024 = Fe1024::new([Fe32::K, Fe32::L]);
+        assert!(!fe1024.to_string().is_empty());
+        assert!(!format!("{:?}", fe1024).is_empty());
+
+        let fe32768 = Fe32768::new([Fe32::A, Fe32::C, Fe32::Q]);
+        assert!(!fe32768.to_string().is_empty());
+        assert!(!format!("{:?}", fe32768).is_empty());
+
+        struct RustCode1024(Fe1024);
+        impl core::fmt::Display for RustCode1024 {
+            fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+                Bech32Field::format_as_rust_code(&self.0, f)
+            }
+        }
+        assert!(RustCode1024(Fe1024::new([Fe32::P, Fe32::X])).to_string().contains("Fe1024::new"));
+
+        struct RustCode32768(Fe32768);
+        impl core::fmt::Display for RustCode32768 {
+            fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+                Bech32Field::format_as_rust_code(&self.0, f)
+            }
+        }
+        assert!(RustCode32768(Fe32768::new([Fe32::A, Fe32::C, Fe32::Q]))
+            .to_string()
+            .contains("Fe32768::new"));
+    }
+
+    #[test]
+    fn mul_by_base_field_scalar() {
+        let fe = Fe1024::new([Fe32::K, Fe32::L]);
+        let scaled = fe * Fe32::Z;
+        assert_ne!(scaled, Fe1024::ZERO);
+        assert_eq!(fe * Fe32::P, fe);
+        assert_eq!(fe * Fe32::Q, Fe1024::ZERO);
+        assert_eq!(scaled, fe * Fe32::Z);
+        let fe_ref = &fe;
+        assert_eq!(fe_ref * Fe32::Z, scaled);
+    }
+
+    #[test]
+    fn fe32768_arithmetic() {
+        let a = Fe32768::new([Fe32::A, Fe32::C, Fe32::Q]);
+        assert_eq!(-a, a); // Negation is identity in char-2
+
+        let b = Fe32768::new([Fe32::P, Fe32::Z, Fe32::Q]);
+        let ratio = a / b;
+        assert_eq!(ratio * b, a);
+    }
 }

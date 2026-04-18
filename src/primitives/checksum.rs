@@ -4,8 +4,6 @@
 //!
 //! [BCH]: <https://en.wikipedia.org/wiki/BCH_code>
 
-#[cfg(all(feature = "alloc", not(feature = "std")))]
-use alloc::vec::Vec;
 use core::marker::PhantomData;
 use core::{fmt, mem, ops};
 
@@ -512,6 +510,8 @@ impl Iterator for HrpFe32Iter<'_> {
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "alloc")]
+    use alloc::vec::Vec;
+    #[cfg(feature = "alloc")]
     use core::convert::TryFrom;
 
     use super::*;
@@ -598,6 +598,50 @@ mod tests {
         .to_string();
         #[cfg(feature = "std")]
         println!("{}", _s);
+    }
+
+    #[test]
+    #[should_panic]
+    fn sanity_check_panics_on_bad_checksums() {
+        enum BadGeneratorShifts {}
+        impl Checksum for BadGeneratorShifts {
+            type MidstateRepr = u32;
+            type CorrectionField = crate::Fe1024;
+            const ROOT_GENERATOR: Self::CorrectionField = crate::Fe1024::new([Fe32::P, Fe32::X]);
+            const ROOT_EXPONENTS: core::ops::RangeInclusive<usize> = 24..=26;
+            const CODE_LENGTH: usize = 1023;
+            const CHECKSUM_LENGTH: usize = 6;
+            const GENERATOR_SH: [u32; 5] = [1, 1, 1, 1, 1];
+            const TARGET_RESIDUE: u32 = 1;
+        }
+
+        BadGeneratorShifts::sanity_check();
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn print_impl_renders_expected_bech32_impl() {
+        let rendered = PrintImpl::<crate::Fe1024>::new(
+            "Bech32",
+            &[Fe32::A, Fe32::K, Fe32::_5, Fe32::_4, Fe32::A, Fe32::J],
+            &[Fe32::Q, Fe32::Q, Fe32::Q, Fe32::Q, Fe32::Q, Fe32::P],
+        )
+        .to_string();
+
+        let generator_shift = "0x4eb8406b0"; // generator << 2^3
+        assert!(
+            rendered.contains(generator_shift),
+            "generated impl missing expected fragment: {}\n\n{}",
+            generator_shift,
+            rendered
+        );
+    }
+
+    #[test]
+    fn packed_null() {
+        let mut packed = PackedNull;
+        assert_eq!(packed.unpack(0), 0);
+        assert_eq!(packed.mul_by_x_then_add(1, 31), 0);
     }
 
     #[test]

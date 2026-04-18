@@ -346,6 +346,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::{Bech32, ByteIterExt, Fe32, Fe32IterExt, Hrp};
 
     // Tests below using this data, are based on the test vector (from BIP-173):
@@ -404,5 +405,40 @@ mod tests {
         for (c, b) in chars.zip(bytes) {
             assert_eq!(c as u8, b)
         }
+    }
+
+    #[test]
+    fn witness_version_iter_size_hint() {
+        let inner = [Fe32::P, Fe32::Z].iter().copied();
+
+        let without_version = WitnessVersionIter::new(None, inner);
+        assert_eq!(without_version.size_hint(), (2, Some(2)));
+    }
+
+    #[test]
+    fn char_and_byte_iter_size_hints() {
+        let hrp = Hrp::parse_unchecked("bc");
+        let fes = DATA.iter().copied().bytes_to_fes();
+        let expected = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4".len();
+        let data = WitnessVersionIter::new(Some(Fe32::Q), fes);
+        let byte_iter = ByteIter::new(CharIter::<_, Bech32>::new(&hrp, data));
+        assert_eq!(byte_iter.size_hint(), (expected, Some(expected)));
+    }
+
+    #[test]
+    fn fe32_iter_correctness_and_size_hint() {
+        let hrp = Hrp::parse_unchecked("ab");
+        let data = [Fe32::P].iter().copied();
+        let wv = WitnessVersionIter::new(None, data);
+        let mut iter = Fe32Iter::<_, Bech32>::new(&hrp, wv);
+
+        let expected_total = 2 * hrp.len() + 1 + 1 + 6; // hrp fe32s + data + checksum
+
+        let (min, max) = iter.size_hint();
+        assert_eq!(min, expected_total);
+        assert_eq!(max, Some(expected_total));
+        iter.next();
+        let count = 1 + iter.by_ref().count();
+        assert_eq!(count, expected_total);
     }
 }

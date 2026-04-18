@@ -468,6 +468,46 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
+    fn encode_v1_matches_known_vectors() {
+        // Recent address from mainnet (Block 801266).
+        let v1_lower: &str = "bc1py3m7vwnghyne9gnvcjw82j7gqt2rafgdmlmwmqnn3hvcmdm09rjqcgrtxs";
+        let v1_upper: &str = "BC1PY3M7VWNGHYNE9GNVCJW82J7GQT2RAFGDMLMWMQNN3HVCMDM09RJQCGRTXS";
+
+        let (got_hrp, got_version, program) = decode(v1_lower).expect("known v1 vector decodes");
+        assert_eq!(got_hrp, hrp::BC);
+        assert_eq!(got_version, VERSION_1);
+
+        let mut upper_fmt = String::new();
+        encode_upper_to_fmt_unchecked(&mut upper_fmt, hrp::BC, VERSION_1, &program)
+            .expect("encode_upper_to_fmt_unchecked");
+        assert_eq!(upper_fmt, v1_upper);
+
+        let mut writer_default = Vec::new();
+        encode_to_writer_unchecked(&mut writer_default, hrp::BC, VERSION_1, &program)
+            .expect("encode_to_writer_unchecked");
+        assert_eq!(std::str::from_utf8(&writer_default).expect("ascii"), v1_lower);
+
+        let mut writer_upper = Vec::new();
+        encode_upper_to_writer_unchecked(&mut writer_upper, hrp::BC, VERSION_1, &program)
+            .expect("encode_upper_to_writer_unchecked");
+        assert_eq!(std::str::from_utf8(&writer_upper).expect("ascii"), v1_upper);
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn segwit_errors_have_non_empty_display_and_source() {
+        let too_long = "anhrpthatistwentycha1pqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgqfrwjz";
+        let decode_err = decode(too_long).expect_err("too long address should fail");
+        assert!(!decode_err.to_string().is_empty());
+        assert!(std::error::Error::source(&decode_err).is_some());
+
+        let encode_err = encode_v1(hrp::BC, &[]).expect_err("empty witness program should fail");
+        assert!(!encode_err.to_string().is_empty());
+        assert!(std::error::Error::source(&encode_err).is_some());
+    }
+
+    #[test]
     fn encode_lower_to_fmt() {
         let program = witness_program();
         let mut address = String::new();

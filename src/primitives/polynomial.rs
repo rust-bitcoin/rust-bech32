@@ -552,4 +552,43 @@ mod tests {
         );
         assert_eq!(bech32_poly_lift, product);
     }
+
+    #[test]
+    fn polynomial_evaluation_and_display() {
+        let zero_poly: Polynomial<Fe32> = [Fe32::Q].iter().copied().collect();
+        assert!(zero_poly.zero_is_root());
+
+        // p(x) = 1 + x
+        let p: Polynomial<Fe32> = [Fe32::P, Fe32::P].iter().copied().collect();
+        assert_eq!(p.evaluate(&Fe32::P), Fe32::Q); // p(1) = 0 (char 2)
+
+        let display_poly: Polynomial<Fe32> = [Fe32::P, Fe32::Z, Fe32::R].iter().copied().collect();
+        assert_eq!(display_poly.to_string(), "pzr");
+
+        // zero_pad_up_to extends the polynomial with zeros
+        let mut padded: Polynomial<Fe32> = [Fe32::P, Fe32::Z].iter().copied().collect();
+        padded.zero_pad_up_to(4);
+        assert_eq!(padded.as_inner().len(), 4);
+    }
+
+    #[test]
+    fn add_assign_sub_assign_modify() {
+        let one: Polynomial<Fe32> = [Fe32::P, Fe32::Q].iter().copied().collect(); // 1
+        let x: Polynomial<Fe32> = [Fe32::Q, Fe32::P].iter().copied().collect(); // x
+
+        // ref AddAssign: 1 += x should give 1 + x
+        let mut r = one.clone();
+        r += &x;
+        assert_eq!(r.as_inner()[1], Fe32::P);
+
+        // owned AddAssign: 1 += x should give 1 + x
+        let mut r = one.clone();
+        r += x.clone();
+        assert_eq!(r.as_inner()[1], Fe32::P);
+
+        // owned SubAssign (char-2: same as add): 1 -= x should give 1 + x
+        let mut r = one.clone();
+        r -= x;
+        assert_eq!(r.as_inner()[1], Fe32::P);
+    }
 }
