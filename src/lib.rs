@@ -748,8 +748,9 @@ mod tests {
 
         match encode::<Bech32m>(hrp, &data) {
             Ok(_) => panic!("false positive"),
-            Err(EncodeError::TooLong(CodeLengthError { encoded_length, code_length: _ })) =>
-                assert_eq!(encoded_length, 1024),
+            Err(EncodeError::TooLong(CodeLengthError { encoded_length, code_length: _ })) => {
+                assert_eq!(encoded_length, 1024)
+            }
             _ => panic!("false negative"),
         }
     }
