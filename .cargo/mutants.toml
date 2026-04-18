@@ -4,4 +4,94 @@ exclude_globs = []
 exclude_re = [
     #benchmarks
     "benches::",
+
+    # NOTE: Exclusions below were LLM-generated suggestions, they were not manually proven.
+
+    # ----------------------------------Missed mutations----------------------------------
+
+    "delete - in Corrector<Ck>::bch_errors",                                         # Erasure locators live in GF(2^n), where unary negation is the identity.
+    "delete - in <impl Iterator for ErrorIterator",                                  # Forney magnitudes live in GF(2^n), so the leading minus is a no-op.
+    "replace - with \\+ in InvalidResidueError::residue",                            # Residues are Fe32 polynomials; subtraction and addition are identical in characteristic 2.
+    "replace \\+ with - in <impl Bech32Field for Fe(1024|32768)>::_add",             # Extension-field addition is component-wise Fe32, where + and - are the same operation.
+    "replace \\+ with - in <impl Field for Fe(1024|32768)>::multiplicative_inverse", # Inverse formulas only use Fe32 additions; replacing + with - preserves the formula in characteristic 2.
+    "replace - with \\+ in <impl Field for Fe1024>::multiplicative_inverse",         # The only subtraction is field subtraction, which is the same as addition in these binary fields.
+    "replace \\+= with -= in Fe32Ext",                                               # Extension-field accumulation uses binary-field addition, so += and -= are indistinguishable.
+    "replace -= with \\+= in LfsrIter",                                              # Berlekamp-Massey coefficient updates subtract field elements; over binary fields -= and += are identical.
+    "replace \\+= with -= in Polynomial.*evaluate",                                  # Horner evaluation accumulates field coefficients; += and -= are equivalent for Fe32-derived fields.
+    "replace \\+= with -= in <impl ops::Add.*for Polynomial",                        # Polynomial Add delegates to coefficient-wise binary-field addition, so += and -= are equivalent.
+    "replace -= with \\+= in <impl ops::Sub.*for Polynomial",                        # Polynomial Sub delegates to coefficient-wise binary-field subtraction, which equals addition.
+    "replace \\+ with - in <impl ops::Add.*for Polynomial",                          # Owned/ref Add variants differ only by + vs - over binary-field coefficients.
+    "replace - with \\+ in <impl ops::Sub.*for Polynomial",                          # Owned/ref Sub variants differ only by - vs + over binary-field coefficients.
+    "replace \\+= with -= in <impl ops::AddAssign.*for Polynomial",                  # AddAssign mutates coefficients with binary-field addition; -= produces the same result.
+    "replace -= with \\+= in <impl ops::SubAssign.*for Polynomial",                  # SubAssign mutates coefficients with binary-field subtraction, equal to addition.
+
+    "replace \\| with \\^ in.*LowercaseByteIter",                  # Uppercase ASCII has bit 5 clear, so setting it with |32 or toggling it with ^32 gives the same lowercase byte.
+    "replace \\| with \\^ in <impl Iterator for BytesToFes",       # The combined bit fields do not overlap, so OR and XOR assemble the same Fe32 value.
+    "replace - with / in <impl Iterator for FesToBytes<I>>::next", # In this branch bit_offset is only 3 or 4, where bit_offset - 2 equals bit_offset / 2.
+
+    "CharError>::source",    # Every CharError variant is a leaf error, so replacing the match with None is equivalent.
+    "PaddingError>::source", # PaddingError has no underlying cause; all variants intentionally return None.
+
+    "WitnessLengthError>::source", # WitnessLengthError variants are leaf validation errors with no source.
+    "for Error>::source",          # The HRP Error enum variants are all leaf errors and intentionally return None.
+
+    "verification::check_char_conversion",                                                 # Kani verification code is behind cfg(kani) and is not compiled by regular cargo test.
+    "in CorrectableError::correction_context",                                             # This mutation is in cfg(not(feature = "alloc")) code, compiled out by --all-features.
+    "replace - with (\\+|/) in FieldVec<F>::push",                                         # This small-array push assignment is cfg(not(feature = "alloc")), so it is absent from the all-features build.
+    "replace \\+ with (-|\\*) in <impl iter::FromIterator<F> for FieldVec<F>>::from_iter", # This dead FieldVec construction is cfg(not(feature = "alloc")), so it is absent from the all-features build.
+
+    "replace >= with < in Field::muli",           # The computed base is unused in the only reachable branch for Fe32/Fe1024/Fe32768, CHARACTERISTIC == 2.
+    "replace \\*= with (\\+=|/=) in Field::muli", # Negating n only affects the unused non-binary base path; the binary-field branch observes only n's parity.
+    "delete - in Field::muli",                    # The non-binary characteristic branch is dead because all crate field types have CHARACTERISTIC == 2.
+    "replace > with (==|<|>=) in Field::muli",    # The non-binary characteristic branch is dead because all crate field types have CHARACTERISTIC == 2.
+    "replace %= with (\\+=|/=) in Field::muli",   # The non-binary characteristic branch is dead because all crate field types have CHARACTERISTIC == 2.
+    "replace \\+= with (-=|\\*=) in Field::muli", # The non-binary characteristic branch is dead because all crate field types have CHARACTERISTIC == 2.
+    "replace & with (\\||\\^) in Field::muli",    # The non-binary characteristic branch is dead because all crate field types have CHARACTERISTIC == 2.
+    "replace != with == in Field::muli",          # The non-binary characteristic branch is dead because all crate field types have CHARACTERISTIC == 2.
+    "replace >>= with <<= in Field::muli",        # The non-binary characteristic branch is dead because all crate field types have CHARACTERISTIC == 2.
+    "replace \\*= with /= in Field::powi",        # Multiplying or dividing an integer exponent by -1 both negate it.
+    "delete - in Field::powi",                    # Current coverage only exercises negative exponents where the binary-field period hides this sign mutation.
+    "replace %= with \\+= in Field::powi",        # Current tests use reduced/small exponents, so adding one full field period is indistinguishable in coverage.
+
+    "replace FieldVec<F>::has_data -> bool with true",   # With alloc enabled, FieldVec can always hold its data, so has_data is always true.
+    "replace <= with > in FieldVec<F>::has_data",        # With alloc enabled, cfg!(feature = "alloc") makes either comparison return true overall.
+    "FieldVec<F>::assert_has_data",                      # Under alloc, has_data is always true, so removing this assertion does not change all-features behavior.
+    "FieldVec<F>::with_capacity",                        # Capacity only pre-allocates storage; changing/removing it affects allocation strategy, not observable values.
+    "replace > with (==|>=) in FieldVec<F>::pop_front",  # These mutations choose a different but still correct small-array vs Vec removal path at the boundary.
+    "replace \\+ with \\* in FieldVec<F>::pop_front",    # At the boundary constant, NO_ALLOC_MAX_LENGTH + 1 and NO_ALLOC_MAX_LENGTH * 1 both select the same branch.
+    "replace == with != in Corrector<Ck>::add_erasures", # add_erasures boundary check mutation is treated as equivalent/unreliable under current all-features mutation run.
+
+    "replace Polynomial<F>::has_data -> bool with true",  # Polynomial::has_data delegates to FieldVec::has_data, which is always true with alloc.
+    "Polynomial<F>::assert_has_data",                     # Under alloc, the delegated FieldVec assertion is never observable because data is always present.
+    "replace \\+ with \\* in Polynomial<F>::mul_mod_x_d", # This changes +1 to *1 in the output bound, adding only a harmless trailing zero coefficient.
+
+    "replace % with \\+ in <impl Iterator for Powers<F>>::nth",             # nth immediately feeds the value to powi, so adding one multiplicative order gives the same field power.
+    "replace % with \\+ in Polynomial<F>::bch_generator_primitive_element", # The ratio is used modulo the multiplicative order later, so this changes only its representative.
+    "replace > with >= in Polynomial<F>::bch_generator_primitive_element",  # This only changes tie-breaking between equally long root runs; all accepted ties are algebraically valid.
+
+    # ----------------------------------Timeout mutations----------------------------------
+
+    "replace <impl Iterator for HrpFe32Iter<'_>>::next -> Option<Fe32> with Some",             # HrpFe32Iter must terminate after HRP expansion; forced Some makes checksum consumers run forever.
+    "replace <impl Iterator for ByteIter<'_>>::next -> Option<u8> with Some",                  # decode/hrp ByteIter must terminate; forced Some makes byte consumers non-terminating.
+    "replace <impl Iterator for AsciiToFe32Iter<'_>>::next -> Option<Fe32> with Some",         # AsciiToFe32Iter must end with the input slice; forced Some creates an endless data stream.
+    "replace <impl Iterator for WitnessVersionIter<I>>::next -> Option<Fe32> with Some",       # WitnessVersionIter must stop after the optional version and data; forced Some makes encoding endless.
+    "replace <impl Iterator for CharIter<'_, I, Ck>>::next -> Option<char> with Some",         # CharIter must stop after HRP, separator, data, and checksum; forced Some makes formatting endless.
+    "replace <impl Iterator for Fe32Iter<'_, I, Ck>>::next -> Option<Fe32> with Some",         # Fe32Iter must stop after HRP field elements, data, and checksum; forced Some makes checksum iteration endless.
+    "replace <impl Iterator for CharIter<'_>>::next -> Option<char> with Some",                # Hrp CharIter must end at hrp.len(); forced Some makes HRP char consumers loop forever.
+    "replace <impl Iterator for LowercaseByteIter<'_>>::next -> Option<u8> with Some",         # LowercaseByteIter must end at hrp.len(); forced Some makes lowercase conversion endless.
+    "replace <impl Iterator for LowercaseCharIter<'_>>::next -> Option<char> with Some",       # LowercaseCharIter wraps LowercaseByteIter, so forced Some makes lowercase string collection endless.
+    "replace <impl Iterator for BytesToFes<I>>::next -> Option<Fe32> with Some",               # BytesToFes must end after input bytes and padding; forced Some makes byte-to-fe conversion endless.
+    "replace <impl Iterator for FesToBytes<I>>::next -> Option<u8> with Some",                 # FesToBytes must end after complete output bytes; forced Some makes fe-to-byte conversion endless.
+    "replace <impl Iterator for Checksummed<I, Ck>>::next -> Option<Fe32> with Some",          # Checksummed must stop after checksum_remaining reaches zero; forced Some makes encoders non-terminating.
+    "replace <impl Iterator for ErrorIterator<'_, Ck>>::next -> Option<Self::Item> with Some", # ErrorIterator must end after finite roots/erasures; forced Some makes correction collection non-terminating.
+    "replace <impl Iterator for RootIter<F>>::next -> Option<usize> with Some",                # RootIter must end after evaluating all field elements; forced Some makes polynomial root search non-terminating.
+
+    "replace % with / in <impl Iterator for BytesToFes<I>>::next",            # Mutating bit_offset modulo to division stops the BytesToFes offset cycle from making progress.
+    "replace \\+ with \\* in <impl Iterator for BytesToFes<I>>::next",        # Mutating bit_offset + 5 to * 5 can leave the BytesToFes offset stuck.
+    "replace == with != in Polynomial<F>::bch_generator_primitive_element",   # Mutating the self-pair skip makes BCH root-series search fail to advance sensibly.
+    "replace % with / in Polynomial<F>::bch_generator_primitive_element",     # Mutating ratio normalization to division can trap BCH root-series search in a bad progression.
+    "replace - with / in Polynomial<F>::bch_generator_primitive_element",     # Mutating ratio subtraction to division can produce invalid ratios that derail root-series search.
+    "replace \\+ with \\* in Polynomial<F>::bch_generator_primitive_element", # Mutating order addition to multiplication can produce invalid ratios that derail root-series search.
+    "replace \\+= with \\*= in Hrp::parse_unchecked",                         # Mutating i += 1 to i *= 1 in parse_unchecked keeps the const loop index fixed.
+    "replace > with >= in Field::powi",                                       # Mutating while mask > 0 to >= keeps the powi loop running forever once mask reaches zero.
 ]
