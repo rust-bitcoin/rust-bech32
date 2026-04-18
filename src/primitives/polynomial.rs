@@ -102,7 +102,7 @@ impl<F: Field> Polynomial<F> {
     /// Helper function to add leading 0 terms until the polynomial has a specified
     /// length.
     fn zero_pad_up_to(&mut self, len: usize) {
-        while self.inner.len() < len {
+        for _ in self.inner.len()..len {
             self.inner.push(F::default());
         }
     }
