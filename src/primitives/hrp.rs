@@ -490,6 +490,8 @@ impl std::error::Error for Error {
 
 #[cfg(test)]
 mod tests {
+    use core::hash::{Hash, Hasher};
+
     use super::*;
 
     macro_rules! check_parse_ok {
@@ -654,5 +656,120 @@ mod tests {
     fn parse_display_iterates_chars() {
         assert_eq!(Hrp::parse_display(" ❤").unwrap_err(), Error::InvalidAsciiByte(b' '));
         assert_eq!(Hrp::parse_display("_❤").unwrap_err(), Error::NonAsciiChar('❤'));
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn display_and_lowercase() {
+        let hrp = Hrp::parse_unchecked("test");
+        assert_eq!(hrp.to_string(), "test");
+
+        let hrp = Hrp::parse_unchecked("ABC");
+        assert_eq!(hrp.to_lowercase(), "abc");
+        let hrp2 = Hrp::parse_unchecked("abc");
+        assert_eq!(hrp2.to_lowercase(), "abc");
+    }
+
+    #[test]
+    fn is_valid_on_networks() {
+        let bc = Hrp::parse_unchecked("bc");
+        assert!(bc.is_valid_on_mainnet());
+        assert!(!bc.is_valid_on_testnet());
+        assert!(!bc.is_valid_on_signet());
+        assert!(!bc.is_valid_on_regtest());
+
+        let tb = Hrp::parse_unchecked("tb");
+        assert!(!tb.is_valid_on_mainnet());
+        assert!(tb.is_valid_on_testnet());
+        assert!(tb.is_valid_on_signet());
+        assert!(!tb.is_valid_on_regtest());
+
+        let bcrt = Hrp::parse_unchecked("bcrt");
+        assert!(!bcrt.is_valid_on_mainnet());
+        assert!(!bcrt.is_valid_on_testnet());
+        assert!(!bcrt.is_valid_on_signet());
+        assert!(bcrt.is_valid_on_regtest());
+    }
+
+    #[test]
+    fn ordering_and_hash() {
+        let a = Hrp::parse_unchecked("a");
+        let b = Hrp::parse_unchecked("b");
+        assert_eq!(a.partial_cmp(&b), Some(core::cmp::Ordering::Less));
+
+        struct Simple(u64);
+        impl Hasher for Simple {
+            fn finish(&self) -> u64 { self.0 }
+            fn write(&mut self, bytes: &[u8]) {
+                for &b in bytes {
+                    self.0 = self.0.wrapping_mul(31).wrapping_add(b as u64);
+                }
+            }
+        }
+
+        let x = Hrp::parse_unchecked("bc");
+        let y = Hrp::parse_unchecked("bc");
+        let mut h1 = Simple(0);
+        let mut h2 = Simple(0);
+        x.hash(&mut h1);
+        y.hash(&mut h2);
+        assert_ne!(h1.finish(), 0);
+    }
+
+    #[test]
+    fn iterator_next_back() {
+        let hrp = Hrp::parse_unchecked("abc");
+        let mut char_iter = hrp.char_iter();
+        assert_eq!(char_iter.next_back(), Some('c'));
+
+        let mut lower_char = hrp.lowercase_char_iter();
+        assert_eq!(lower_char.next_back(), Some('c'));
+
+        let hrp_upper = Hrp::parse_unchecked("ABC");
+        let mut lower_byte = hrp_upper.lowercase_byte_iter();
+        assert_eq!(lower_byte.next_back(), Some(b'c'));
+        assert_eq!(lower_byte.next_back(), Some(b'b'));
+        assert_eq!(lower_byte.next_back(), Some(b'a'));
+
+        let mut lower_char_upper = hrp_upper.lowercase_char_iter();
+        assert_eq!(lower_char_upper.next_back(), Some('c'));
+    }
+
+    #[test]
+    fn char_iter_size_hints() {
+        let hrp = Hrp::parse_unchecked("test");
+        let iter = hrp.char_iter();
+        assert_eq!(iter.len(), 4);
+        assert_eq!(iter.size_hint(), (4, Some(4)));
+
+        let lower = hrp.lowercase_char_iter();
+        assert_eq!(lower.len(), 4);
+        assert_eq!(lower.size_hint(), (4, Some(4)));
+    }
+
+    #[test]
+    fn is_ascii_uppercase_with_non_letter_bytes() {
+        // This ensures the lowercase iterator handles non-letter uppercase-range bytes correctly
+        let hrp = Hrp::parse_unchecked("A]B");
+        let lower_bytes: Vec<u8> = hrp.lowercase_byte_iter().collect();
+        assert_eq!(lower_bytes, vec![b'a', b']', b'b']);
+    }
+
+    #[test]
+    fn error_display_non_empty() {
+        let e = Error::Empty;
+        assert!(!e.to_string().is_empty());
+    }
+
+    #[test]
+    fn parse_unchecked_replaces_invalid_bytes() {
+        // Bytes < 33 or > 126 are replaced with 'X'
+        let hrp = Hrp::parse_unchecked("a\x01b");
+        assert_eq!(hrp.as_bytes()[1], b'X');
+        // Boundary: byte 33 (!) is valid, byte 126 (~) is valid, byte 127 is invalid
+        let hrp = Hrp::parse_unchecked("!\x7f~");
+        assert_eq!(hrp.as_bytes()[0], b'!');
+        assert_eq!(hrp.as_bytes()[1], b'X');
+        assert_eq!(hrp.as_bytes()[2], b'~');
     }
 }

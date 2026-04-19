@@ -645,4 +645,106 @@ mod tests {
         let mut x: FieldVec<_> = (0..NO_ALLOC_MAX_LENGTH).collect();
         x.push(100);
     }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn alloc_boundary_ops() {
+        let n = NO_ALLOC_MAX_LENGTH + 1;
+
+        // Reverse at exactly NO_ALLOC_MAX_LENGTH (catches > to >= in reverse)
+        let mut small: FieldVec<_> = (0..NO_ALLOC_MAX_LENGTH).collect();
+        small.reverse();
+        assert_eq!(small[0], NO_ALLOC_MAX_LENGTH - 1);
+
+        // pop_front at NO_ALLOC_MAX_LENGTH (catches + to - in pop_front condition)
+        let mut at_max: FieldVec<_> = (0..NO_ALLOC_MAX_LENGTH).collect();
+        assert_eq!(at_max.pop_front(), Some(0));
+        assert_eq!(at_max.len(), NO_ALLOC_MAX_LENGTH - 1);
+
+        // Push n (=8) elements to cross array-to-Vec boundary
+        let mut v: FieldVec<_> = (0..n).collect();
+        assert_eq!(v.len(), n);
+        assert_eq!(v[0], 0);
+        assert_eq!(v[n - 1], n - 1);
+
+        // Reverse with len > NO_ALLOC_MAX_LENGTH (catches > to == in reverse)
+        v.reverse();
+        assert_eq!(v[0], n - 1);
+        assert_eq!(v[n - 1], 0);
+        v.reverse();
+
+        // Pop from n to NO_ALLOC_MAX_LENGTH (catches < to <= in pop)
+        assert_eq!(v.pop(), Some(n - 1));
+        assert_eq!(v.len(), NO_ALLOC_MAX_LENGTH);
+
+        // Push to n+1 then pop_front (catches -= to +=//= in pop_front)
+        v.push(n - 1);
+        v.push(n);
+        assert_eq!(v.len(), n + 1);
+        assert_eq!(v.pop_front(), Some(0));
+        assert_eq!(v.len(), n);
+    }
+
+    #[test]
+    fn basic_fieldvec_ops() {
+        let mut v: FieldVec<Fe32> = [Fe32::P, Fe32::Z, Fe32::R].iter().copied().collect();
+        assert!(!v.to_string().is_empty());
+
+        assert_eq!(v.pop_front(), Some(Fe32::P));
+        assert_eq!(v.pop_front(), Some(Fe32::Z));
+        assert_eq!(v.pop_front(), Some(Fe32::R));
+        assert_eq!(v.pop_front(), None);
+
+        v.push_back(Fe32::A);
+        v.push_back(Fe32::K);
+        assert_eq!(v.pop_front(), Some(Fe32::A));
+
+        let mut nums: FieldVec<_> = (0..3usize).collect();
+        for elem in &mut nums {
+            *elem += 10;
+        }
+        assert_eq!(nums[2], 12);
+    }
+
+    #[test]
+    fn small_vec_range_indexing() {
+        let mut v: FieldVec<_> = (0..3usize).collect();
+        assert_eq!(&v[0..2], &[0, 1]);
+        // Test IndexMut<RangeFull> on small vec
+        for elem in v[..].iter_mut() {
+            *elem += 10;
+        }
+        assert_eq!(&v[..], &[10, 11, 12]);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn large_vec_range_indexing() {
+        let n = NO_ALLOC_MAX_LENGTH + 2;
+
+        // Range
+        let mut v: FieldVec<_> = (0..n).collect();
+        for elem in v[NO_ALLOC_MAX_LENGTH..n].iter_mut() {
+            *elem += 100;
+        }
+        assert_eq!(v[NO_ALLOC_MAX_LENGTH], NO_ALLOC_MAX_LENGTH + 100);
+        assert_eq!(v[n - 1], n - 1 + 100);
+
+        // RangeFrom
+        let mut v: FieldVec<_> = (0..n).collect();
+        for elem in v[NO_ALLOC_MAX_LENGTH..].iter_mut() {
+            *elem += 200;
+        }
+        assert_eq!(v[NO_ALLOC_MAX_LENGTH], NO_ALLOC_MAX_LENGTH + 200);
+        assert_eq!(v[n - 1], n - 1 + 200);
+
+        // RangeTo
+        let mut v: FieldVec<_> = (0..n).collect();
+        for elem in v[..2].iter_mut() {
+            *elem += 300;
+        }
+        assert_eq!(v[0], 300);
+        assert_eq!(v[1], 301);
+        assert_eq!(v[n - 1], n - 1);
+    }
 }

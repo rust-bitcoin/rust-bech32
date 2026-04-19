@@ -111,3 +111,24 @@ impl std::error::Error for WitnessLengthError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn witness_validation_rules() {
+        assert!(is_valid_witness_version(Fe32::Q)); // version 0
+        assert!(is_valid_witness_version(Fe32::P)); // version 1
+        assert!(!is_valid_witness_version(Fe32::L)); // 31 > 16
+        assert!(!is_valid_witness_program_length(1, VERSION_1));
+        assert!(is_valid_witness_program_length(20, VERSION_1));
+    }
+
+    #[test]
+    fn error_display_non_empty() {
+        let e = InvalidWitnessVersionError(Fe32::L);
+        assert!(!e.to_string().is_empty());
+        assert!(!WitnessLengthError::TooShort.to_string().is_empty());
+    }
+}

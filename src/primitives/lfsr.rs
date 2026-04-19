@@ -237,7 +237,9 @@ mod tests {
 
         // Hits the the "2L <= N" path with x != L, without overflowing subtraction
         // as in the above vector.
-        LfsrIter::berlekamp_massey(&[Fe32::Y, Fe32::H, Fe32::Q, Fe32::Q]).take(10).count();
+        let sequence: Vec<_> =
+            LfsrIter::berlekamp_massey(&[Fe32::Y, Fe32::H, Fe32::Q, Fe32::Q]).take(10).collect();
+        assert!(sequence[2..].iter().all(|&fe| fe == Fe32::Q));
 
         // Triggers a length change with x != n + 1 - ell. The reason you might expect
         // this is that ell is initially set to 0, then re-set to (n + 1 - ell) on each
@@ -248,5 +250,15 @@ mod tests {
         // change. These assignment patterns sound very similar, but they are not the
         // same, because the initial values and +1s are not the same.
         LfsrIter::berlekamp_massey(&[Fe32::P, Fe32::P, Fe32::Y, Fe32::Q, Fe32::Q]).take(10).count();
+
+        // This vector specifically exercises the Step 5 update path
+        // Step 5 runs when old_conn.len() + x > conn.len()
+        // where old_conn is multiplied into the update term
+        //  replacing '*' with '/' there changes output.
+        let step5_sequence: Vec<_> =
+            LfsrIter::berlekamp_massey(&[Fe32::A, Fe32::C, Fe32::A, Fe32::Y, Fe32::A])
+                .take(4)
+                .collect();
+        assert_eq!(step5_sequence, [Fe32::A, Fe32::C, Fe32::A, Fe32::Y]);
     }
 }

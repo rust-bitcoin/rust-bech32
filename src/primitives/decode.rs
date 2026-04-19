@@ -1282,6 +1282,158 @@ mod tests {
         );
     }
 
+    fn sample_invalid_residue_error() -> InvalidResidueError {
+        match UncheckedHrpstring::new("A1G7SGD8")
+            .expect("vector should parse")
+            .validate_checksum::<Bech32>()
+            .expect_err("vector should have invalid checksum residue")
+        {
+            ChecksumError::InvalidResidue(e) => e,
+            other => panic!("expected invalid residue error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn witness_version_enforces_bounds() {
+        let unchecked_empty = UncheckedHrpstring {
+            hrp: Hrp::parse_unchecked("bc"),
+            data_part_ascii: b"",
+            hrpstring_length: 3,
+        };
+        assert_eq!(unchecked_empty.witness_version(), None);
+
+        let unchecked_valid = UncheckedHrpstring {
+            hrp: Hrp::parse_unchecked("bc"),
+            data_part_ascii: b"s", // fe32 value 16
+            hrpstring_length: 4,
+        };
+        assert_eq!(unchecked_valid.witness_version(), Some(Fe32(16)));
+
+        let unchecked_too_large = UncheckedHrpstring {
+            hrp: Hrp::parse_unchecked("bc"),
+            data_part_ascii: b"3", // fe32 value 17
+            hrpstring_length: 4,
+        };
+        assert_eq!(unchecked_too_large.witness_version(), None);
+
+        let checked_empty =
+            CheckedHrpstring { hrp: Hrp::parse_unchecked("bc"), ascii: b"", hrpstring_length: 3 };
+        assert_eq!(checked_empty.witness_version(), None);
+
+        let checked_valid =
+            CheckedHrpstring { hrp: Hrp::parse_unchecked("bc"), ascii: b"s", hrpstring_length: 4 };
+        assert_eq!(checked_valid.witness_version(), Some(Fe32(16)));
+
+        let checked_too_large =
+            CheckedHrpstring { hrp: Hrp::parse_unchecked("bc"), ascii: b"3", hrpstring_length: 4 };
+        assert_eq!(checked_too_large.witness_version(), None);
+    }
+
+    #[test]
+    fn checksum_validation() {
+        let valid = UncheckedHrpstring::new("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq")
+            .expect("valid address should parse");
+        assert!(valid.has_valid_checksum::<Bech32>());
+        assert!(!valid.has_valid_checksum::<Bech32m>());
+
+        let at_limit = UncheckedHrpstring {
+            hrp: Hrp::parse_unchecked("bc"),
+            data_part_ascii: b"",
+            hrpstring_length: Bech32::CODE_LENGTH,
+        };
+        assert_eq!(at_limit.validate_checksum::<Bech32>(), Err(ChecksumError::InvalidLength));
+    }
+
+    #[test]
+    fn validate_segwit_padding() {
+        let checked = |ascii: &'static [u8]| CheckedHrpstring {
+            hrp: Hrp::parse_unchecked("bc"),
+            ascii,
+            hrpstring_length: ascii.len() + 3,
+        };
+
+        // padding_len = 1
+        assert_eq!(checked(b"qqqqq").validate_segwit_padding(), Ok(()));
+        assert_eq!(checked(b"qqqqp").validate_segwit_padding(), Err(PaddingError::NonZero));
+
+        // padding_len = 2
+        assert_eq!(checked(b"qp").validate_segwit_padding(), Err(PaddingError::NonZero));
+        assert_eq!(checked(b"qqqqqqp").validate_segwit_padding(), Err(PaddingError::NonZero));
+    }
+
+    #[test]
+    fn segwit_has_valid_hrp() {
+        let mainnet = SegwitHrpstring {
+            hrp: Hrp::parse_unchecked("bc"),
+            witness_version: VERSION_0,
+            ascii: b"qq",
+        };
+        assert!(mainnet.has_valid_hrp());
+    }
+
+    #[test]
+    fn iterator_size_hints() {
+        let mut fe_iter = AsciiToFe32Iter { iter: b"qpz".iter().copied() };
+        assert_eq!(fe_iter.size_hint(), (3, Some(3)));
+        assert_eq!(fe_iter.next(), Some(Fe32::Q));
+        assert_eq!(fe_iter.size_hint(), (2, Some(2)));
+
+        let checked = CheckedHrpstring {
+            hrp: Hrp::parse_unchecked("bc"),
+            ascii: b"qqqqqqqq",
+            hrpstring_length: 11,
+        };
+        let mut byte_iter = checked.byte_iter();
+        assert_eq!(byte_iter.size_hint(), (5, Some(5)));
+        assert_eq!(byte_iter.next(), Some(0));
+        assert_eq!(byte_iter.size_hint(), (4, Some(4)));
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn error_display_and_sources() {
+        let unchecked_err = UncheckedHrpstringError::Char(CharError::MissingSeparator);
+        assert!(!unchecked_err.to_string().is_empty());
+        assert!(std::error::Error::source(&unchecked_err).is_some());
+
+        let checked_parse = CheckedHrpstringError::Parse(unchecked_err);
+        assert!(!checked_parse.to_string().is_empty());
+        assert!(std::error::Error::source(&checked_parse).is_some());
+
+        let residue = sample_invalid_residue_error();
+        assert!(!residue.to_string().is_empty());
+        assert!(std::error::Error::source(&residue).is_none());
+
+        let checksum_residue = ChecksumError::InvalidResidue(residue);
+        assert!(!checksum_residue.to_string().is_empty());
+        assert!(std::error::Error::source(&checksum_residue).is_some());
+
+        let checksum_len = ChecksumError::InvalidLength;
+        assert!(!checksum_len.to_string().is_empty());
+        assert!(std::error::Error::source(&checksum_len).is_none());
+
+        let segwit_ck = SegwitHrpstringError::Checksum(checksum_len);
+        assert!(!segwit_ck.to_string().is_empty());
+        assert!(std::error::Error::source(&segwit_ck).is_some());
+        assert!(std::error::Error::source(&SegwitHrpstringError::NoData).is_none());
+
+        assert!(!CharError::MixedCase.to_string().is_empty());
+        assert!(std::error::Error::source(&CharError::MixedCase).is_none());
+
+        let code_len = CodeLengthError { encoded_length: 91, code_length: 90 };
+        assert!(!code_len.to_string().is_empty());
+        assert!(std::error::Error::source(&code_len).is_none());
+
+        let segwit_len = SegwitCodeLengthError(100);
+        assert!(!segwit_len.to_string().is_empty());
+        assert!(std::error::Error::source(&segwit_len).is_none());
+
+        assert!(!PaddingError::TooMuch.to_string().is_empty());
+        assert!(std::error::Error::source(&PaddingError::TooMuch).is_none());
+        assert!(!PaddingError::NonZero.to_string().is_empty());
+        assert!(std::error::Error::source(&PaddingError::NonZero).is_none());
+    }
+
     macro_rules! check_invalid_segwit_addresses {
         ($($test_name:ident, $reason:literal, $address:literal);* $(;)?) => {
             $(

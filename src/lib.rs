@@ -593,6 +593,9 @@ impl From<std::io::Error> for EncodeIoError {
 #[cfg(test)]
 #[cfg(feature = "alloc")]
 mod tests {
+    #[cfg(feature = "std")]
+    use std::error::Error;
+
     use super::*;
 
     // Tests below using this data, are based on the test vector (from BIP-173):
@@ -603,6 +606,45 @@ mod tests {
         0x54, 0x94, 0x1c, 0x45, 0xd1, 0xb3, 0xa3, 0x23,
         0xf1, 0x43, 0x3b, 0xd6,
     ];
+
+    #[test]
+    fn errors_have_non_empty_display_and_source() {
+        let decode_err = decode("test1lu08d6qejxtdg4y5r3zarvary0c5xw7kw79nny")
+            .expect_err("checksum error expected");
+        assert!(!decode_err.to_string().is_empty());
+
+        let too_long_data = [0_u8; 632];
+        let encode_err = encode::<Bech32m>(Hrp::parse_unchecked("abcde"), &too_long_data)
+            .expect_err("too long error expected");
+        assert!(!encode_err.to_string().is_empty());
+
+        #[cfg(feature = "std")]
+        {
+            assert!(decode_err.source().is_some());
+            assert!(encode_err.source().is_some());
+
+            struct BrokenWriter;
+            impl std::io::Write for BrokenWriter {
+                fn write(&mut self, _buf: &[u8]) -> std::io::Result<usize> {
+                    Err(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        "mutation regression test write failure",
+                    ))
+                }
+
+                fn flush(&mut self) -> std::io::Result<()> { Ok(()) }
+            }
+
+            let io_err = encode_to_writer::<Bech32, _>(
+                &mut BrokenWriter,
+                Hrp::parse_unchecked("test"),
+                &DATA,
+            )
+            .expect_err("writer error expected");
+            assert!(!io_err.to_string().is_empty());
+            assert!(io_err.source().is_some());
+        }
+    }
 
     #[test]
     fn encode_bech32m() {
@@ -706,8 +748,9 @@ mod tests {
 
         match encode::<Bech32m>(hrp, &data) {
             Ok(_) => panic!("false positive"),
-            Err(EncodeError::TooLong(CodeLengthError { encoded_length, code_length: _ })) =>
-                assert_eq!(encoded_length, 1024),
+            Err(EncodeError::TooLong(CodeLengthError { encoded_length, code_length: _ })) => {
+                assert_eq!(encoded_length, 1024)
+            }
             _ => panic!("false negative"),
         }
     }
