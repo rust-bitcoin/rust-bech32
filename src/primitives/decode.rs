@@ -1282,6 +1282,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "std")]
     fn sample_invalid_residue_error() -> InvalidResidueError {
         match UncheckedHrpstring::new("A1G7SGD8")
             .expect("vector should parse")

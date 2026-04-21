@@ -2,133 +2,120 @@ on: [push, pull_request]
 
 name: Continuous Integration
 
+permissions:
+  contents: read
+
 jobs:
-  Prepare:
-    runs-on: ubuntu-latest
-    outputs:
-      nightly_version: ${{ steps.read_toolchain.outputs.nightly_version }}
-    steps:
-      - name: "Checkout repo"
-        uses: actions/checkout@v4
-      - name: "Read nightly version"
-        id: read_toolchain
-        run: echo "nightly_version=$(cat nightly-version)" >> $GITHUB_OUTPUT
-
-  Stable:
-    name: Test - stable toolchain
-    runs-on: ubuntu-latest
+  Test: # 6 jobs: 3 toolchains × 2 lock files.
+    name: Test - ${{ matrix.toolchain }} toolchain (${{ matrix.dep }})
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
+      matrix:
+        dep: [minimal, recent]
+        toolchain: [stable, nightly, msrv]
     steps:
-      - name: Checkout Crate
+      - name: Checkout repo
         uses: actions/checkout@v4
-      - name: Checkout Toolchain
-        # https://github.com/dtolnay/rust-toolchain
-        uses: dtolnay/rust-toolchain@stable
-      - name: Running test script
-        env:
-          DO_LINT: true
-          DO_DOCS: true
-          DO_FEATURE_MATRIX: true
-        run: ./contrib/test.sh
+      - uses: rust-bitcoin/rust-bitcoin-maintainer-tools/.github/actions/setup-rbmt@af3c2868415b17eedc808da6d0589e10b7482660 # v0.1.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Run ${{ matrix.toolchain }} tests
+        run: |
+          if [ "${{ matrix.toolchain }}" = "msrv" ]; then
+            MSRV="$(cargo rbmt toolchains --msrv)"
+            cp "Cargo-${{ matrix.dep }}.lock" Cargo.lock
+            cargo +"$MSRV" test --locked
+          else
+            cargo rbmt --lock-file ${{ matrix.dep }} test --toolchain ${{ matrix.toolchain }}
+          fi
 
-  Beta:
-    name: Test - beta toolchain
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
+  Lint:
+    name: Lint - nightly toolchain
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout Crate
         uses: actions/checkout@v4
-      - name: Checkout Toolchain
-        uses: dtolnay/rust-toolchain@beta
-      - name: Running test script
-        env:
-          DO_FEATURE_MATRIX: true
-        run: ./contrib/test.sh
+      - uses: rust-bitcoin/rust-bitcoin-maintainer-tools/.github/actions/setup-rbmt@af3c2868415b17eedc808da6d0589e10b7482660 # v0.1.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Run lints
+        run: cargo rbmt --lock-file recent lint
 
-  Nightly:
-    name: Test - nightly toolchain
-    needs: Prepare
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
+  Docs:
+    name: Docs - stable toolchain
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout Crate
         uses: actions/checkout@v4
-      - name: Checkout Toolchain
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: ${{ needs.Prepare.outputs.nightly_version }}
-      - name: Running test script
-        env:
-          DO_DOCSRS: true
-          DO_FMT: true
-          DO_BENCH: true
-        run: ./contrib/test.sh
+      - uses: rust-bitcoin/rust-bitcoin-maintainer-tools/.github/actions/setup-rbmt@af3c2868415b17eedc808da6d0589e10b7482660 # v0.1.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Run doc tests
+        run: cargo rbmt --lock-file recent docs
 
-  MSRV:
-    name: Test - 1.56.1 toolchain
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
+  Docsrs:
+    name: Docs - nightly toolchain
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout Crate
         uses: actions/checkout@v4
-      - name: Checkout Toolchain
-        uses: dtolnay/rust-toolchain@1.56.1
-      - name: Running test script
-        env:
-          DO_FEATURE_MATRIX: true
-        run: ./contrib/test.sh
+      - uses: rust-bitcoin/rust-bitcoin-maintainer-tools/.github/actions/setup-rbmt@af3c2868415b17eedc808da6d0589e10b7482660 # v0.1.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Run docsrs tests
+        run: cargo rbmt --lock-file recent docsrs
 
-  EmbeddedWithAlloc:
-    name: no_std with alloc
-    needs: Prepare
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
+  Format: # 1 job, run cargo fmt directly.
+    name: Format - nightly toolchain
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout Crate
         uses: actions/checkout@v4
-      - name: Set up QEMU
-        run: sudo apt update && sudo apt install -y qemu-system-arm gcc-arm-none-eabi
-      - name: Checkout Toolchain
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          targets: thumbv7m-none-eabi
-          toolchain: ${{ needs.Prepare.outputs.nightly_version }}
-      - name: Run
-        env:
-          RUSTFLAGS: "-C link-arg=-Tlink.x"
-          CARGO_TARGET_THUMBV7M_NONE_EABI_RUNNER: "qemu-system-arm -cpu cortex-m3 -machine mps2-an385 -nographic -semihosting-config enable=on,target=native -kernel"
-        run: cd embedded/with-allocator && cargo run --target thumbv7m-none-eabi
+      - uses: rust-bitcoin/rust-bitcoin-maintainer-tools/.github/actions/setup-rbmt@af3c2868415b17eedc808da6d0589e10b7482660 # v0.1.0
+      - name: Check formatting
+        run: cargo rbmt --lock-file recent fmt --check
 
-  EmbeddedNoAlloc:
-    name: no_std no alloc
-    needs: Prepare
-    runs-on: ubuntu-latest
+  Bench:
+    name: Bench - nightly toolchain
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Crate
+        uses: actions/checkout@v4
+      - uses: rust-bitcoin/rust-bitcoin-maintainer-tools/.github/actions/setup-rbmt@af3c2868415b17eedc808da6d0589e10b7482660 # v0.1.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Run benches
+        run: cargo rbmt --lock-file recent bench
+
+  Embedded:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
+      matrix:
+        include:
+          - name: no_std with alloc
+            dir: embedded/with-allocator
+          - name: no_std no alloc
+            dir: embedded/no-allocator
     steps:
       - name: Checkout Crate
         uses: actions/checkout@v4
       - name: Set up QEMU
-        run: sudo apt update && sudo apt install -y qemu-system-arm gcc-arm-none-eabi
+        run: sudo apt-get update -y && sudo apt-get install -y qemu-system-arm gcc-arm-none-eabi
+      - name: Read nightly version
+        id: nightly
+        run: echo "version=$(cat nightly-version)" >> $GITHUB_OUTPUT
       - name: Checkout Toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
           targets: thumbv7m-none-eabi
-          toolchain: ${{ needs.Prepare.outputs.nightly_version }}
+          toolchain: ${{ steps.nightly.outputs.version }}
       - name: Run
         env:
           RUSTFLAGS: "-C link-arg=-Tlink.x"
           CARGO_TARGET_THUMBV7M_NONE_EABI_RUNNER: "qemu-system-arm -cpu cortex-m3 -machine mps2-an385 -nographic -semihosting-config enable=on,target=native -kernel"
-        run: cd embedded/no-allocator && cargo run --target thumbv7m-none-eabi
+        run: cd ${{ matrix.dir }} && cargo run --target thumbv7m-none-eabi
 
   Arch32bit:
     name: Test 32-bit version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout Crate
         uses: actions/checkout@v4
@@ -145,8 +132,7 @@ jobs:
 
   Cross:
     name: Cross test
-    if: ${{ !github.event.act }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout Crate
         uses: actions/checkout@v4

@@ -10,6 +10,11 @@ keywords = ["base32", "encoding", "bech32", "bitcoin", "cryptocurrency"]
 categories = ["encoding", "cryptography::cryptocurrencies"]
 license = "MIT"
 edition = "2018"
+rust-version = "1.56.1"
+
+[package.metadata.rbmt.toolchains]
+nightly = "nightly-2025-09-05"
+stable = "stable"
 
 [features]
 default = ["std"]

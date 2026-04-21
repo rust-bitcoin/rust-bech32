@@ -417,12 +417,12 @@ mod tests {
             "checked checksum errors should expose invalid residue"
         );
 
-        let segwit_checksum = SegwitHrpstringError::Checksum(checksum_error.clone());
         let segwit_no_data = SegwitHrpstringError::NoData;
         assert!(segwit_no_data.residue_error().is_none(), "no-data errors are not correctable");
 
         #[cfg(feature = "alloc")]
         {
+            let segwit_checksum = SegwitHrpstringError::Checksum(checksum_error.clone());
             let segwit_decode = crate::segwit::DecodeError(segwit_checksum.clone());
             assert!(
                 segwit_decode.residue_error().is_some(),
