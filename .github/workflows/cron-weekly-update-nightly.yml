@@ -9,16 +9,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
-      - name: Update rust.yml to use latest nightly
+      - name: Install cargo-rbmt
+        run: cargo install --git https://github.com/rust-bitcoin/rust-bitcoin-maintainer-tools.git --rev "$(cat rbmt-version)" cargo-rbmt
+      - name: Update nightly toolchain pins
         run: |
           set -x
-          # Not every night has a nightly, so extract the date from whatever
-          # version of the compiler dtolnay/rust-toolchain gives us.
-          NIGHTLY_DATE=$(rustc +nightly --verbose --version | sed -ne 's/^commit-date: //p')
-          # Update the nightly version in the reference file.
-          echo "nightly-${NIGHTLY_DATE}" > nightly-version
-          echo "nightly_date=${NIGHTLY_DATE}" >> $GITHUB_ENV
+          eval "$(cargo rbmt toolchains --update-nightly)"
+          # Keep the legacy reference file in sync for the Embedded job.
+          echo "$RBMT_NIGHTLY" > nightly-version
+          echo "nightly_version=${RBMT_NIGHTLY}" >> $GITHUB_ENV
           # Some days there is no new nightly. In this case don't make an empty PR.
           if ! git diff --exit-code > /dev/null; then
               echo "Updated nightly. Opening PR."
@@ -34,8 +33,8 @@ jobs:
           token: ${{ secrets.APOELSTRA_RUST_BITCOIN_ORG_CREATE_PR }}
           author: Update Nightly Rustc Bot <bot@example.com>
           committer: Update Nightly Rustc Bot <bot@example.com>
-          title: Automated update to nightly-version (to nightly-${{ env.nightly_date }})
+          title: Automated update to rustc nightly toolchain (to ${{ env.nightly_version }})
           body: |
-           Automated update to Github CI workflow `rust.yml` by [create-pull-request](https://github.com/peter-evans/create-pull-request) GitHub action
-          commit-message: Automated update to Github CI to rustc nightly-${{ env.nightly_date }}
+           Automated update to Cargo.toml rbmt toolchain metadata and `nightly-version` by [create-pull-request](https://github.com/peter-evans/create-pull-request) GitHub action
+          commit-message: Automated update to rustc ${{ env.nightly_version }}
           branch: create-pull-request/weekly-nightly-update
