@@ -14,7 +14,7 @@ rust-version = "1.56.1"
 
 [package.metadata.rbmt.toolchains]
 nightly = "nightly-2026-06-05"
-stable = "stable"
+stable = "1.95.0"
 
 [features]
 default = ["std"]

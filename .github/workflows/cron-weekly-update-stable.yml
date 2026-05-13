@@ -1,0 +1,35 @@
+name: Update Stable rustc
+on:
+  schedule:
+    - cron: "0 0 * * 5" # runs every Friday at 00:00 (generally rust releases on Thursday)
+  workflow_dispatch: # allows manual triggering
+permissions: {}
+jobs:
+  format:
+    name: Update stable rustc
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - name: Install cargo-rbmt
+        run: cargo install --git https://github.com/rust-bitcoin/rust-bitcoin-maintainer-tools.git --rev $(cat rbmt-version) cargo-rbmt
+      - name: Update stable toolchain in Cargo.toml
+        run: |
+          eval "$(cargo rbmt toolchains --update-stable)"
+          echo "stable_version=$RBMT_STABLE" >> $GITHUB_ENV
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
+        with:
+          token: ${{ secrets.APOELSTRA_RUST_BITCOIN_ORG_CREATE_PR }}
+          author: Update Stable Rustc Bot <bot@example.com>
+          committer: Update Stable Rustc Bot <bot@example.com>
+          title: Automated weekly update to rustc stable (to ${{ env.stable_version }})
+          body: |
+           Automated update to Cargo.toml workspace metadata by [create-pull-request](https://github.com/peter-evans/create-pull-request) GitHub action
+          commit-message: Automated update to rustc stable-${{ env.stable_version }}
+          branch: create-pull-request/weekly-stable-update
