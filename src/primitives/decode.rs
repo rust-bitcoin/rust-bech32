@@ -495,7 +495,7 @@ impl<'s> CheckedHrpstring<'s> {
         let padding_len = fe_iter.len() * 5 % 8;
 
         if padding_len > 4 {
-            return Err(PaddingError::TooMuch)?;
+            return Err(PaddingError::TooMuch);
         }
 
         let last_fe = fe_iter.last().expect("checked above");
