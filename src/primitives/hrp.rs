@@ -778,4 +778,25 @@ mod tests {
         assert_eq!(hrp.as_bytes()[1], b'X');
         assert_eq!(hrp.as_bytes()[2], b'~');
     }
+
+    #[test]
+    fn test_parse_display_mixed_case_across_boundaries() {
+        let result_lowercase_then_uppercase_static =
+            Hrp::parse_display(format_args!("{}{}", "abc", "DEF"));
+        assert_eq!(
+            result_lowercase_then_uppercase_static.unwrap_err(),
+            Error::MixedCase,
+            "Failed to detect mixed case when lowercase precedes uppercase across boundaries"
+        );
+
+        let lower_abc = "abc".to_string();
+        let upper_def = "DEF".to_string();
+        let result_lowercase_then_uppercase_heap =
+            Hrp::parse_display(format_args!("{}{}", lower_abc, upper_def));
+        assert_eq!(
+            result_lowercase_then_uppercase_heap.unwrap_err(),
+            Error::MixedCase,
+            "Failed to detect mixed case when lowercase precedes uppercase across boundaries"
+        );
+    }
 }
