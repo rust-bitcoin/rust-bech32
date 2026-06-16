@@ -779,4 +779,54 @@ mod tests {
         assert_eq!(hrp.as_bytes()[1], b'X');
         assert_eq!(hrp.as_bytes()[2], b'~');
     }
+
+    struct Simple(u64);
+
+    impl Hasher for Simple {
+        fn finish(&self) -> u64 { self.0 }
+        fn write(&mut self, bytes: &[u8]) {
+            for &b in bytes {
+                self.0 = self.0.wrapping_mul(31).wrapping_add(b as u64);
+            }
+        }
+    }
+
+    #[test]
+    fn hash_consistent_with_eq() {
+        let get_hash = |hrp: &Hrp| {
+            let mut hasher = Simple(0);
+            hrp.hash(&mut hasher);
+            hasher.finish()
+        };
+
+        let a = Hrp::parse_unchecked("ABC");
+        let b = Hrp::parse_unchecked("abc");
+        assert_eq!(a, b);
+        assert_eq!(get_hash(&a), get_hash(&b));
+
+        let mixed_1 = Hrp::parse_unchecked("aBcDeFg");
+        let mixed_2 = Hrp::parse_unchecked("AbCdEfG");
+        assert_eq!(mixed_1, mixed_2);
+        assert_eq!(get_hash(&mixed_1), get_hash(&mixed_2));
+
+        let num_1 = &Hrp::parse_unchecked("bc1");
+        let num_2 = &Hrp::parse_unchecked("BC1");
+        assert_eq!(num_1, num_2);
+        assert_eq!(get_hash(num_1), get_hash(num_2));
+
+        let short = Hrp::parse_unchecked("abc");
+        let long = Hrp::parse_unchecked("abcd");
+        assert_ne!(short, long);
+        assert_ne!(get_hash(&short), get_hash(&long));
+
+        let get_composite_hash = |item: &(Hrp, &str)| {
+            let mut hasher = Simple(0);
+            item.hash(&mut hasher);
+            hasher.finish()
+        };
+        let composite_1 = (short, "def");
+        let composite_2 = (long, "ef");
+        assert_ne!(composite_1, composite_2);
+        assert_ne!(get_composite_hash(&composite_1), get_composite_hash(&composite_2));
+    }
 }
