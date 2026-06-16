@@ -470,7 +470,11 @@ impl<'s> CheckedHrpstring<'s> {
 
         // Unwrap ok since check_characters checked the bech32-ness of this char.
         let witness_version = Fe32::from_char(self.ascii[0].into()).unwrap();
-        self.ascii = &self.ascii[1..]; // Remove the witness version byte.
+        if witness_version.to_u8() > 16 {
+            return Err(SegwitHrpstringError::InvalidWitnessVersion(witness_version));
+        }
+
+        self.ascii = &self.ascii[1..]; // Remove the witness version byte
 
         self.validate_segwit_padding()?;
         self.validate_witness_program_length(witness_version)?;
@@ -1370,6 +1374,55 @@ mod tests {
             ascii: b"qq",
         };
         assert!(mainnet.has_valid_hrp());
+    }
+
+    #[test]
+    fn validate_segwit_witness_version_bounds() {
+        // witness version 0, 'q' => Fe32(0)
+        let valid_v0 = CheckedHrpstring {
+            hrp: Hrp::parse_unchecked("bc"),
+            ascii: b"qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq",
+            hrpstring_length: 36, // bc1 prefix (3) + 1 version char + 32 program chars = 36
+        };
+        assert!(
+            valid_v0.validate_segwit().is_ok(),
+            "validate_segwit failed to accept valid witness version 0"
+        );
+
+        // witness version 'p' =>  Fe32(16) (maximum allowed version by BIP-350)
+        let valid_v16 = CheckedHrpstring {
+            hrp: Hrp::parse_unchecked("bc"),
+            ascii: b"ppppppppppppppppppppppppppppppppppppppppp",
+            hrpstring_length: 44, // bc1 prefix (3) + 1 version char + 40 program chars = 44
+        };
+        assert!(
+            valid_v16.validate_segwit().is_ok(),
+            "validate_segwit failed to accept valid witness version 16"
+        );
+
+        // invalid witness version '3' => Fe32(17)  (above the maximum allowed)
+        let invalid_v17 = CheckedHrpstring {
+            hrp: Hrp::parse_unchecked("bc"),
+            ascii: b"3pppppppppppppppppppppppppppppppppppppppp",
+            hrpstring_length: 44, // bc1 prefix (3) + 1 version char + 40 program chars = 44
+        };
+
+        match invalid_v17.validate_segwit() {
+            Err(SegwitHrpstringError::InvalidWitnessVersion(v)) => assert_eq!(v.to_u8(), 17),
+            other => panic!("Expected InvalidWitnessVersion(17), got {:?}", other),
+        }
+
+        // invalid witness version 'l' => Fe32(31) (the absolute maximum possible Fe32 value)
+        let invalid_v31 = CheckedHrpstring {
+            hrp: Hrp::parse_unchecked("bc"),
+            ascii: b"lpppppppppppppppppppppppppppppppppppppppp",
+            hrpstring_length: 44, // bc1 prefix (3) + 1 version char + 40 program chars = 44
+        };
+
+        match invalid_v31.validate_segwit() {
+            Err(SegwitHrpstringError::InvalidWitnessVersion(v)) => assert_eq!(v.to_u8(), 31),
+            other => panic!("Expected InvalidWitnessVersion(31), got {:?}", other),
+        }
     }
 
     #[test]
