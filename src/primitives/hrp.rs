@@ -131,12 +131,12 @@ impl Hrp {
             arr: [u8; MAX_HRP_LEN],
             index: usize,
             error: Option<Error>,
+            has_lower: bool,
+            has_upper: bool,
         }
 
         impl core::fmt::Write for ByteFormatter {
             fn write_str(&mut self, s: &str) -> fmt::Result {
-                let mut has_lower: bool = false;
-                let mut has_upper: bool = false;
                 for ch in s.chars() {
                     let b = ch as u8; // cast ok, `b` unused until `ch` is checked to be ASCII
 
@@ -151,17 +151,17 @@ impl Hrp {
                     }
 
                     if ch.is_ascii_lowercase() {
-                        if has_upper {
+                        if self.has_upper {
                             self.error = Some(MixedCase);
                             break;
                         }
-                        has_lower = true;
+                        self.has_lower = true;
                     } else if ch.is_ascii_uppercase() {
-                        if has_lower {
+                        if self.has_lower {
                             self.error = Some(MixedCase);
                             break;
                         }
-                        has_upper = true;
+                        self.has_upper = true;
                     };
                 }
 
@@ -181,7 +181,13 @@ impl Hrp {
             }
         }
 
-        let mut byte_formatter = ByteFormatter { arr: [0; MAX_HRP_LEN], index: 0, error: None };
+        let mut byte_formatter = ByteFormatter {
+            arr: [0; MAX_HRP_LEN],
+            index: 0,
+            error: None,
+            has_lower: false,
+            has_upper: false,
+        };
 
         write!(byte_formatter, "{}", data).expect("custom Formatter cannot fail");
         if byte_formatter.index == 0 {
