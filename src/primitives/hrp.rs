@@ -331,7 +331,14 @@ impl Eq for Hrp {}
 
 impl core::hash::Hash for Hrp {
     #[inline]
-    fn hash<H: core::hash::Hasher>(&self, h: &mut H) { self.buf.hash(h) }
+    fn hash<H: core::hash::Hasher>(&self, h: &mut H) {
+        h.write_usize(self.size);
+        let mut buf = [0u8; MAX_HRP_LEN];
+        for (idx, byte) in self.lowercase_byte_iter().enumerate() {
+            buf[idx] = byte;
+        }
+        h.write(&buf[..self.size]);
+    }
 }
 
 /// Iterator over bytes (ASCII values) of the human-readable part.
