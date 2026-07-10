@@ -209,25 +209,24 @@ where
     #[inline]
     fn next(&mut self) -> Option<char> {
         if let Some(ref mut hrp_iter) = self.hrp_iter {
-            match hrp_iter.next() {
-                Some(c) => return Some(c),
-                None => {
-                    self.hrp_iter = None;
-                    return Some('1');
-                }
-            }
+            return if let Some(c) = hrp_iter.next() {
+                Some(c)
+            } else {
+                self.hrp_iter = None;
+                Some('1')
+            };
         }
 
-        self.checksummed.next().map(|fe| fe.to_char())
+        self.checksummed.next().map(Fe32::to_char)
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        match &self.hrp_iter {
+        self.hrp_iter.as_ref().map_or_else(
             // We have yielded the hrp and separator already.
-            None => self.checksummed.size_hint(),
+            || self.checksummed.size_hint(),
             // Yet to finish yielding the hrp (and the separator).
-            Some(hrp_iter) => {
+            |hrp_iter| {
                 let (hrp_min, hrp_max) = hrp_iter.size_hint();
                 let (chk_min, chk_max) = self.checksummed.size_hint();
 
@@ -235,14 +234,11 @@ where
 
                 // To provide a max boundary we need to have gotten a value from the hrp iter as well as the
                 // checksummed iter, otherwise we have to return None since we cannot know the maximum.
-                let max = match (hrp_max, chk_max) {
-                    (Some(hrp_max), Some(chk_max)) => Some(hrp_max + 1 + chk_max),
-                    (_, _) => None,
-                };
+                let max = hrp_max.zip(chk_max).map(|(hrp, chk)| hrp + 1 + chk);
 
                 (min, max)
-            }
-        }
+            },
+        )
     }
 }
 
@@ -330,10 +326,7 @@ where
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let hrp = match &self.hrp_iter {
-            Some(hrp_iter) => hrp_iter.size_hint(),
-            None => (0, Some(0)),
-        };
+        let hrp = self.hrp_iter.as_ref().map_or((0, Some(0)), HrpFe32Iter::size_hint);
 
         let data = self.checksummed.size_hint();
 
