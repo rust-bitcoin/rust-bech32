@@ -215,17 +215,10 @@ impl<'s> UncheckedHrpstring<'s> {
     /// ```
     #[inline]
     pub fn witness_version(&self) -> Option<Fe32> {
-        let data_part = self.data_part_ascii();
-        if data_part.is_empty() {
-            return None;
-        }
-
-        // unwrap ok because we know we gave valid bech32 characters.
-        let witness_version = Fe32::from_char(data_part[0].into()).unwrap();
-        if witness_version.to_u8() > 16 {
-            return None;
-        }
-        Some(witness_version)
+        self.data_part_ascii
+            .first()
+            .map(|&ch| Fe32::from_char(ch.into()).unwrap()) // unwrap ok because we know we gave valid bech32 characters.
+            .filter(|version| version.to_u8() <= 16)
     }
 
     /// Validates that data has a valid checksum for the `Ck` algorithm and returns a [`CheckedHrpstring`].
@@ -427,17 +420,10 @@ impl<'s> CheckedHrpstring<'s> {
     /// ```
     #[inline]
     pub fn witness_version(&self) -> Option<Fe32> {
-        let data_part = self.data_part_ascii_no_checksum();
-        if data_part.is_empty() {
-            return None;
-        }
-
-        // unwrap ok because we know we gave valid bech32 characters.
-        let witness_version = Fe32::from_char(data_part[0].into()).unwrap();
-        if witness_version.to_u8() > 16 {
-            return None;
-        }
-        Some(witness_version)
+        self.data_part_ascii_no_checksum()
+            .first()
+            .map(|&ch| Fe32::from_char(ch.into()).unwrap()) // unwrap ok because we know we gave valid bech32 characters.
+            .filter(|version| version.to_u8() <= 16)
     }
 
     /// Returns an iterator that yields the data part of the parsed bech32 encoded string as [`Fe32`]s.
