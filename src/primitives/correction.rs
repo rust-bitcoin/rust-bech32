@@ -299,7 +299,7 @@ impl<Ck: Checksum> Iterator for ErrorIterator<'_, Ck> {
         let ret = -num / den;
         match ret.try_into() {
             Ok(ret) => Some((neg_i, ret)),
-            Err(_) => unreachable!("error guaranteed to  lie in base field"),
+            Err(_) => unreachable!("error guaranteed to lie in base field"),
         }
     }
 }
