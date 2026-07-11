@@ -8,7 +8,7 @@ use core::marker::PhantomData;
 use core::{fmt, mem, ops};
 
 use super::Polynomial;
-use crate::primitives::hrp::Hrp;
+use crate::primitives::hrp::{Hrp, LowercaseByteIter};
 use crate::{Fe1024, Fe32};
 
 /// Trait defining a particular checksum.
@@ -179,7 +179,7 @@ impl<'a, ExtField> PrintImpl<'a, ExtField> {
     /// Panics if any of the input values fail various sanity checks.
     pub fn new(name: &'a str, generator: &'a [Fe32], target: &'a [Fe32]) -> Self {
         // Sanity checks.
-        assert_ne!(name.len(), 0, "type name cannot be the empty string",);
+        assert_ne!(name.len(), 0, "type name cannot be the empty string");
         assert_ne!(
             generator.len(),
             0,
@@ -396,9 +396,7 @@ impl PackedFe32 for PackedNull {
 
     #[inline]
     fn pack<I: Iterator<Item = u8>>(mut iter: I) -> Self {
-        if iter.next().is_some() {
-            panic!("Cannot pack anything into a PackedNull");
-        }
+        assert!(iter.next().is_none(), "Cannot pack anything into a PackedNull");
         Self
     }
 }
@@ -469,13 +467,12 @@ impl Iterator for HrpFe32Iter<'_> {
     #[inline]
     fn next(&mut self) -> Option<Fe32> {
         if let Some(ref mut high_iter) = &mut self.high_iter {
-            match high_iter.next() {
-                Some(high) => return Some(Fe32(high >> 5)),
-                None => {
-                    self.high_iter = None;
-                    return Some(Fe32::Q);
-                }
-            }
+            return if let Some(high) = high_iter.next() {
+                Some(Fe32(high >> 5))
+            } else {
+                self.high_iter = None;
+                Some(Fe32::Q)
+            };
         }
         if let Some(ref mut low_iter) = &mut self.low_iter {
             match low_iter.next() {
@@ -488,17 +485,11 @@ impl Iterator for HrpFe32Iter<'_> {
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let high = match &self.high_iter {
-            Some(high_iter) => {
-                let (min, max) = high_iter.size_hint();
-                (min + 1, max.map(|max| max + 1)) // +1 for the extra Q
-            }
-            None => (0, Some(0)),
-        };
-        let low = match &self.low_iter {
-            Some(low_iter) => low_iter.size_hint(),
-            None => (0, Some(0)),
-        };
+        let high = self.high_iter.as_ref().map_or((0, Some(0)), |high_iter| {
+            let (min, max) = high_iter.size_hint();
+            (min + 1, max.map(|max| max + 1)) // +1 for the extra Q
+        });
+        let low = self.low_iter.as_ref().map_or((0, Some(0)), LowercaseByteIter::size_hint);
 
         let min = high.0 + low.0;
         let max = high.1.zip(low.1).map(|(high, low)| high + low);

@@ -352,7 +352,7 @@ impl<F: Clone + Default> iter::FromIterator<F> for FieldVec<F> {
         // This goofy map construction is needed because we cannot use the
         // `[F::default(); N]` syntax without adding a `Copy` bound to `F`.
         // After Rust 1.63 we will be able to use array::from_fn.
-        let mut inner_a = [(); NO_ALLOC_MAX_LENGTH].map(|_| F::default());
+        let mut inner_a = [(); NO_ALLOC_MAX_LENGTH].map(|()| F::default());
         let mut len = 0;
         for elem in iter.by_ref().take(NO_ALLOC_MAX_LENGTH) {
             inner_a[len] = elem;
@@ -389,7 +389,7 @@ impl<F: Clone + Default> iter::FromIterator<F> for FieldVec<F> {
 
 impl<F: fmt::Display> fmt::Display for FieldVec<F> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for fe in self.iter() {
+        for fe in self {
             fe.fmt(f)?;
         }
         Ok(())
