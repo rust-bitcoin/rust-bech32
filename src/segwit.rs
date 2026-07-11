@@ -159,29 +159,17 @@ pub fn encode_lower_to_fmt_unchecked<W: fmt::Write>(
     witness_version: Fe32,
     witness_program: &[u8],
 ) -> fmt::Result {
-    let mut buf = [0u8; MAX_STRING_LENGTH];
-    let mut pos = 0;
-
     let iter = witness_program.iter().copied().bytes_to_fes();
     match witness_version {
         VERSION_0 => {
             let bytes = iter.with_checksum::<Bech32>(&hrp).with_witness_version(VERSION_0).bytes();
-            buf.iter_mut().zip(bytes).for_each(|(dst, src)| {
-                *dst = src;
-                pos += 1;
-            });
+            write_bytes_to_fmt(fmt, bytes, false)?;
         }
         version => {
             let bytes = iter.with_checksum::<Bech32m>(&hrp).with_witness_version(version).bytes();
-            buf.iter_mut().zip(bytes).for_each(|(dst, src)| {
-                *dst = src;
-                pos += 1;
-            });
+            write_bytes_to_fmt(fmt, bytes, false)?;
         }
     }
-
-    let s = core::str::from_utf8(&buf[..pos]).expect("we only write ASCII");
-    fmt.write_str(s)?;
 
     Ok(())
 }
@@ -199,31 +187,42 @@ pub fn encode_upper_to_fmt_unchecked<W: fmt::Write>(
     witness_version: Fe32,
     witness_program: &[u8],
 ) -> fmt::Result {
-    let mut buf = [0u8; MAX_STRING_LENGTH];
-    let mut pos = 0;
-
     let iter = witness_program.iter().copied().bytes_to_fes();
     match witness_version {
         VERSION_0 => {
             let bytes = iter.with_checksum::<Bech32>(&hrp).with_witness_version(VERSION_0).bytes();
-            buf.iter_mut().zip(bytes).for_each(|(dst, src)| {
-                *dst = src.to_ascii_uppercase();
-                pos += 1;
-            });
+            write_bytes_to_fmt(fmt, bytes, true)?;
         }
         version => {
             let bytes = iter.with_checksum::<Bech32m>(&hrp).with_witness_version(version).bytes();
-            buf.iter_mut().zip(bytes).for_each(|(dst, src)| {
-                *dst = src.to_ascii_uppercase();
-                pos += 1;
-            });
+            write_bytes_to_fmt(fmt, bytes, true)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn write_bytes_to_fmt<W, I>(fmt: &mut W, bytes: I, uppercase: bool) -> fmt::Result
+where
+    W: fmt::Write,
+    I: Iterator<Item = u8>,
+{
+    let mut buf = [0u8; MAX_STRING_LENGTH];
+    let mut pos = 0;
+
+    for byte in bytes {
+        buf[pos] = if uppercase { byte.to_ascii_uppercase() } else { byte };
+        pos += 1;
+
+        if pos == buf.len() {
+            let s = core::str::from_utf8(&buf).expect("we only write ASCII");
+            fmt.write_str(s)?;
+            pos = 0;
         }
     }
 
     let s = core::str::from_utf8(&buf[..pos]).expect("we only write ASCII");
-    fmt.write_str(s)?;
-
-    Ok(())
+    fmt.write_str(s)
 }
 
 /// Encodes a segwit address to a writer ([`io::Write`]) using lowercase characters.
@@ -257,28 +256,17 @@ pub fn encode_lower_to_writer_unchecked<W: std::io::Write>(
     witness_version: Fe32,
     witness_program: &[u8],
 ) -> std::io::Result<()> {
-    let mut buf = [0u8; MAX_STRING_LENGTH];
-    let mut pos = 0;
-
     let iter = witness_program.iter().copied().bytes_to_fes();
     match witness_version {
         VERSION_0 => {
             let bytes = iter.with_checksum::<Bech32>(&hrp).with_witness_version(VERSION_0).bytes();
-            buf.iter_mut().zip(bytes).for_each(|(dst, src)| {
-                *dst = src;
-                pos += 1;
-            });
+            write_bytes_to_writer(w, bytes, false)?;
         }
         version => {
             let bytes = iter.with_checksum::<Bech32m>(&hrp).with_witness_version(version).bytes();
-            buf.iter_mut().zip(bytes).for_each(|(dst, src)| {
-                *dst = src;
-                pos += 1;
-            });
+            write_bytes_to_writer(w, bytes, false)?;
         }
     }
-
-    w.write_all(&buf[..pos])?;
 
     Ok(())
 }
@@ -299,30 +287,41 @@ pub fn encode_upper_to_writer_unchecked<W: std::io::Write>(
     witness_version: Fe32,
     witness_program: &[u8],
 ) -> std::io::Result<()> {
-    let mut buf = [0u8; MAX_STRING_LENGTH];
-    let mut pos = 0;
-
     let iter = witness_program.iter().copied().bytes_to_fes();
     match witness_version {
         VERSION_0 => {
             let bytes = iter.with_checksum::<Bech32>(&hrp).with_witness_version(VERSION_0).bytes();
-            buf.iter_mut().zip(bytes).for_each(|(dst, src)| {
-                *dst = src.to_ascii_uppercase();
-                pos += 1;
-            });
+            write_bytes_to_writer(w, bytes, true)?;
         }
         version => {
             let bytes = iter.with_checksum::<Bech32m>(&hrp).with_witness_version(version).bytes();
-            buf.iter_mut().zip(bytes).for_each(|(dst, src)| {
-                *dst = src.to_ascii_uppercase();
-                pos += 1;
-            });
+            write_bytes_to_writer(w, bytes, true)?;
         }
     }
 
-    w.write_all(&buf[..pos])?;
-
     Ok(())
+}
+
+#[cfg(feature = "std")]
+fn write_bytes_to_writer<W, I>(w: &mut W, bytes: I, uppercase: bool) -> std::io::Result<()>
+where
+    W: std::io::Write,
+    I: Iterator<Item = u8>,
+{
+    let mut buf = [0u8; MAX_STRING_LENGTH];
+    let mut pos = 0;
+
+    for byte in bytes {
+        buf[pos] = if uppercase { byte.to_ascii_uppercase() } else { byte };
+        pos += 1;
+
+        if pos == buf.len() {
+            w.write_all(&buf)?;
+            pos = 0;
+        }
+    }
+
+    w.write_all(&buf[..pos])
 }
 
 /// Returns the length of the address after encoding HRP, witness version and program.
@@ -624,5 +623,36 @@ mod tests {
         assert_eq!(address.len(), MAX_STRING_LENGTH + 1);
 
         assert_eq!(decode(address).unwrap_err(), DecodeError(SegwitHrpstringError::TooLong(91)));
+    }
+
+    #[test]
+    fn unchecked_encoders_must_not_silently_truncate() {
+        // 22-char HRP + 1 separator + 1 witness version + 64 data + 6 checksum = 94 chars,
+        // which exceeds the 90-byte (per spec) stack buffer used by the unchecked encoders.
+        let hrp = Hrp::parse_unchecked("anhrpthatistwentychars");
+        let program = [0_u8; 40];
+
+        let mut lower = String::new();
+        encode_lower_to_fmt_unchecked(&mut lower, hrp, VERSION_1, &program)
+            .expect("encode_lower_to_fmt_unchecked");
+        assert_eq!(lower.len(), 94);
+
+        let mut upper = String::new();
+        encode_upper_to_fmt_unchecked(&mut upper, hrp, VERSION_1, &program)
+            .expect("encode_upper_to_fmt_unchecked");
+        assert_eq!(upper, lower.to_ascii_uppercase());
+
+        #[cfg(feature = "std")]
+        {
+            let mut lower_writer = Vec::new();
+            encode_lower_to_writer_unchecked(&mut lower_writer, hrp, VERSION_1, &program)
+                .expect("encode_lower_to_writer_unchecked");
+            assert_eq!(lower_writer, lower.as_bytes());
+
+            let mut upper_writer = Vec::new();
+            encode_upper_to_writer_unchecked(&mut upper_writer, hrp, VERSION_1, &program)
+                .expect("encode_upper_to_writer_unchecked");
+            assert_eq!(upper_writer, upper.as_bytes());
+        }
     }
 }
