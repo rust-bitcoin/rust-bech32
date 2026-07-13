@@ -50,10 +50,7 @@ fn do_test(data: &[u8]) {
         if idx >= CORRECT.len() - 3 {
             return;
         }
-        let offs = match Fe32::try_from(sl[1]) {
-            Ok(fe) => fe,
-            Err(_) => return,
-        };
+        let Ok(offs) = Fe32::try_from(sl[1]) else { return };
 
         hrpstring[idx + 3] =
             (Fe32::from_char(hrpstring[idx + 3].into()).unwrap() + offs).to_char() as u8;
