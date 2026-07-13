@@ -297,7 +297,7 @@ impl<Ck: Checksum> Default for Engine<Ck> {
 impl<Ck: Checksum> Engine<Ck> {
     /// Constructs a new checksum engine with no data input.
     #[inline]
-    pub fn new() -> Self { Engine { residue: Ck::MidstateRepr::ONE } }
+    pub fn new() -> Self { Self { residue: Ck::MidstateRepr::ONE } }
 
     /// Feeds `hrp` into the checksum engine.
     #[inline]
@@ -381,14 +381,14 @@ pub trait PackedFe32: Copy + PartialEq + Eq + ops::BitXor<Self, Output = Self> {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct PackedNull;
 
-impl ops::BitXor<PackedNull> for PackedNull {
-    type Output = PackedNull;
+impl ops::BitXor<Self> for PackedNull {
+    type Output = Self;
     #[inline]
-    fn bitxor(self, _: PackedNull) -> PackedNull { PackedNull }
+    fn bitxor(self, _: Self) -> Self { Self }
 }
 
 impl PackedFe32 for PackedNull {
-    const ONE: Self = PackedNull;
+    const ONE: Self = Self;
     #[inline]
     fn unpack(&self, _: usize) -> u8 { 0 }
     #[inline]

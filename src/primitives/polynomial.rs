@@ -46,7 +46,7 @@ impl<F: Field> Polynomial<F> {
     pub fn with_monic_leading_term(coeffs: &[F]) -> Self {
         let mut inner: FieldVec<_> = coeffs.iter().rev().cloned().collect();
         inner.push(F::ONE);
-        Polynomial { inner }
+        Self { inner }
     }
 
     /// The degree of the polynomial.
@@ -322,7 +322,7 @@ impl<F: Field> iter::FromIterator<F> for Polynomial<F> {
     where
         I: IntoIterator<Item = F>,
     {
-        Polynomial { inner: FieldVec::from_iter(iter) }
+        Self { inner: FieldVec::from_iter(iter) }
     }
 }
 
@@ -330,34 +330,34 @@ impl<F> From<FieldVec<F>> for Polynomial<F> {
     fn from(inner: FieldVec<F>) -> Self { Self { inner } }
 }
 
-impl<F: Field> ops::Add<&Polynomial<F>> for Polynomial<F> {
-    type Output = Polynomial<F>;
+impl<F: Field> ops::Add<&Self> for Polynomial<F> {
+    type Output = Self;
 
-    fn add(mut self, other: &Polynomial<F>) -> Polynomial<F> {
+    fn add(mut self, other: &Self) -> Self {
         self += other;
         self
     }
 }
 
-impl<F: Field> ops::Add<Polynomial<F>> for Polynomial<F> {
-    type Output = Polynomial<F>;
-    fn add(self, other: Polynomial<F>) -> Polynomial<F> { self + &other }
+impl<F: Field> ops::Add<Self> for Polynomial<F> {
+    type Output = Self;
+    fn add(self, other: Self) -> Self { self + &other }
 }
 
-impl<F: Field> ops::Sub<&Polynomial<F>> for Polynomial<F> {
-    type Output = Polynomial<F>;
-    fn sub(mut self, other: &Polynomial<F>) -> Polynomial<F> {
+impl<F: Field> ops::Sub<&Self> for Polynomial<F> {
+    type Output = Self;
+    fn sub(mut self, other: &Self) -> Self {
         self -= other;
         self
     }
 }
 
-impl<F: Field> ops::Sub<Polynomial<F>> for Polynomial<F> {
-    type Output = Polynomial<F>;
-    fn sub(self, other: Polynomial<F>) -> Polynomial<F> { self - &other }
+impl<F: Field> ops::Sub<Self> for Polynomial<F> {
+    type Output = Self;
+    fn sub(self, other: Self) -> Self { self - &other }
 }
 
-impl<F: Field> ops::AddAssign<&Polynomial<F>> for Polynomial<F> {
+impl<F: Field> ops::AddAssign<&Self> for Polynomial<F> {
     fn add_assign(&mut self, other: &Self) {
         self.zero_pad_up_to(other.inner.len());
         for i in 0..other.inner.len() {
@@ -367,11 +367,11 @@ impl<F: Field> ops::AddAssign<&Polynomial<F>> for Polynomial<F> {
 }
 
 impl<F: Field> ops::AddAssign for Polynomial<F> {
-    fn add_assign(&mut self, other: Polynomial<F>) { *self += &other; }
+    fn add_assign(&mut self, other: Self) { *self += &other; }
 }
 
-impl<F: Field> ops::SubAssign<&Polynomial<F>> for Polynomial<F> {
-    fn sub_assign(&mut self, other: &Polynomial<F>) {
+impl<F: Field> ops::SubAssign<&Self> for Polynomial<F> {
+    fn sub_assign(&mut self, other: &Self) {
         self.zero_pad_up_to(other.inner.len());
         for i in 0..other.inner.len() {
             self.inner[i] -= &other.inner[i];
@@ -380,7 +380,7 @@ impl<F: Field> ops::SubAssign<&Polynomial<F>> for Polynomial<F> {
 }
 
 impl<F: Field> ops::SubAssign for Polynomial<F> {
-    fn sub_assign(&mut self, other: Polynomial<F>) { *self -= &other; }
+    fn sub_assign(&mut self, other: Self) { *self -= &other; }
 }
 
 /// An iterator over the roots of a polynomial.

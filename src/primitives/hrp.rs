@@ -85,7 +85,7 @@ impl Hrp {
             return Err(TooLong(hrp.len()));
         }
 
-        let mut new = Hrp { buf: [0_u8; MAX_HRP_LEN], size: 0 };
+        let mut new = Self { buf: [0_u8; MAX_HRP_LEN], size: 0 };
 
         let mut has_lower: bool = false;
         let mut has_upper: bool = false;
@@ -204,7 +204,7 @@ impl Hrp {
     /// Does not check that `hrp` is valid according to BIP-173 but does check for valid ASCII
     /// values, replacing any invalid characters with `X`.
     pub const fn parse_unchecked(hrp: &str) -> Self {
-        let mut new = Hrp { buf: [0_u8; MAX_HRP_LEN], size: 0 };
+        let mut new = Self { buf: [0_u8; MAX_HRP_LEN], size: 0 };
         let hrp_bytes = hrp.as_bytes();
 
         let mut i = 0;

@@ -71,106 +71,106 @@ pub struct Fe32(pub(crate) u8);
 impl Fe32 {
     // These are a little gratuitous for a reference implementation, but it makes me happy to do it.
     /// Numeric value maps to bech32 character: 0 == "q".
-    pub const Q: Fe32 = Fe32(0);
+    pub const Q: Self = Self(0);
     /// Numeric value maps to bech32 character: 1 == "p".
-    pub const P: Fe32 = Fe32(1);
+    pub const P: Self = Self(1);
     /// Numeric value maps to bech32 character: 2 == "z".
-    pub const Z: Fe32 = Fe32(2);
+    pub const Z: Self = Self(2);
     /// Numeric value maps to bech32 character: 3 == "r".
-    pub const R: Fe32 = Fe32(3);
+    pub const R: Self = Self(3);
     /// Numeric value maps to bech32 character: 4 == "y".
-    pub const Y: Fe32 = Fe32(4);
+    pub const Y: Self = Self(4);
     /// Numeric value maps to bech32 character: 5 == "9".
-    pub const _9: Fe32 = Fe32(5);
+    pub const _9: Self = Self(5);
     /// Numeric value maps to bech32 character: 6 == "x".
-    pub const X: Fe32 = Fe32(6);
+    pub const X: Self = Self(6);
     /// Numeric value maps to bech32 character: 7 == "8".
-    pub const _8: Fe32 = Fe32(7);
+    pub const _8: Self = Self(7);
     /// Numeric value maps to bech32 character: 8 == "g".
-    pub const G: Fe32 = Fe32(8);
+    pub const G: Self = Self(8);
     /// Numeric value maps to bech32 character: 9 == "f".
-    pub const F: Fe32 = Fe32(9);
+    pub const F: Self = Self(9);
     /// Numeric value maps to bech32 character: 10 == "2".
-    pub const _2: Fe32 = Fe32(10);
+    pub const _2: Self = Self(10);
     /// Numeric value maps to bech32 character: 11 == "t".
-    pub const T: Fe32 = Fe32(11);
+    pub const T: Self = Self(11);
     /// Numeric value maps to bech32 character: 12 == "v".
-    pub const V: Fe32 = Fe32(12);
+    pub const V: Self = Self(12);
     /// Numeric value maps to bech32 character: 13 == "d".
-    pub const D: Fe32 = Fe32(13);
+    pub const D: Self = Self(13);
     /// Numeric value maps to bech32 character: 14 == "w".
-    pub const W: Fe32 = Fe32(14);
+    pub const W: Self = Self(14);
     /// Numeric value maps to bech32 character: 15 == "0".
-    pub const _0: Fe32 = Fe32(15);
+    pub const _0: Self = Self(15);
     /// Numeric value maps to bech32 character: 16 == "s".
-    pub const S: Fe32 = Fe32(16);
+    pub const S: Self = Self(16);
     /// Numeric value maps to bech32 character: 17 == "3".
-    pub const _3: Fe32 = Fe32(17);
+    pub const _3: Self = Self(17);
     /// Numeric value maps to bech32 character: 18 == "j".
-    pub const J: Fe32 = Fe32(18);
+    pub const J: Self = Self(18);
     /// Numeric value maps to bech32 character: 19 == "n".
-    pub const N: Fe32 = Fe32(19);
+    pub const N: Self = Self(19);
     /// Numeric value maps to bech32 character: 20 == "5".
-    pub const _5: Fe32 = Fe32(20);
+    pub const _5: Self = Self(20);
     /// Numeric value maps to bech32 character: 21 == "4".
-    pub const _4: Fe32 = Fe32(21);
+    pub const _4: Self = Self(21);
     /// Numeric value maps to bech32 character: 22 == "k".
-    pub const K: Fe32 = Fe32(22);
+    pub const K: Self = Self(22);
     /// Numeric value maps to bech32 character: 23 == "h".
-    pub const H: Fe32 = Fe32(23);
+    pub const H: Self = Self(23);
     /// Numeric value maps to bech32 character: 24 == "c".
-    pub const C: Fe32 = Fe32(24);
+    pub const C: Self = Self(24);
     /// Numeric value maps to bech32 character: 25 == "e".
-    pub const E: Fe32 = Fe32(25);
+    pub const E: Self = Self(25);
     /// Numeric value maps to bech32 character: 26 == "6".
-    pub const _6: Fe32 = Fe32(26);
+    pub const _6: Self = Self(26);
     /// Numeric value maps to bech32 character: 27 == "m".
-    pub const M: Fe32 = Fe32(27);
+    pub const M: Self = Self(27);
     /// Numeric value maps to bech32 character: 28 == "u".
-    pub const U: Fe32 = Fe32(28);
+    pub const U: Self = Self(28);
     /// Numeric value maps to bech32 character: 29 == "a".
-    pub const A: Fe32 = Fe32(29);
+    pub const A: Self = Self(29);
     /// Numeric value maps to bech32 character: 30 == "7".
-    pub const _7: Fe32 = Fe32(30);
+    pub const _7: Self = Self(30);
     /// Numeric value maps to bech32 character: 31 == "l".
-    pub const L: Fe32 = Fe32(31);
+    pub const L: Self = Self(31);
 
     /// Iterator over all field elements, in alphabetical order.
     #[inline]
-    pub fn iter_alpha() -> impl Iterator<Item = Fe32> {
+    pub fn iter_alpha() -> impl Iterator<Item = Self> {
         [
-            Fe32::A,
-            Fe32::C,
-            Fe32::D,
-            Fe32::E,
-            Fe32::F,
-            Fe32::G,
-            Fe32::H,
-            Fe32::J,
-            Fe32::K,
-            Fe32::L,
-            Fe32::M,
-            Fe32::N,
-            Fe32::P,
-            Fe32::Q,
-            Fe32::R,
-            Fe32::S,
-            Fe32::T,
-            Fe32::U,
-            Fe32::V,
-            Fe32::W,
-            Fe32::X,
-            Fe32::Y,
-            Fe32::Z,
-            Fe32::_0,
-            Fe32::_2,
-            Fe32::_3,
-            Fe32::_4,
-            Fe32::_5,
-            Fe32::_6,
-            Fe32::_7,
-            Fe32::_8,
-            Fe32::_9,
+            Self::A,
+            Self::C,
+            Self::D,
+            Self::E,
+            Self::F,
+            Self::G,
+            Self::H,
+            Self::J,
+            Self::K,
+            Self::L,
+            Self::M,
+            Self::N,
+            Self::P,
+            Self::Q,
+            Self::R,
+            Self::S,
+            Self::T,
+            Self::U,
+            Self::V,
+            Self::W,
+            Self::X,
+            Self::Y,
+            Self::Z,
+            Self::_0,
+            Self::_2,
+            Self::_3,
+            Self::_4,
+            Self::_5,
+            Self::_6,
+            Self::_7,
+            Self::_8,
+            Self::_9,
         ]
         .iter()
         .copied()
@@ -182,7 +182,7 @@ impl Fe32 {
     ///
     /// If the input char is not part of the bech32 alphabet.
     #[inline]
-    pub fn from_char(c: char) -> Result<Fe32, FromCharError> {
+    pub fn from_char(c: char) -> Result<Self, FromCharError> {
         use FromCharError::*;
 
         // i8::try_from gets a value in the range 0..=127 since char is unsigned.
@@ -192,7 +192,7 @@ impl Fe32 {
         // We use -1 for any array element that is an invalid char to trigger error from u8::try_from
         let u5 = u8::try_from(CHARS_INV[ascii]).map_err(|_| Invalid(c))?;
 
-        Ok(Fe32(u5))
+        Ok(Self(u5))
     }
 
     /// Creates a field element from a single bech32 character.
@@ -200,7 +200,7 @@ impl Fe32 {
     /// # Panics
     ///
     /// If the input character is not part of the bech32 alphabet.
-    pub fn from_char_unchecked(c: u8) -> Fe32 { Fe32(CHARS_INV[usize::from(c)] as u8) }
+    pub fn from_char_unchecked(c: u8) -> Self { Self(CHARS_INV[usize::from(c)] as u8) }
 
     /// Converts the field element to a lowercase bech32 character.
     #[inline]
@@ -221,7 +221,7 @@ impl fmt::Display for Fe32 {
 
 impl From<Fe32> for u8 {
     #[inline]
-    fn from(v: Fe32) -> u8 { v.0 }
+    fn from(v: Fe32) -> Self { v.0 }
 }
 
 macro_rules! impl_try_from {
@@ -255,29 +255,29 @@ impl AsRef<u8> for Fe32 {
 }
 
 impl Bech32Field for Fe32 {
-    fn _add(&self, other: &Fe32) -> Fe32 { Fe32(self.0 ^ other.0) }
+    fn _add(&self, other: &Self) -> Self { Self(self.0 ^ other.0) }
 
-    fn _mul(&self, other: &Fe32) -> Fe32 {
+    fn _mul(&self, other: &Self) -> Self {
         if self.0 == 0 || other.0 == 0 {
-            Fe32(0)
+            Self(0)
         } else {
             let log1 = LOG[usize::from(self.0)];
             let log2 = LOG[usize::from(other.0)];
             let mult_order = Self::MULTIPLICATIVE_ORDER as isize;
-            Fe32(LOG_INV[((log1 + log2) % mult_order) as usize])
+            Self(LOG_INV[((log1 + log2) % mult_order) as usize])
         }
     }
 
-    fn _div(&self, other: &Fe32) -> Fe32 {
+    fn _div(&self, other: &Self) -> Self {
         if self.0 == 0 {
-            Fe32(0)
+            Self(0)
         } else if other.0 == 0 {
             panic!("Attempt to divide {} by 0 in GF32", self);
         } else {
             let log1 = LOG[usize::from(self.0)];
             let log2 = LOG[usize::from(other.0)];
             let mult_order = Self::MULTIPLICATIVE_ORDER as isize;
-            Fe32(LOG_INV[((mult_order + log1 - log2) % mult_order) as usize])
+            Self(LOG_INV[((mult_order + log1 - log2) % mult_order) as usize])
         }
     }
 
@@ -294,9 +294,9 @@ impl Bech32Field for Fe32 {
 }
 
 impl Field for Fe32 {
-    const ZERO: Self = Fe32::Q;
-    const ONE: Self = Fe32::P;
-    const GENERATOR: Self = Fe32::Z;
+    const ZERO: Self = Self::Q;
+    const ONE: Self = Self::P;
+    const GENERATOR: Self = Self::Z;
     const CHARACTERISTIC: usize = 2;
     const MULTIPLICATIVE_ORDER: usize = 31;
     const MULTIPLICATIVE_ORDER_FACTORS: &'static [usize] = &[1, 31];
@@ -309,8 +309,8 @@ super::impl_ops_for_fe!(impl for Fe32);
 impl super::ExtensionField for Fe32 {
     type BaseField = Self;
     const DEGREE: usize = 1;
-    const POLYNOMIAL: Self = Fe32::Q;
-    const EXT_ELEM: Self = Fe32::P;
+    const POLYNOMIAL: Self = Self::Q;
+    const EXT_ELEM: Self = Self::P;
 }
 
 /// A galois field error when converting from a character.
