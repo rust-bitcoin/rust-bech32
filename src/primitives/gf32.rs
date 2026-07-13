@@ -183,14 +183,12 @@ impl Fe32 {
     /// If the input char is not part of the bech32 alphabet.
     #[inline]
     pub fn from_char(c: char) -> Result<Self, FromCharError> {
-        use FromCharError::*;
-
         // i8::try_from gets a value in the range 0..=127 since char is unsigned.
-        let byte = i8::try_from(u32::from(c)).map_err(|_| NotAscii(c))?;
+        let byte = i8::try_from(u32::from(c)).map_err(|_| FromCharError::NotAscii(c))?;
         // Now we have a valid ASCII value cast is safe.
         let ascii = byte as usize;
         // We use -1 for any array element that is an invalid char to trigger error from u8::try_from
-        let u5 = u8::try_from(CHARS_INV[ascii]).map_err(|_| Invalid(c))?;
+        let u5 = u8::try_from(CHARS_INV[ascii]).map_err(|_| FromCharError::Invalid(c))?;
 
         Ok(Self(u5))
     }
@@ -325,11 +323,9 @@ pub enum FromCharError {
 
 impl fmt::Display for FromCharError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use FromCharError::*;
-
         match *self {
-            NotAscii(c) => write!(f, "non-ascii char in field element: {}", c),
-            Invalid(c) => write!(f, "invalid char in field element: {}", c),
+            Self::NotAscii(c) => write!(f, "non-ascii char in field element: {}", c),
+            Self::Invalid(c) => write!(f, "invalid char in field element: {}", c),
         }
     }
 }
@@ -337,10 +333,8 @@ impl fmt::Display for FromCharError {
 #[cfg(feature = "std")]
 impl std::error::Error for FromCharError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        use FromCharError::*;
-
         match *self {
-            NotAscii(_) | Invalid(_) => None,
+            Self::NotAscii(_) | Self::Invalid(_) => None,
         }
     }
 }
@@ -357,11 +351,9 @@ pub enum TryFromError {
 
 impl fmt::Display for TryFromError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use TryFromError::*;
-
         match *self {
-            NotAByte(ref e) => write_err!(f, "invalid field element"; e),
-            InvalidByte(ref b) => write!(f, "invalid byte in field element: {:#04x}", b),
+            Self::NotAByte(ref e) => write_err!(f, "invalid field element"; e),
+            Self::InvalidByte(ref b) => write!(f, "invalid byte in field element: {:#04x}", b),
         }
     }
 }
@@ -369,11 +361,9 @@ impl fmt::Display for TryFromError {
 #[cfg(feature = "std")]
 impl std::error::Error for TryFromError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        use TryFromError::*;
-
         match *self {
-            NotAByte(ref e) => Some(e),
-            InvalidByte(_) => None,
+            Self::NotAByte(ref e) => Some(e),
+            Self::InvalidByte(_) => None,
         }
     }
 }

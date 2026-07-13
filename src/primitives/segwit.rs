@@ -46,16 +46,14 @@ pub fn validate_witness_program_length(
     length: usize,
     version: Fe32,
 ) -> Result<(), WitnessLengthError> {
-    use WitnessLengthError::*;
-
     if length < 2 {
-        return Err(TooShort);
+        return Err(WitnessLengthError::TooShort);
     }
     if length > 40 {
-        return Err(TooLong);
+        return Err(WitnessLengthError::TooLong);
     }
     if version == VERSION_0 && length != 20 && length != 32 {
-        return Err(InvalidSegwitV0);
+        return Err(WitnessLengthError::InvalidSegwitV0);
     }
     Ok(())
 }
@@ -91,12 +89,10 @@ pub enum WitnessLengthError {
 
 impl fmt::Display for WitnessLengthError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use WitnessLengthError::*;
-
         match *self {
-            TooShort => write!(f, "witness program is less than 2 bytes long"),
-            TooLong => write!(f, "witness program is more than 40 bytes long"),
-            InvalidSegwitV0 => write!(f, "the segwit v0 witness is not 20 or 32 bytes long"),
+            Self::TooShort => write!(f, "witness program is less than 2 bytes long"),
+            Self::TooLong => write!(f, "witness program is more than 40 bytes long"),
+            Self::InvalidSegwitV0 => write!(f, "the segwit v0 witness is not 20 or 32 bytes long"),
         }
     }
 }
@@ -104,10 +100,8 @@ impl fmt::Display for WitnessLengthError {
 #[cfg(feature = "std")]
 impl std::error::Error for WitnessLengthError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        use WitnessLengthError::*;
-
         match *self {
-            TooShort | TooLong | InvalidSegwitV0 => None,
+            Self::TooShort | Self::TooLong | Self::InvalidSegwitV0 => None,
         }
     }
 }

@@ -245,8 +245,6 @@ impl<'s> UncheckedHrpstring<'s> {
     /// checksum if `NoChecksum` is used).
     #[inline]
     pub fn validate_checksum<Ck: Checksum>(&self) -> Result<(), ChecksumError> {
-        use ChecksumError::*;
-
         if self.hrpstring_length > Ck::CODE_LENGTH {
             return Err(ChecksumError::CodeLength(CodeLengthError {
                 encoded_length: self.hrpstring_length,
@@ -260,7 +258,7 @@ impl<'s> UncheckedHrpstring<'s> {
         }
 
         if self.data_part_ascii.len() < Ck::CHECKSUM_LENGTH {
-            return Err(InvalidLength);
+            return Err(ChecksumError::InvalidLength);
         }
 
         let mut checksum_eng = checksum::Engine::<Ck>::new();
@@ -273,7 +271,10 @@ impl<'s> UncheckedHrpstring<'s> {
 
         let residue = *checksum_eng.residue();
         if residue != Ck::TARGET_RESIDUE {
-            return Err(InvalidResidue(InvalidResidueError::new(residue, Ck::TARGET_RESIDUE)));
+            return Err(ChecksumError::InvalidResidue(InvalidResidueError::new(
+                residue,
+                Ck::TARGET_RESIDUE,
+            )));
         }
 
         Ok(())
@@ -661,8 +662,6 @@ impl<'s> SegwitHrpstring<'s> {
 ///
 /// The byte-index into the string where the '1' separator occurs, or an error if it does not.
 fn check_characters(s: &str) -> Result<usize, CharError> {
-    use CharError::*;
-
     let mut has_upper = false;
     let mut has_lower = false;
     let mut req_bech32 = true;
@@ -673,7 +672,7 @@ fn check_characters(s: &str) -> Result<usize, CharError> {
             sep_pos = Some(n);
         }
         if req_bech32 {
-            Fe32::from_char(ch).map_err(|_| InvalidChar(ch))?;
+            Fe32::from_char(ch).map_err(|_| CharError::InvalidChar(ch))?;
         }
         if ch.is_ascii_uppercase() {
             has_upper = true;
@@ -682,11 +681,11 @@ fn check_characters(s: &str) -> Result<usize, CharError> {
         }
     }
     if has_upper && has_lower {
-        Err(MixedCase)
+        Err(CharError::MixedCase)
     } else if let Some(pos) = sep_pos {
         Ok(pos)
     } else {
-        Err(MissingSeparator)
+        Err(CharError::MissingSeparator)
     }
 }
 
@@ -758,18 +757,16 @@ pub enum SegwitHrpstringError {
 #[rustfmt::skip]
 impl fmt::Display for SegwitHrpstringError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use SegwitHrpstringError::*;
-
         match *self {
-            Unchecked(ref e) => write_err!(f, "parsing unchecked hrpstring failed"; e),
-            NoData => write!(f, "no data found after removing the checksum"),
-            TooLong(len) =>
+            Self::Unchecked(ref e) => write_err!(f, "parsing unchecked hrpstring failed"; e),
+            Self::NoData => write!(f, "no data found after removing the checksum"),
+            Self::TooLong(len) =>
                 write!(f, "encoded length {} exceeds spec limit {} chars", len, segwit::MAX_STRING_LENGTH),
-            InvalidWitnessVersion(fe) =>
+            Self::InvalidWitnessVersion(fe) =>
                 write!(f, "invalid segwit witness version: {} (bech32 character: '{}')", fe.to_u8(), fe),
-            Padding(ref e) => write_err!(f, "invalid padding on the witness data"; e),
-            WitnessLength(ref e) => write_err!(f, "invalid witness length"; e),
-            Checksum(ref e) => write_err!(f, "invalid checksum"; e),
+            Self::Padding(ref e) => write_err!(f, "invalid padding on the witness data"; e),
+            Self::WitnessLength(ref e) => write_err!(f, "invalid witness length"; e),
+            Self::Checksum(ref e) => write_err!(f, "invalid checksum"; e),
         }
     }
 }
@@ -777,14 +774,12 @@ impl fmt::Display for SegwitHrpstringError {
 #[cfg(feature = "std")]
 impl std::error::Error for SegwitHrpstringError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        use SegwitHrpstringError::*;
-
         match *self {
-            Unchecked(ref e) => Some(e),
-            Padding(ref e) => Some(e),
-            WitnessLength(ref e) => Some(e),
-            Checksum(ref e) => Some(e),
-            NoData | TooLong(_) | InvalidWitnessVersion(_) => None,
+            Self::Unchecked(ref e) => Some(e),
+            Self::Padding(ref e) => Some(e),
+            Self::WitnessLength(ref e) => Some(e),
+            Self::Checksum(ref e) => Some(e),
+            Self::NoData | Self::TooLong(_) | Self::InvalidWitnessVersion(_) => None,
         }
     }
 }
@@ -821,11 +816,9 @@ pub enum CheckedHrpstringError {
 
 impl fmt::Display for CheckedHrpstringError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use CheckedHrpstringError::*;
-
         match *self {
-            Parse(ref e) => write_err!(f, "parse failed"; e),
-            Checksum(ref e) => write_err!(f, "invalid checksum"; e),
+            Self::Parse(ref e) => write_err!(f, "parse failed"; e),
+            Self::Checksum(ref e) => write_err!(f, "invalid checksum"; e),
         }
     }
 }
@@ -833,11 +826,9 @@ impl fmt::Display for CheckedHrpstringError {
 #[cfg(feature = "std")]
 impl std::error::Error for CheckedHrpstringError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        use CheckedHrpstringError::*;
-
         match *self {
-            Parse(ref e) => Some(e),
-            Checksum(ref e) => Some(e),
+            Self::Parse(ref e) => Some(e),
+            Self::Checksum(ref e) => Some(e),
         }
     }
 }
@@ -864,11 +855,9 @@ pub enum UncheckedHrpstringError {
 
 impl fmt::Display for UncheckedHrpstringError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use UncheckedHrpstringError::*;
-
         match *self {
-            Char(ref e) => write_err!(f, "character error"; e),
-            Hrp(ref e) => write_err!(f, "invalid human-readable part"; e),
+            Self::Char(ref e) => write_err!(f, "character error"; e),
+            Self::Hrp(ref e) => write_err!(f, "invalid human-readable part"; e),
         }
     }
 }
@@ -876,11 +865,9 @@ impl fmt::Display for UncheckedHrpstringError {
 #[cfg(feature = "std")]
 impl std::error::Error for UncheckedHrpstringError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        use UncheckedHrpstringError::*;
-
         match *self {
-            Char(ref e) => Some(e),
-            Hrp(ref e) => Some(e),
+            Self::Char(ref e) => Some(e),
+            Self::Hrp(ref e) => Some(e),
         }
     }
 }
@@ -911,13 +898,13 @@ pub enum CharError {
 
 impl fmt::Display for CharError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use CharError::*;
-
         match *self {
-            MissingSeparator => write!(f, "missing human-readable separator, \"{}\"", SEP),
-            NothingAfterSeparator => write!(f, "invalid data - no characters after the separator"),
-            InvalidChar(n) => write!(f, "invalid character (code={})", n),
-            MixedCase => write!(f, "mixed-case strings not allowed"),
+            Self::MissingSeparator => write!(f, "missing human-readable separator, \"{}\"", SEP),
+            Self::NothingAfterSeparator => {
+                write!(f, "invalid data - no characters after the separator")
+            }
+            Self::InvalidChar(n) => write!(f, "invalid character (code={})", n),
+            Self::MixedCase => write!(f, "mixed-case strings not allowed"),
         }
     }
 }
@@ -925,10 +912,11 @@ impl fmt::Display for CharError {
 #[cfg(feature = "std")]
 impl std::error::Error for CharError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        use CharError::*;
-
         match *self {
-            MissingSeparator | NothingAfterSeparator | InvalidChar(_) | MixedCase => None,
+            Self::MissingSeparator
+            | Self::NothingAfterSeparator
+            | Self::InvalidChar(_)
+            | Self::MixedCase => None,
         }
     }
 }
@@ -947,12 +935,10 @@ pub enum ChecksumError {
 
 impl fmt::Display for ChecksumError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use ChecksumError::*;
-
         match *self {
-            CodeLength(ref e) => write_err!(f, "string exceeds maximum allowed length"; e),
-            InvalidResidue(ref e) => write_err!(f, "checksum failed"; e),
-            InvalidLength => write!(f, "the checksummed string is not a valid length"),
+            Self::CodeLength(ref e) => write_err!(f, "string exceeds maximum allowed length"; e),
+            Self::InvalidResidue(ref e) => write_err!(f, "checksum failed"; e),
+            Self::InvalidLength => write!(f, "the checksummed string is not a valid length"),
         }
     }
 }
@@ -960,12 +946,10 @@ impl fmt::Display for ChecksumError {
 #[cfg(feature = "std")]
 impl std::error::Error for ChecksumError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        use ChecksumError::*;
-
         match *self {
-            CodeLength(ref e) => Some(e),
-            InvalidResidue(ref e) => Some(e),
-            InvalidLength => None,
+            Self::CodeLength(ref e) => Some(e),
+            Self::InvalidResidue(ref e) => Some(e),
+            Self::InvalidLength => None,
         }
     }
 }
@@ -1087,11 +1071,9 @@ pub enum PaddingError {
 
 impl fmt::Display for PaddingError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use PaddingError::*;
-
         match *self {
-            TooMuch => write!(f, "the data payload has too many bits of padding"),
-            NonZero => write!(f, "the data payload is padded with non-zero bits"),
+            Self::TooMuch => write!(f, "the data payload has too many bits of padding"),
+            Self::NonZero => write!(f, "the data payload is padded with non-zero bits"),
         }
     }
 }
@@ -1099,10 +1081,8 @@ impl fmt::Display for PaddingError {
 #[cfg(feature = "std")]
 impl std::error::Error for PaddingError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        use PaddingError::*;
-
         match *self {
-            TooMuch | NonZero => None,
+            Self::TooMuch | Self::NonZero => None,
         }
     }
 }

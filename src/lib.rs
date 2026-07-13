@@ -467,11 +467,9 @@ pub enum DecodeError {
 #[cfg(feature = "alloc")]
 impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use DecodeError::*;
-
         match *self {
-            Parse(ref e) => write_err!(f, "parsing failed"; e),
-            Checksum(ref e) => write_err!(f, "no valid bech32 or bech32m checksum"; e),
+            Self::Parse(ref e) => write_err!(f, "parsing failed"; e),
+            Self::Checksum(ref e) => write_err!(f, "no valid bech32 or bech32m checksum"; e),
         }
     }
 }
@@ -479,11 +477,9 @@ impl fmt::Display for DecodeError {
 #[cfg(feature = "std")]
 impl std::error::Error for DecodeError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        use DecodeError::*;
-
         match *self {
-            Parse(ref e) => Some(e),
-            Checksum(ref e) => Some(e),
+            Self::Parse(ref e) => Some(e),
+            Self::Checksum(ref e) => Some(e),
         }
     }
 }
@@ -512,11 +508,9 @@ pub enum EncodeError {
 
 impl fmt::Display for EncodeError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use EncodeError::*;
-
         match *self {
-            TooLong(ref e) => write_err!(f, "encode error"; e),
-            Fmt(ref e) => write_err!(f, "encode to formatter failed"; e),
+            Self::TooLong(ref e) => write_err!(f, "encode error"; e),
+            Self::Fmt(ref e) => write_err!(f, "encode to formatter failed"; e),
         }
     }
 }
@@ -524,11 +518,9 @@ impl fmt::Display for EncodeError {
 #[cfg(feature = "std")]
 impl std::error::Error for EncodeError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        use EncodeError::*;
-
         match *self {
-            TooLong(ref e) => Some(e),
-            Fmt(ref e) => Some(e),
+            Self::TooLong(ref e) => Some(e),
+            Self::Fmt(ref e) => Some(e),
         }
     }
 }
@@ -557,11 +549,9 @@ pub enum EncodeIoError {
 #[cfg(feature = "std")]
 impl fmt::Display for EncodeIoError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use EncodeIoError::*;
-
         match *self {
-            TooLong(ref e) => write_err!(f, "encode error"; e),
-            Write(ref e) => write_err!(f, "encode to writer failed"; e),
+            Self::TooLong(ref e) => write_err!(f, "encode error"; e),
+            Self::Write(ref e) => write_err!(f, "encode to writer failed"; e),
         }
     }
 }
@@ -569,11 +559,9 @@ impl fmt::Display for EncodeIoError {
 #[cfg(feature = "std")]
 impl std::error::Error for EncodeIoError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        use EncodeIoError::*;
-
         match *self {
-            TooLong(ref e) => Some(e),
-            Write(ref e) => Some(e),
+            Self::TooLong(ref e) => Some(e),
+            Self::Write(ref e) => Some(e),
         }
     }
 }

@@ -110,7 +110,7 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Fe32> {
-        use core::cmp::Ordering::*;
+        use core::cmp::Ordering::{Equal, Greater, Less};
 
         let bit_offset = {
             let ret = self.bit_offset;
