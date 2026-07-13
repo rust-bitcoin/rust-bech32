@@ -139,7 +139,7 @@ pub struct Corrector<Ck: Checksum> {
 
 impl<Ck: Checksum> Corrector<Ck> {
     /// A bound on the number of errors and erasures (errors with known location)
-    /// can be corrected by this corrector.
+    /// that can be corrected by this corrector.
     ///
     /// Returns N such that, given E errors and X erasures, correction is possible
     /// iff 2E + X <= N.
@@ -288,7 +288,7 @@ impl<Ck: Checksum> Iterator for ErrorIterator<'_, Ck> {
         //              (a^i)^(c - 1)) locator_derivative(a^-i)
         //
         // where here a is `Ck::ROOT_GENERATOR`, c is the first element of the range
-        // `Ck::ROOT_EXPONENTS`, and both evalutor and locator_derivative are polynomials
+        // `Ck::ROOT_EXPONENTS`, and both evaluator and locator_derivative are polynomials
         // which are computed when constructing the ErrorIterator.
 
         let a_i = self.a.powi(neg_i as i64);

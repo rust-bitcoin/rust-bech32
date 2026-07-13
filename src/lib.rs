@@ -314,7 +314,7 @@ pub fn encode_lower_to_fmt<Ck: Checksum, W: fmt::Write>(
     Ok(())
 }
 
-/// Encodes `data` to a writer ([`fmt::Write`]) as a uppercase bech32 encoded string.
+/// Encodes `data` to a writer ([`fmt::Write`]) as an uppercase bech32 encoded string.
 ///
 /// Encoded string will be prefixed with the `hrp` and have a checksum appended as specified by the
 /// `Ck` algorithm (`NoChecksum` to exclude checksum all together).
@@ -399,7 +399,7 @@ pub fn encode_lower_to_writer<Ck: Checksum, W: std::io::Write>(
     Ok(())
 }
 
-/// Encodes `data` to a writer ([`io::Write`]) as a uppercase bech32 encoded string.
+/// Encodes `data` to a writer ([`io::Write`]) as an uppercase bech32 encoded string.
 ///
 /// Encoded string will be prefixed with the `hrp` and have a checksum appended as specified by the
 /// `Ck` algorithm (`NoChecksum` to exclude checksum all together).
@@ -757,7 +757,7 @@ mod tests {
 
     #[test]
     fn can_decode_segwit_too_long_string() {
-        // A  91 character long string, greater than the segwit enforced maximum of 90.
+        // A 91 character long string, greater than the segwit enforced maximum of 90.
         let s = "abcd1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqrw9z3s";
         assert!(decode(s).is_ok());
     }
