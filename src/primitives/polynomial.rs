@@ -256,7 +256,7 @@ impl<F: Field> Polynomial<F> {
                 // search them. In practice this doesn't matter because we have
                 // such a small number of roots (it may actually be faster than
                 // using a hashset) and because the root-finding takes such a
-                // long time that noboby can use this method in a loop anyway.
+                // long time that nobody can use this method in a loop anyway.
                 let mut len = 2;
                 while let Ok(k) = roots[..].binary_search(&((r2 + ratio) % E::MULTIPLICATIVE_ORDER))
                 {

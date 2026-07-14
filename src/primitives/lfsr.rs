@@ -235,7 +235,7 @@ mod tests {
         // the "2L <= N" path with x != L.
         LfsrIter::berlekamp_massey(&[Fe32::Q, Fe32::Y, Fe32::H]).take(10).count();
 
-        // Hits the the "2L <= N" path with x != L, without overflowing subtraction
+        // Hits the "2L <= N" path with x != L, without overflowing subtraction
         // as in the above vector.
         let sequence: Vec<_> =
             LfsrIter::berlekamp_massey(&[Fe32::Y, Fe32::H, Fe32::Q, Fe32::Q]).take(10).collect();
@@ -254,7 +254,7 @@ mod tests {
         // This vector specifically exercises the Step 5 update path
         // Step 5 runs when old_conn.len() + x > conn.len()
         // where old_conn is multiplied into the update term
-        //  replacing '*' with '/' there changes output.
+        // replacing '*' with '/' there changes output.
         let step5_sequence: Vec<_> =
             LfsrIter::berlekamp_massey(&[Fe32::A, Fe32::C, Fe32::A, Fe32::Y, Fe32::A])
                 .take(4)

@@ -109,7 +109,7 @@ const SEP: char = '1';
 /// } else if unchecked.has_valid_checksum::<Bech32m>() {
 ///     // Remove the checksum and do something with the data as above.
 /// } else {
-///     // Checksum is not valid for either the bech32 or bech32 checksum algorithms.
+///     // Checksum is not valid for either the bech32 or bech32m checksum algorithms.
 /// }
 /// ```
 #[derive(Debug)]
@@ -125,7 +125,7 @@ pub struct UncheckedHrpstring<'s> {
 }
 
 impl<'s> UncheckedHrpstring<'s> {
-    /// Parses an bech32 encode string and constructs a [`UncheckedHrpstring`] object.
+    /// Parses an bech32 encode string and constructs an [`UncheckedHrpstring`] object.
     ///
     /// Checks for valid ASCII values, does not validate the checksum.
     #[inline]
@@ -279,7 +279,7 @@ impl<'s> UncheckedHrpstring<'s> {
         Ok(())
     }
 
-    /// Removes the checksum for the `Ck` algorithm and returns an [`CheckedHrpstring`].
+    /// Removes the checksum for the `Ck` algorithm and returns a [`CheckedHrpstring`].
     ///
     /// Data must be valid (ie, first call `has_valid_checksum` or `validate_checksum()`). This
     /// function is typically paired with `has_valid_checksum` when validating against multiple
@@ -329,7 +329,7 @@ pub struct CheckedHrpstring<'s> {
     hrp: Hrp,
     /// This is ASCII byte values of the parsed string, guaranteed to be valid bech32 characters.
     ///
-    /// The characters after the '1' separator and the before the checksum.
+    /// The characters after the '1' separator and before the checksum.
     ascii: &'s [u8],
     /// The length of the parsed hrpstring.
     hrpstring_length: usize, // Guaranteed to be <= CK::CODE_LENGTH
