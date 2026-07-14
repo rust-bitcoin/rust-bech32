@@ -76,38 +76,36 @@ impl Hrp {
     ///
     /// [BIP-173]: <https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki>
     pub fn parse(hrp: &str) -> Result<Self, Error> {
-        use Error::*;
-
         if hrp.is_empty() {
-            return Err(Empty);
+            return Err(Error::Empty);
         }
         if hrp.len() > MAX_HRP_LEN {
-            return Err(TooLong(hrp.len()));
+            return Err(Error::TooLong(hrp.len()));
         }
 
-        let mut new = Hrp { buf: [0_u8; MAX_HRP_LEN], size: 0 };
+        let mut new = Self { buf: [0_u8; MAX_HRP_LEN], size: 0 };
 
         let mut has_lower: bool = false;
         let mut has_upper: bool = false;
         for (i, c) in hrp.chars().enumerate() {
             if !c.is_ascii() {
-                return Err(NonAsciiChar(c));
+                return Err(Error::NonAsciiChar(c));
             }
             let b = c as u8; // cast OK as we just checked that c is an ASCII value
 
             // Valid subset of ASCII
             if !(33..=126).contains(&b) {
-                return Err(InvalidAsciiByte(b));
+                return Err(Error::InvalidAsciiByte(b));
             }
 
             if b.is_ascii_lowercase() {
                 if has_upper {
-                    return Err(MixedCase);
+                    return Err(Error::MixedCase);
                 }
                 has_lower = true;
             } else if b.is_ascii_uppercase() {
                 if has_lower {
-                    return Err(MixedCase);
+                    return Err(Error::MixedCase);
                 }
                 has_upper = true;
             };
@@ -125,8 +123,6 @@ impl Hrp {
     /// This method is semantically equivalent to `Hrp::parse(&data.to_string())` but avoids
     /// allocating an intermediate string.
     pub fn parse_display<T: core::fmt::Display>(data: T) -> Result<Self, Error> {
-        use Error::*;
-
         struct ByteFormatter {
             arr: [u8; MAX_HRP_LEN],
             index: usize,
@@ -146,19 +142,19 @@ impl Hrp {
                         self.error = Some(Error::NonAsciiChar(ch));
                         break;
                     } else if !(33..=126).contains(&b) {
-                        self.error = Some(InvalidAsciiByte(b));
+                        self.error = Some(Error::InvalidAsciiByte(b));
                         break;
                     }
 
                     if ch.is_ascii_lowercase() {
                         if self.has_upper {
-                            self.error = Some(MixedCase);
+                            self.error = Some(Error::MixedCase);
                             break;
                         }
                         self.has_lower = true;
                     } else if ch.is_ascii_uppercase() {
                         if self.has_lower {
-                            self.error = Some(MixedCase);
+                            self.error = Some(Error::MixedCase);
                             break;
                         }
                         self.has_upper = true;
@@ -191,7 +187,7 @@ impl Hrp {
 
         write!(byte_formatter, "{}", data).expect("custom Formatter cannot fail");
         if byte_formatter.index == 0 {
-            Err(Empty)
+            Err(Error::Empty)
         } else if let Some(err) = byte_formatter.error {
             Err(err)
         } else {
@@ -204,7 +200,7 @@ impl Hrp {
     /// Does not check that `hrp` is valid according to BIP-173 but does check for valid ASCII
     /// values, replacing any invalid characters with `X`.
     pub const fn parse_unchecked(hrp: &str) -> Self {
-        let mut new = Hrp { buf: [0_u8; MAX_HRP_LEN], size: 0 };
+        let mut new = Self { buf: [0_u8; MAX_HRP_LEN], size: 0 };
         let hrp_bytes = hrp.as_bytes();
 
         let mut i = 0;
@@ -470,15 +466,14 @@ pub enum Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use Error::*;
-
         match *self {
-            TooLong(len) =>
-                write!(f, "hrp is too long, found {} characters, must be <= {}", len, MAX_HRP_LEN),
-            Empty => write!(f, "hrp is empty, must have at least 1 character"),
-            NonAsciiChar(c) => write!(f, "found non-ASCII character: {}", c),
-            InvalidAsciiByte(b) => write!(f, "byte value is not valid US-ASCII: \'{:x}\'", b),
-            MixedCase => write!(f, "hrp cannot mix upper and lower case"),
+            Self::TooLong(len) => {
+                write!(f, "hrp is too long, found {} characters, must be <= {}", len, MAX_HRP_LEN)
+            }
+            Self::Empty => write!(f, "hrp is empty, must have at least 1 character"),
+            Self::NonAsciiChar(c) => write!(f, "found non-ASCII character: {}", c),
+            Self::InvalidAsciiByte(b) => write!(f, "byte value is not valid US-ASCII: \'{:x}\'", b),
+            Self::MixedCase => write!(f, "hrp cannot mix upper and lower case"),
         }
     }
 }
@@ -486,10 +481,12 @@ impl fmt::Display for Error {
 #[cfg(feature = "std")]
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        use Error::*;
-
         match *self {
-            TooLong(_) | Empty | NonAsciiChar(_) | InvalidAsciiByte(_) | MixedCase => None,
+            Self::TooLong(_)
+            | Self::Empty
+            | Self::NonAsciiChar(_)
+            | Self::InvalidAsciiByte(_)
+            | Self::MixedCase => None,
         }
     }
 }

@@ -91,7 +91,7 @@ impl CorrectableError for InvalidResidueError {
 impl CorrectableError for ChecksumError {
     fn residue_error(&self) -> Option<&InvalidResidueError> {
         match self {
-            ChecksumError::InvalidResidue(ref e) => Some(e),
+            Self::InvalidResidue(ref e) => Some(e),
             _ => None,
         }
     }
@@ -100,7 +100,7 @@ impl CorrectableError for ChecksumError {
 impl CorrectableError for SegwitHrpstringError {
     fn residue_error(&self) -> Option<&InvalidResidueError> {
         match self {
-            SegwitHrpstringError::Checksum(ref e) => e.residue_error(),
+            Self::Checksum(ref e) => e.residue_error(),
             _ => None,
         }
     }
@@ -109,7 +109,7 @@ impl CorrectableError for SegwitHrpstringError {
 impl CorrectableError for CheckedHrpstringError {
     fn residue_error(&self) -> Option<&InvalidResidueError> {
         match self {
-            CheckedHrpstringError::Checksum(ref e) => e.residue_error(),
+            Self::Checksum(ref e) => e.residue_error(),
             _ => None,
         }
     }
@@ -124,7 +124,7 @@ impl CorrectableError for crate::segwit::DecodeError {
 impl CorrectableError for DecodeError {
     fn residue_error(&self) -> Option<&InvalidResidueError> {
         match self {
-            DecodeError::Checksum(ref e) => e.residue_error(),
+            Self::Checksum(ref e) => e.residue_error(),
             _ => None,
         }
     }

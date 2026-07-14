@@ -388,13 +388,11 @@ pub enum EncodeError {
 #[cfg(feature = "alloc")]
 impl fmt::Display for EncodeError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use EncodeError::*;
-
         match *self {
-            WitnessVersion(ref e) => write_err!(f, "witness version"; e),
-            WitnessLength(ref e) => write_err!(f, "witness length"; e),
-            TooLong(ref e) => write_err!(f, "encode error"; e),
-            Fmt(ref e) => write_err!(f, "writing to formatter failed"; e),
+            Self::WitnessVersion(ref e) => write_err!(f, "witness version"; e),
+            Self::WitnessLength(ref e) => write_err!(f, "witness length"; e),
+            Self::TooLong(ref e) => write_err!(f, "encode error"; e),
+            Self::Fmt(ref e) => write_err!(f, "writing to formatter failed"; e),
         }
     }
 }
@@ -403,13 +401,11 @@ impl fmt::Display for EncodeError {
 #[cfg(feature = "alloc")]
 impl std::error::Error for EncodeError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        use EncodeError::*;
-
         match *self {
-            WitnessVersion(ref e) => Some(e),
-            WitnessLength(ref e) => Some(e),
-            TooLong(ref e) => Some(e),
-            Fmt(ref e) => Some(e),
+            Self::WitnessVersion(ref e) => Some(e),
+            Self::WitnessLength(ref e) => Some(e),
+            Self::TooLong(ref e) => Some(e),
+            Self::Fmt(ref e) => Some(e),
         }
     }
 }

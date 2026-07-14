@@ -210,7 +210,7 @@ impl<F: Default> Default for FieldVec<F> {
 impl<F: Default> FieldVec<F> {
     /// Constructs a new empty field vector.
     pub fn new() -> Self {
-        FieldVec {
+        Self {
             inner_a: Default::default(),
             len: 0,
             #[cfg(feature = "alloc")]

@@ -26,7 +26,7 @@ pub struct Fe32Ext<const DEG: usize> {
 
 // For some reason this cannot be derived.
 impl<const DEG: usize> Default for Fe32Ext<DEG> {
-    fn default() -> Self { Fe32Ext { inner: [Fe32::Q; DEG] } }
+    fn default() -> Self { Self { inner: [Fe32::Q; DEG] } }
 }
 
 impl<const DEG: usize> From<Fe32> for Fe32Ext<DEG> {
@@ -42,7 +42,7 @@ impl<const DEG: usize> core::convert::TryFrom<Fe32Ext<DEG>> for Fe32 {
 
     fn try_from(ext: Fe32Ext<DEG>) -> Result<Self, Self::Error> {
         for elem in &ext.inner[1..] {
-            if *elem != Fe32::Q {
+            if *elem != Self::Q {
                 return Err(());
             }
         }
@@ -64,7 +64,7 @@ impl<const DEG: usize> fmt::Display for Fe32Ext<DEG> {
 }
 
 impl<const DEG: usize> ops::Mul<&Fe32> for Fe32Ext<DEG> {
-    type Output = Fe32Ext<DEG>;
+    type Output = Self;
     fn mul(mut self, other: &Fe32) -> Self::Output {
         for elem in &mut self.inner {
             *elem *= other;
@@ -74,7 +74,7 @@ impl<const DEG: usize> ops::Mul<&Fe32> for Fe32Ext<DEG> {
 }
 
 impl<const DEG: usize> ops::Mul<Fe32> for Fe32Ext<DEG> {
-    type Output = Fe32Ext<DEG>;
+    type Output = Self;
     fn mul(self, other: Fe32) -> Self::Output { self.mul(&other) }
 }
 

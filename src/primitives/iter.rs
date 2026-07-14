@@ -110,7 +110,7 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Fe32> {
-        use core::cmp::Ordering::*;
+        use core::cmp::Ordering::{Equal, Greater, Less};
 
         let bit_offset = {
             let ret = self.bit_offset;
@@ -283,8 +283,8 @@ where
     /// Creates a new checksummed iterator which adapts a data iterator of field elements by
     /// appending a checksum.
     #[inline]
-    pub fn new(data: I) -> Checksummed<I, Ck> {
-        Checksummed {
+    pub fn new(data: I) -> Self {
+        Self {
             iter: data,
             checksum_remaining: Ck::CHECKSUM_LENGTH,
             checksum_engine: checksum::Engine::new(),
@@ -294,7 +294,7 @@ where
     /// Creates a new checksummed iterator which adapts a data iterator of field elements by
     /// first inputting the [`Hrp`] and then appending a checksum.
     #[inline]
-    pub fn new_hrp(hrp: Hrp, data: I) -> Checksummed<I, Ck> {
+    pub fn new_hrp(hrp: Hrp, data: I) -> Self {
         let mut ret = Self::new(data);
         ret.checksum_engine.input_hrp(hrp);
         ret

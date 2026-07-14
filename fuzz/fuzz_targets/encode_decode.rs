@@ -16,18 +16,9 @@ fn do_test(data: &[u8]) {
 
     let dp = &data[hrp_end..];
 
-    let s = match str::from_utf8(&data[1..hrp_end]) {
-        Ok(s) => s,
-        Err(_) => return,
-    };
-    let hrp = match Hrp::parse(s) {
-        Ok(hrp) => hrp,
-        Err(_) => return,
-    };
-    let address = match bech32::encode::<Bech32m>(hrp, dp) {
-        Ok(addr) => addr,
-        Err(_) => return,
-    };
+    let Ok(s) = str::from_utf8(&data[1..hrp_end]) else { return };
+    let Ok(hrp) = Hrp::parse(s) else { return };
+    let Ok(address) = bech32::encode::<Bech32m>(hrp, dp) else { return };
 
     let (hrp, data) = bech32::decode(&address).expect("should be able to decode own encoding");
     assert_eq!(bech32::encode::<Bech32m>(hrp, &data).unwrap(), address);

@@ -48,7 +48,7 @@ impl<F: Field> LfsrIter<F> {
     /// # Panics
     ///
     /// Panics if given an empty list of initial contents.
-    pub fn berlekamp_massey(initial_contents: &[F]) -> LfsrIter<F> {
+    pub fn berlekamp_massey(initial_contents: &[F]) -> Self {
         assert_ne!(initial_contents.len(), 0, "cannot create a LFSR with no initial contents");
 
         // Step numbers taken from Massey 1969 "Shift-register synthesis and BCH decoding"
@@ -149,7 +149,7 @@ impl<F: Field> LfsrIter<F> {
 
         // Copy conn.len() (less the monic term) initial elements into the LSFR.
         let contents = initial_contents.iter().take(conn.len() - 1).cloned().collect();
-        LfsrIter { contents, coeffs: conn.into() }
+        Self { contents, coeffs: conn.into() }
     }
 }
 
