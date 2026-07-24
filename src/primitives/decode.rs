@@ -293,11 +293,7 @@ impl<'s> UncheckedHrpstring<'s> {
     pub fn remove_checksum<Ck: Checksum>(self) -> CheckedHrpstring<'s> {
         let end = self.data_part_ascii.len() - Ck::CHECKSUM_LENGTH;
 
-        CheckedHrpstring {
-            hrp: self.hrp(),
-            ascii: &self.data_part_ascii[..end],
-            hrpstring_length: self.hrpstring_length,
-        }
+        CheckedHrpstring { hrp: self.hrp(), ascii: &self.data_part_ascii[..end] }
     }
 }
 
@@ -332,8 +328,6 @@ pub struct CheckedHrpstring<'s> {
     ///
     /// The characters after the '1' separator and before the checksum.
     ascii: &'s [u8],
-    /// The length of the parsed hrpstring.
-    hrpstring_length: usize, // Guaranteed to be <= CK::CODE_LENGTH
 }
 
 impl<'s> CheckedHrpstring<'s> {
@@ -1258,16 +1252,13 @@ mod tests {
         };
         assert_eq!(unchecked_too_large.witness_version(), None);
 
-        let checked_empty =
-            CheckedHrpstring { hrp: Hrp::parse_unchecked("bc"), ascii: b"", hrpstring_length: 3 };
+        let checked_empty = CheckedHrpstring { hrp: Hrp::parse_unchecked("bc"), ascii: b"" };
         assert_eq!(checked_empty.witness_version(), None);
 
-        let checked_valid =
-            CheckedHrpstring { hrp: Hrp::parse_unchecked("bc"), ascii: b"s", hrpstring_length: 4 };
+        let checked_valid = CheckedHrpstring { hrp: Hrp::parse_unchecked("bc"), ascii: b"s" };
         assert_eq!(checked_valid.witness_version(), Some(Fe32(16)));
 
-        let checked_too_large =
-            CheckedHrpstring { hrp: Hrp::parse_unchecked("bc"), ascii: b"3", hrpstring_length: 4 };
+        let checked_too_large = CheckedHrpstring { hrp: Hrp::parse_unchecked("bc"), ascii: b"3" };
         assert_eq!(checked_too_large.witness_version(), None);
     }
 
@@ -1288,11 +1279,8 @@ mod tests {
 
     #[test]
     fn validate_segwit_padding() {
-        let checked = |ascii: &'static [u8]| CheckedHrpstring {
-            hrp: Hrp::parse_unchecked("bc"),
-            ascii,
-            hrpstring_length: ascii.len() + 3,
-        };
+        let checked =
+            |ascii: &'static [u8]| CheckedHrpstring { hrp: Hrp::parse_unchecked("bc"), ascii };
 
         // padding_len = 1
         assert_eq!(checked(b"qqqqq").validate_segwit_padding(), Ok(()));
@@ -1320,11 +1308,7 @@ mod tests {
         assert_eq!(fe_iter.next(), Some(Fe32::Q));
         assert_eq!(fe_iter.size_hint(), (2, Some(2)));
 
-        let checked = CheckedHrpstring {
-            hrp: Hrp::parse_unchecked("bc"),
-            ascii: b"qqqqqqqq",
-            hrpstring_length: 11,
-        };
+        let checked = CheckedHrpstring { hrp: Hrp::parse_unchecked("bc"), ascii: b"qqqqqqqq" };
         let mut byte_iter = checked.byte_iter();
         assert_eq!(byte_iter.size_hint(), (5, Some(5)));
         assert_eq!(byte_iter.next(), Some(0));
