@@ -333,7 +333,10 @@ impl Eq for Hrp {}
 
 impl core::hash::Hash for Hrp {
     #[inline]
-    fn hash<H: core::hash::Hasher>(&self, h: &mut H) { self.buf.hash(h) }
+    fn hash<H: core::hash::Hasher>(&self, h: &mut H) {
+        self.buf.len().hash(h);
+        self.lowercase_byte_iter().for_each(|ch| ch.hash(h))
+    }
 }
 
 /// Iterator over bytes (ASCII values) of the human-readable part.
