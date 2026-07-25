@@ -333,7 +333,10 @@ impl Eq for Hrp {}
 
 impl core::hash::Hash for Hrp {
     #[inline]
-    fn hash<H: core::hash::Hasher>(&self, h: &mut H) { self.buf.hash(h) }
+    fn hash<H: core::hash::Hasher>(&self, h: &mut H) {
+        self.buf.len().hash(h);
+        self.lowercase_byte_iter().for_each(|ch| ch.hash(h))
+    }
 }
 
 /// Iterator over bytes (ASCII values) of the human-readable part.
@@ -795,5 +798,32 @@ mod tests {
             Error::MixedCase,
             "Failed to detect mixed case when lowercase precedes uppercase across boundaries"
         );
+    }
+
+    #[test]
+    fn hash_matches_case_insensitive_eq() {
+        // `Hrp`'s `Eq`/`Ord` are case-insensitive, so "BC" and "bc" are equal.
+        // The `Hash`/`Eq` contract then requires them to hash identically, but
+        // the `Hash` impl hashes the raw `buf` in its original case, so equal
+        // values hash differently and break hash-based collections.
+        struct Simple(u64);
+        impl Hasher for Simple {
+            fn finish(&self) -> u64 { self.0 }
+            fn write(&mut self, bytes: &[u8]) {
+                for &b in bytes {
+                    self.0 = self.0.wrapping_mul(31).wrapping_add(b as u64);
+                }
+            }
+        }
+
+        let upper = Hrp::parse_unchecked("BC");
+        let lower = Hrp::parse_unchecked("bc");
+        assert_eq!(upper, lower);
+
+        let mut h1 = Simple(0);
+        let mut h2 = Simple(0);
+        upper.hash(&mut h1);
+        lower.hash(&mut h2);
+        assert_eq!(h1.finish(), h2.finish());
     }
 }
