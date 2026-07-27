@@ -597,6 +597,10 @@ impl<'s> SegwitHrpstring<'s> {
         let unchecked = UncheckedHrpstring::new(s)?;
         let data_part = unchecked.data_part_ascii();
 
+        if data_part.is_empty() {
+            return Err(SegwitHrpstringError::NoData);
+        }
+
         // Unwrap ok since check_characters (in `Self::new`) checked the bech32-ness of this char.
         let witness_version = Fe32::from_char(data_part[0].into()).unwrap();
         if witness_version.to_u8() > 16 {
@@ -1326,6 +1330,12 @@ mod tests {
         // padding_len = 2
         assert_eq!(checked(b"qp").validate_segwit_padding(), Err(PaddingError::NonZero));
         assert_eq!(checked(b"qqqqqqp").validate_segwit_padding(), Err(PaddingError::NonZero));
+    }
+
+    #[test]
+    fn segwit_empty_data_part_returns_no_data() {
+        assert_eq!(SegwitHrpstring::new("bc1").unwrap_err(), SegwitHrpstringError::NoData);
+        assert_eq!(SegwitHrpstring::new_bech32("bc1").unwrap_err(), SegwitHrpstringError::NoData);
     }
 
     #[test]
