@@ -651,4 +651,7 @@ mod tests {
             assert_eq!(upper_writer, upper.as_bytes());
         }
     }
+
+    #[test]
+    fn segwit_bech32_no_data() { let _ = SegwitHrpstring::new_bech32("bc1"); }
 }

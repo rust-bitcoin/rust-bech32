@@ -293,11 +293,7 @@ impl<'s> UncheckedHrpstring<'s> {
     pub fn remove_checksum<Ck: Checksum>(self) -> CheckedHrpstring<'s> {
         let end = self.data_part_ascii.len() - Ck::CHECKSUM_LENGTH;
 
-        CheckedHrpstring {
-            hrp: self.hrp(),
-            ascii: &self.data_part_ascii[..end],
-            hrpstring_length: self.hrpstring_length,
-        }
+        CheckedHrpstring { hrp: self.hrp(), ascii: &self.data_part_ascii[..end] }
     }
 }
 
@@ -332,8 +328,6 @@ pub struct CheckedHrpstring<'s> {
     ///
     /// The characters after the '1' separator and before the checksum.
     ascii: &'s [u8],
-    /// The length of the parsed hrpstring.
-    hrpstring_length: usize, // Guaranteed to be <= CK::CODE_LENGTH
 }
 
 impl<'s> CheckedHrpstring<'s> {
@@ -444,27 +438,6 @@ impl<'s> CheckedHrpstring<'s> {
         ByteIter { iter: AsciiToFe32Iter { iter: self.ascii.iter().copied() }.fes_to_bytes() }
     }
 
-    /// Converts this type to a [`SegwitHrpstring`] after validating the witness and HRP.
-    #[inline]
-    pub fn validate_segwit(mut self) -> Result<SegwitHrpstring<'s>, SegwitHrpstringError> {
-        if self.ascii.is_empty() {
-            return Err(SegwitHrpstringError::NoData);
-        }
-
-        if self.hrpstring_length > segwit::MAX_STRING_LENGTH {
-            return Err(SegwitHrpstringError::TooLong(self.hrpstring_length));
-        }
-
-        // Unwrap ok since check_characters checked the bech32-ness of this char.
-        let witness_version = Fe32::from_char(self.ascii[0].into()).unwrap();
-        self.ascii = &self.ascii[1..]; // Remove the witness version byte.
-
-        self.validate_segwit_padding()?;
-        self.validate_witness_program_length(witness_version)?;
-
-        Ok(SegwitHrpstring { hrp: self.hrp(), witness_version, ascii: self.ascii })
-    }
-
     /// Validates the segwit padding rules.
     ///
     /// Must be called after the witness version byte is removed from the data part.
@@ -544,15 +517,7 @@ pub struct SegwitHrpstring<'s> {
 }
 
 impl<'s> SegwitHrpstring<'s> {
-    /// Parses an HRP string, treating the first data character as a witness version.
-    ///
-    /// The version byte does not appear in the extracted binary data, but is covered by the
-    /// checksum. It can be accessed with [`Self::witness_version`].
-    ///
-    /// NOTE: We do not enforce any restrictions on the HRP, use [`SegwitHrpstring::has_valid_hrp`]
-    /// to get strict BIP conformance (also [`Hrp::is_valid_on_mainnet`] and friends).
-    #[inline]
-    pub fn new(s: &'s str) -> Result<Self, SegwitHrpstringError> {
+    fn new_internal(s: &'s str, force_bech32: bool) -> Result<Self, SegwitHrpstringError> {
         let len = s.len();
         if len > segwit::MAX_STRING_LENGTH {
             return Err(SegwitHrpstringError::TooLong(len));
@@ -572,13 +537,27 @@ impl<'s> SegwitHrpstring<'s> {
             return Err(SegwitHrpstringError::InvalidWitnessVersion(witness_version));
         }
 
-        let checked: CheckedHrpstring<'s> = match witness_version {
-            VERSION_0 => unchecked.validate_and_remove_checksum::<Bech32>()?,
+        let mut checked: CheckedHrpstring<'s> = match (force_bech32, witness_version) {
+            (true, _) | (false, VERSION_0) => unchecked.validate_and_remove_checksum::<Bech32>()?,
             _ => unchecked.validate_and_remove_checksum::<Bech32m>()?,
         };
+        checked.ascii = &checked.ascii[1..]; // Remove the witness version byte.
 
-        checked.validate_segwit()
+        // Do additional segwit-specific checks.
+        checked.validate_segwit_padding()?;
+        checked.validate_witness_program_length(witness_version)?;
+        Ok(SegwitHrpstring { hrp: checked.hrp(), witness_version, ascii: checked.ascii })
     }
+
+    /// Parses an HRP string, treating the first data character as a witness version.
+    ///
+    /// The version byte does not appear in the extracted binary data, but is covered by the
+    /// checksum. It can be accessed with [`Self::witness_version`].
+    ///
+    /// NOTE: We do not enforce any restrictions on the HRP, use [`SegwitHrpstring::has_valid_hrp`]
+    /// to get strict BIP conformance (also [`Hrp::is_valid_on_mainnet`] and friends).
+    #[inline]
+    pub fn new(s: &'s str) -> Result<Self, SegwitHrpstringError> { Self::new_internal(s, false) }
 
     /// Parses an HRP string, treating the first data character as a witness version.
     ///
@@ -594,17 +573,7 @@ impl<'s> SegwitHrpstring<'s> {
     /// [BIP-350]: https://github.com/bitcoin/bips/blob/master/bip-0350.mediawiki
     #[inline]
     pub fn new_bech32(s: &'s str) -> Result<Self, SegwitHrpstringError> {
-        let unchecked = UncheckedHrpstring::new(s)?;
-        let data_part = unchecked.data_part_ascii();
-
-        // Unwrap ok since check_characters (in `Self::new`) checked the bech32-ness of this char.
-        let witness_version = Fe32::from_char(data_part[0].into()).unwrap();
-        if witness_version.to_u8() > 16 {
-            return Err(SegwitHrpstringError::InvalidWitnessVersion(witness_version));
-        }
-
-        let checked = unchecked.validate_and_remove_checksum::<Bech32>()?;
-        checked.validate_segwit()
+        Self::new_internal(s, true)
     }
 
     /// Returns `true` if the HRP is "bc" or "tb".
@@ -1283,16 +1252,13 @@ mod tests {
         };
         assert_eq!(unchecked_too_large.witness_version(), None);
 
-        let checked_empty =
-            CheckedHrpstring { hrp: Hrp::parse_unchecked("bc"), ascii: b"", hrpstring_length: 3 };
+        let checked_empty = CheckedHrpstring { hrp: Hrp::parse_unchecked("bc"), ascii: b"" };
         assert_eq!(checked_empty.witness_version(), None);
 
-        let checked_valid =
-            CheckedHrpstring { hrp: Hrp::parse_unchecked("bc"), ascii: b"s", hrpstring_length: 4 };
+        let checked_valid = CheckedHrpstring { hrp: Hrp::parse_unchecked("bc"), ascii: b"s" };
         assert_eq!(checked_valid.witness_version(), Some(Fe32(16)));
 
-        let checked_too_large =
-            CheckedHrpstring { hrp: Hrp::parse_unchecked("bc"), ascii: b"3", hrpstring_length: 4 };
+        let checked_too_large = CheckedHrpstring { hrp: Hrp::parse_unchecked("bc"), ascii: b"3" };
         assert_eq!(checked_too_large.witness_version(), None);
     }
 
@@ -1313,11 +1279,8 @@ mod tests {
 
     #[test]
     fn validate_segwit_padding() {
-        let checked = |ascii: &'static [u8]| CheckedHrpstring {
-            hrp: Hrp::parse_unchecked("bc"),
-            ascii,
-            hrpstring_length: ascii.len() + 3,
-        };
+        let checked =
+            |ascii: &'static [u8]| CheckedHrpstring { hrp: Hrp::parse_unchecked("bc"), ascii };
 
         // padding_len = 1
         assert_eq!(checked(b"qqqqq").validate_segwit_padding(), Ok(()));
@@ -1345,11 +1308,7 @@ mod tests {
         assert_eq!(fe_iter.next(), Some(Fe32::Q));
         assert_eq!(fe_iter.size_hint(), (2, Some(2)));
 
-        let checked = CheckedHrpstring {
-            hrp: Hrp::parse_unchecked("bc"),
-            ascii: b"qqqqqqqq",
-            hrpstring_length: 11,
-        };
+        let checked = CheckedHrpstring { hrp: Hrp::parse_unchecked("bc"), ascii: b"qqqqqqqq" };
         let mut byte_iter = checked.byte_iter();
         assert_eq!(byte_iter.size_hint(), (5, Some(5)));
         assert_eq!(byte_iter.next(), Some(0));
