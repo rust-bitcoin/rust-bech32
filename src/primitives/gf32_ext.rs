@@ -103,8 +103,8 @@ where
             self.inner[i + 1] = self.inner[i];
         }
         self.inner[0] = Fe32::Q;
-        for i in 0..DEG {
-            self.inner[i] += xn_coeff * Self::POLYNOMIAL.inner[i]
+        for (i, elem) in self.inner.iter_mut().enumerate() {
+            *elem += xn_coeff * Self::POLYNOMIAL.inner[i]
         }
     }
 
