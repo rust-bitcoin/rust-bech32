@@ -70,6 +70,8 @@ fn do_test(data: &[u8]) {
         for val in errors.values() {
             assert_eq!(*val, Fe32::Q);
         }
+    } else if let Some(iter) = iter {
+        for _ in iter {}
     }
 }
 

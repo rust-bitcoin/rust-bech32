@@ -168,7 +168,11 @@ impl<Ck: Checksum> Corrector<Ck> {
     /// Returns an iterator over the errors in the string.
     ///
     /// Returns `None` if it can be determined that there are too many errors to be
-    /// corrected. However, returning an iterator from this function does **not**
+    /// corrected, or if a candidate correction has an undefined Forney evaluation
+    /// or a value that cannot be represented in the base field. Candidate corrections
+    /// are validated before returning, so the root search is repeated during iteration.
+    ///
+    /// However, returning an iterator from this function does **not**
     /// imply that the intended string can be determined. It only implies that there
     /// is a unique closest correct string to the erroneous string, and gives
     /// instructions for finding it.
@@ -210,14 +214,22 @@ impl<Ck: Checksum> Corrector<Ck> {
             //     when calling the BM algorithm, in all other cases we use the ordinary
             //     unmodified syndromes.
             let errata_locator = conn.mul_mod_x_d(&erasure_locator, usize::MAX);
-            Some(ErrorIterator {
+            let mut iter = ErrorIterator {
                 evaluator: errata_locator.mul_mod_x_d(&syndromes, self.singleton_bound()),
                 locator_derivative: errata_locator.formal_derivative(),
                 erasures: &self.erasures[..],
                 errors: conn.find_nonzero_distinct_roots(Ck::ROOT_GENERATOR),
                 a: Ck::ROOT_GENERATOR,
                 c: *Ck::ROOT_EXPONENTS.start(),
-            })
+            };
+
+            // Validate every candidate before exposing any corrections to the caller.
+            while iter.try_next().ok()?.is_some() {}
+
+            // Restore the cursors consumed by validation.
+            iter.erasures = &self.erasures[..];
+            iter.errors = conn.find_nonzero_distinct_roots(Ck::ROOT_GENERATOR);
+            Some(iter)
         } else {
             None
         }
@@ -265,11 +277,15 @@ pub struct ErrorIterator<'c, Ck: Checksum> {
 impl<Ck: Checksum> Iterator for ErrorIterator<'_, Ck> {
     type Item = (usize, Fe32);
 
-    fn next(&mut self) -> Option<Self::Item> {
+    fn next(&mut self) -> Option<Self::Item> { self.try_next().ok().flatten() }
+}
+
+impl<Ck: Checksum> ErrorIterator<'_, Ck> {
+    fn try_next(&mut self) -> Result<Option<(usize, Fe32)>, ()> {
         // Compute -i, which is the location we will return to the user.
         let neg_i = if self.erasures.is_empty() {
             match self.errors.next() {
-                None => return None,
+                None => return Ok(None),
                 Some(0) => 0,
                 Some(x) => Ck::ROOT_GENERATOR.multiplicative_order() - x,
             }
@@ -296,11 +312,11 @@ impl<Ck: Checksum> Iterator for ErrorIterator<'_, Ck> {
 
         let num = self.evaluator.evaluate(&a_neg_i);
         let den = a_i.powi(self.c as i64 - 1) * self.locator_derivative.evaluate(&a_neg_i);
-        let ret = -num / den;
-        match ret.try_into() {
-            Ok(ret) => Some((neg_i, ret)),
-            Err(_) => unreachable!("error guaranteed to lie in base field"),
+        if den == Ck::CorrectionField::ZERO {
+            return Err(());
         }
+        let ret = -num / den;
+        ret.try_into().map(|ret| Some((neg_i, ret))).map_err(|_| ())
     }
 }
 
@@ -308,9 +324,80 @@ impl<Ck: Checksum> Iterator for ErrorIterator<'_, Ck> {
 mod tests {
     use super::*;
     use crate::primitives::decode::{
-        CheckedHrpstringError, SegwitHrpstring, SegwitHrpstringError, UncheckedHrpstring,
+        CheckedHrpstring, CheckedHrpstringError, SegwitHrpstring, SegwitHrpstringError,
+        UncheckedHrpstring,
     };
-    use crate::Bech32;
+    use crate::{Bech32, Bech32m};
+
+    #[test]
+    fn issue_290_cbbc() {
+        let err = CheckedHrpstring::new::<Bech32m>("cbbc1yuglpryqdm").unwrap_err();
+        let ctx = err.correction_context::<Bech32m>().unwrap();
+        assert!(ctx.bch_errors().is_none());
+    }
+
+    #[test]
+    fn issue_290_aa() {
+        let err = CheckedHrpstring::new::<Bech32m>("aa1aagz20up2hk8e").unwrap_err();
+        let ctx = err.correction_context::<Bech32m>().unwrap();
+        assert!(ctx.bch_errors().is_none());
+    }
+
+    #[test]
+    fn issue_290_segwit() {
+        let err = SegwitHrpstring::new("cbbc1yuglpryqdm").unwrap_err();
+        let ctx = err.correction_context::<Bech32m>().unwrap();
+        assert!(ctx.bch_errors().is_none());
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn issue_290_segwit_decode() {
+        let err = crate::segwit::decode("cbbc1yuglpryqdm").unwrap_err();
+        let ctx = err.correction_context::<Bech32m>().unwrap();
+        assert!(ctx.bch_errors().is_none());
+    }
+
+    #[test]
+    fn bech32m() {
+        let correct = b"abcdef1l7aum6echk45nj3s0wdvt2fg8x9yrzpqzd3ryx";
+        assert!(CheckedHrpstring::new::<Bech32m>(core::str::from_utf8(correct).unwrap()).is_ok());
+
+        // Add X at the final character, and independently at an interior position.
+        for &location in &[0, 20] {
+            let mut corrupted = *correct;
+            let index = correct.len() - location - 1;
+            corrupted[index] =
+                (Fe32::from_char(corrupted[index].into()).unwrap() + Fe32::X).to_char() as u8;
+            let err = CheckedHrpstring::new::<Bech32m>(core::str::from_utf8(&corrupted).unwrap())
+                .unwrap_err();
+            let ctx = err.correction_context::<Bech32m>().unwrap();
+            let mut iter = ctx.bch_errors().unwrap();
+            let (actual_location, delta) = iter.next().unwrap();
+            assert_eq!((actual_location, delta), (location, Fe32::X));
+            assert_eq!(iter.next(), None);
+
+            let index = corrupted.len() - actual_location - 1;
+            corrupted[index] =
+                (Fe32::from_char(corrupted[index].into()).unwrap() + delta).to_char() as u8;
+            assert_eq!(corrupted, *correct);
+            assert!(
+                CheckedHrpstring::new::<Bech32m>(core::str::from_utf8(&corrupted).unwrap()).is_ok()
+            );
+        }
+    }
+
+    #[test]
+    fn unchanged_erasure() {
+        let err = CheckedHrpstring::new::<Bech32>("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdx")
+            .unwrap_err();
+        let mut ctx = err.correction_context::<Bech32>().unwrap();
+        ctx.add_erasures(&[6]);
+        let mut iter = ctx.bch_errors().unwrap();
+        assert_eq!(iter.next(), Some((6, Fe32::Q)));
+        assert_eq!(iter.next(), Some((0, Fe32::X)));
+        assert_eq!(iter.next(), None);
+    }
 
     #[test]
     fn bech32() {
