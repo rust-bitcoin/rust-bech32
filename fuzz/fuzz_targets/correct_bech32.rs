@@ -64,12 +64,33 @@ fn do_test(data: &[u8]) {
 
     let iter = correct_ctx.bch_errors();
     if e2t <= 3 {
+        // If this is correctable string, the result should be correct
         for (idx, fe) in iter.unwrap() {
             assert_eq!(errors.remove(&idx), Some(fe));
+            if !erasures.contains(&idx) {
+                // Erasures may be reported as "errors" of 0, if the original character was
+                // correct. But non-erasure errors should always be nontrivial.
+                assert_ne!(fe, Fe32::Q);
+            }
         }
         for val in errors.values() {
             assert_eq!(*val, Fe32::Q);
         }
+    } else if let Some(iter) = iter {
+        // If it's -not- correctable, and we return anything, it should at least pass the checksum.
+        for (idx, fe) in iter {
+            // We should not return errors outside of the data, i.e. in the HRP or before. In
+            // theory these could indicate that the HRP is wrong, or that the string was truncated
+            // at the front, but these are "unrecognizably mangled strings" outside of what this
+            // error correcting algorithm can correct, and the user will need to use a list decoder
+            // or grinding tool or something.
+            assert!(idx < CORRECT.len() - 3);
+            let pos = CORRECT.len() - idx - 1;
+            hrpstring[pos] =
+                (Fe32::from_char(hrpstring[pos].into()).unwrap() + fe).to_char() as u8;
+        }
+        let corrected = core::str::from_utf8(&hrpstring).unwrap();
+        assert!(CheckedHrpstring::new::<Bech32>(corrected).is_ok());
     }
 }
 
