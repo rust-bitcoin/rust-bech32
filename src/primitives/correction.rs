@@ -474,4 +474,36 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn regression_vector_1() {
+        // Found by fuzzer. Produces errors that don't live in the base field, causing a panic in
+        // ErrorIterator::next. (This happens despite passing the various degree checks, proving
+        // that these cheap checks are not sufficient.)
+        let e = UncheckedHrpstring::new(
+            "bc1awzrzyqr3ja8w7hnja2spmkgfdcgvqwp5sw94af4ngsjecfz0w0pqud7k38",
+        )
+        .expect("well-formed string")
+        .validate_checksum::<crate::Bech32>()
+        .expect_err("invalid bech32 string");
+        let mut ctx = e.correction_context::<Bech32>().unwrap();
+        assert!(ctx.bch_errors().is_none(), "cannot correct");
+        ctx.add_erasures(&[23]);
+        assert!(ctx.bch_errors().is_none(), "cannot correct");
+    }
+
+    #[test]
+    fn regression_vector_2() {
+        // Found by fuzzer. *Should* be correctable. Has one unknown error and one erasure.
+        let e = UncheckedHrpstring::new(
+            "bc1qwzrryqr3ja8w7hnda2spmkgfdcgvqwp5swz4pf4ngsjecfz0w0pqud7k38",
+        )
+        .expect("well-formed string")
+        .validate_checksum::<crate::Bech32>()
+        .expect_err("invalid bech32 string");
+        let mut ctx = e.correction_context::<Bech32>().unwrap();
+        assert!(ctx.bch_errors().is_none(), "cannot correct");
+        ctx.add_erasures(&[21]);
+        assert!(ctx.bch_errors().is_some(), "should be able to correct");
+    }
 }
