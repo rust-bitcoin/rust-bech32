@@ -81,7 +81,7 @@ fn do_test(data: &[u8]) {
 
     let s = unsafe { core::str::from_utf8_unchecked(&hrpstring) };
     let mut correct_ctx =
-        CheckedHrpstring::new::<Codex32>(s).unwrap_err().correction_context::<Codex32>().unwrap();
+        CheckedHrpstring::new::<Codex32>(s).unwrap_err().correction_context::<Codex32>(55).unwrap();
 
     correct_ctx.add_erasures(&erasures);
 

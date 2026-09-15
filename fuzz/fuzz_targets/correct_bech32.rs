@@ -55,10 +55,8 @@ fn do_test(data: &[u8]) {
     }
 
     let s = unsafe { core::str::from_utf8_unchecked(&hrpstring) };
-    let mut correct_ctx = CheckedHrpstring::new::<Bech32>(s)
-        .unwrap_err()
-        .correction_context::<Bech32>()
-        .unwrap();
+    let mut correct_ctx =
+        CheckedHrpstring::new::<Bech32>(s).unwrap_err().correction_context::<Bech32>(59).unwrap();
 
     correct_ctx.add_erasures(&erasures);
 
@@ -86,8 +84,7 @@ fn do_test(data: &[u8]) {
             // or grinding tool or something.
             assert!(idx < CORRECT.len() - 3);
             let pos = CORRECT.len() - idx - 1;
-            hrpstring[pos] =
-                (Fe32::from_char(hrpstring[pos].into()).unwrap() + fe).to_char() as u8;
+            hrpstring[pos] = (Fe32::from_char(hrpstring[pos].into()).unwrap() + fe).to_char() as u8;
         }
         let corrected = core::str::from_utf8(&hrpstring).unwrap();
         assert!(CheckedHrpstring::new::<Bech32>(corrected).is_ok());
