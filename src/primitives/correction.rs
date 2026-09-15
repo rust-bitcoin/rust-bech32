@@ -210,14 +210,19 @@ impl<Ck: Checksum> Corrector<Ck> {
             //     when calling the BM algorithm, in all other cases we use the ordinary
             //     unmodified syndromes.
             let errata_locator = conn.mul_mod_x_d(&erasure_locator, usize::MAX);
-            Some(ErrorIterator {
-                evaluator: errata_locator.mul_mod_x_d(&syndromes, self.singleton_bound()),
-                locator_derivative: errata_locator.formal_derivative(),
-                erasures: &self.erasures[..],
-                errors: conn.find_nonzero_distinct_roots(Ck::ROOT_GENERATOR),
-                a: Ck::ROOT_GENERATOR,
-                c: *Ck::ROOT_EXPONENTS.start(),
-            })
+            let evaluator = errata_locator.mul_mod_x_d(&syndromes, self.singleton_bound());
+            if evaluator.degree() < errata_locator.degree() {
+                Some(ErrorIterator {
+                    evaluator,
+                    locator_derivative: errata_locator.formal_derivative(),
+                    erasures: &self.erasures[..],
+                    errors: conn.find_nonzero_distinct_roots(Ck::ROOT_GENERATOR),
+                    a: Ck::ROOT_GENERATOR,
+                    c: *Ck::ROOT_EXPONENTS.start(),
+                })
+            } else {
+                None
+            }
         } else {
             None
         }
