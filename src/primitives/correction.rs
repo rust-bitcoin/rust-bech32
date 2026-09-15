@@ -329,9 +329,13 @@ impl<Ck: Checksum> Iterator for ErrorIterator<'_, Ck> {
         // which are computed when constructing the ErrorIterator.
         let a_i = self.a.powi(neg_i as i64);
         let a_neg_i = a_i.clone().multiplicative_inverse();
+        let locator_eval = self.locator_derivative.evaluate(&a_neg_i);
+        if locator_eval == Ck::CorrectionField::ZERO {
+            return None;
+        }
 
         let num = self.evaluator.evaluate(&a_neg_i);
-        let den = a_i.powi(self.c as i64 - 1) * self.locator_derivative.evaluate(&a_neg_i);
+        let den = a_i.powi(self.c as i64 - 1) * locator_eval;
 
         let ret = -num / den;
         ret.try_into().ok().map(|ret| (neg_i, ret))
