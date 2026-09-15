@@ -211,15 +211,34 @@ impl<Ck: Checksum> Corrector<Ck> {
             //     unmodified syndromes.
             let errata_locator = conn.mul_mod_x_d(&erasure_locator, usize::MAX);
             let evaluator = errata_locator.mul_mod_x_d(&syndromes, self.singleton_bound());
+
+            // If we are within the correction radius, it can be shown that the evaluator degree
+            // is strictly less than the locator degree. This is a very cheap check, so do it here.
             if evaluator.degree() < errata_locator.degree() {
-                Some(ErrorIterator {
+                let ret = ErrorIterator {
                     evaluator,
                     locator_derivative: errata_locator.formal_derivative(),
                     erasures: &self.erasures[..],
                     errors: conn.find_nonzero_distinct_roots(Ck::ROOT_GENERATOR),
                     a: Ck::ROOT_GENERATOR,
                     c: *Ck::ROOT_EXPONENTS.start(),
-                })
+                };
+
+                // ...however, if we are outside of the correction radius, several things may still
+                // go wrong. In particular, we may have fewer roots than we expect (the locator
+                // polynomial is not fully reducible) or we may have roots that lie outside of the
+                // base field (our syndromes are "best explained" by some weird object which is not
+                // an error pattern).
+                //
+                // In the latter case, because our iterator terminates early if it would return
+                // something not in the base field, our root count will fail. So we don't need to
+                // do a separate "not in the base field" check here.
+                let n_roots = ret.clone().count();
+                if n_roots == errata_locator.degree() {
+                    Some(ret)
+                } else {
+                    None
+                }
             } else {
                 None
             }
@@ -267,6 +286,19 @@ pub struct ErrorIterator<'c, Ck: Checksum> {
     c: usize,
 }
 
+impl<Ck: Checksum> Clone for ErrorIterator<'_, Ck> {
+    fn clone(&self) -> Self {
+        Self {
+            evaluator: self.evaluator.clone(),
+            locator_derivative: self.locator_derivative.clone(),
+            erasures: self.erasures,
+            errors: self.errors.clone(),
+            a: self.a.clone(),
+            c: self.c,
+        }
+    }
+}
+
 impl<Ck: Checksum> Iterator for ErrorIterator<'_, Ck> {
     type Item = (usize, Fe32);
 
@@ -295,17 +327,14 @@ impl<Ck: Checksum> Iterator for ErrorIterator<'_, Ck> {
         // where here a is `Ck::ROOT_GENERATOR`, c is the first element of the range
         // `Ck::ROOT_EXPONENTS`, and both evaluator and locator_derivative are polynomials
         // which are computed when constructing the ErrorIterator.
-
         let a_i = self.a.powi(neg_i as i64);
         let a_neg_i = a_i.clone().multiplicative_inverse();
 
         let num = self.evaluator.evaluate(&a_neg_i);
         let den = a_i.powi(self.c as i64 - 1) * self.locator_derivative.evaluate(&a_neg_i);
+
         let ret = -num / den;
-        match ret.try_into() {
-            Ok(ret) => Some((neg_i, ret)),
-            Err(_) => unreachable!("error guaranteed to lie in base field"),
-        }
+        ret.try_into().ok().map(|ret| (neg_i, ret))
     }
 }
 

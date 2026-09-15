@@ -389,6 +389,7 @@ impl<F: Field> ops::SubAssign for Polynomial<F> {
 /// method, which takes a field element as a base. The roots of the
 /// polynomial are yielded as exponents of the base. See the documentation
 /// of that method for more information.
+#[derive(Clone)]
 pub struct RootIter<F> {
     idx: usize,
     max_idx: usize,
