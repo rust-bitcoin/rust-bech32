@@ -68,7 +68,7 @@ pub trait Field:
             self.clone()
         } else {
             n *= -1;
-            self.clone().multiplicative_inverse()
+            -self.clone()
         };
 
         let mut ret = Self::ZERO;
