@@ -432,3 +432,19 @@ impl<F: Field> Iterator for Powers<F> {
         self.next()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Fe32;
+
+    #[test]
+    #[allow(clippy::iter_nth_zero)] // we are testing this
+    fn zero_pow() {
+        assert_eq!(Fe32::ZERO.powi(0), Fe32::ONE);
+        assert_eq!(Fe32::ZERO.powi(31), Fe32::ONE);
+        assert_eq!(Fe32::ZERO.powers().take(2).collect::<Vec<_>>(), vec![Fe32::ONE, Fe32::ZERO]);
+        assert_eq!(Fe32::ZERO.powers().nth(0), Some(Fe32::ONE));
+        assert_eq!(Fe32::ZERO.powers().nth(31), Some(Fe32::ONE));
+    }
+}
