@@ -199,6 +199,10 @@ impl Hrp {
     ///
     /// Does not check that `hrp` is valid according to BIP-173 but does check for valid ASCII
     /// values, replacing any invalid characters with `X`.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the provided `hrp` string is longer than 83.
     pub const fn parse_unchecked(hrp: &str) -> Self {
         let mut new = Self { buf: [0_u8; MAX_HRP_LEN], size: 0 };
         let hrp_bytes = hrp.as_bytes();
