@@ -162,7 +162,7 @@ impl<F: Field> Iterator for LfsrIter<F> {
             .coefficients()
             .iter()
             .zip(self.contents.iter().rev())
-            .map(|(a, b)| a.clone() * b)
+            .map(|(a, b)| -a.clone() * b)
             .sum();
 
         let ret = self.contents.pop_front();
