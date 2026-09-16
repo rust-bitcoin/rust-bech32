@@ -234,19 +234,21 @@ where
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        // If the total number of bits is not a multiple of 8, any trailing bits are dropped.
-        let fes_len_to_bytes_len = |n| n * 5 / 8;
-
         let (fes_min, fes_max) = self.iter.size_hint();
-        // +1 because we set last_fe with call to `next`.
-        let min = fes_len_to_bytes_len(fes_min + 1);
-        let max = fes_max.map(|max| fes_len_to_bytes_len(max + 1));
+        let extra_bits = self.last_fe.map(|_| 5 - self.bit_offset).unwrap_or(0);
+        let min = fes_len_to_bytes_len(fes_min, extra_bits);
+        let max = fes_max.map(|max| fes_len_to_bytes_len(max, extra_bits));
         (min, max)
     }
 }
 
 // If the total number of bits is not a multiple of 8, any trailing bits are dropped.
-fn fes_len_to_bytes_len(n: usize) -> usize { n * 5 / 8 }
+fn fes_len_to_bytes_len(n: usize, extra_bits: usize) -> usize {
+    let q = n / 8;
+    let r = n % 8;
+
+    5 * q + (5 * r + extra_bits) / 8
+}
 
 impl<I> ExactSizeIterator for FesToBytes<I>
 where
@@ -254,11 +256,9 @@ where
 {
     #[inline]
     fn len(&self) -> usize {
-        let len = match self.last_fe {
-            Some(_) => self.iter.len() + 1,
-            None => self.iter.len(),
-        };
-        fes_len_to_bytes_len(len)
+        let len = self.iter.len();
+        let extra_bits = self.last_fe.map(|_| 5 - self.bit_offset).unwrap_or(0);
+        fes_len_to_bytes_len(len, extra_bits)
     }
 }
 
