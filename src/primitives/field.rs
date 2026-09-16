@@ -561,9 +561,25 @@ mod tests {
     fn zero_pow() {
         assert_eq!(Fe32::ZERO.powi(0), Fe32::ONE);
         assert_eq!(Fe32::ZERO.powi(31), Fe32::ONE);
+        assert_eq!(Fe32::ZERO.powu(0), Fe32::ONE);
+        assert_eq!(Fe32::ZERO.powu(31), Fe32::ONE);
         assert_eq!(Fe32::ZERO.powers().take(2).collect::<Vec<_>>(), vec![Fe32::ONE, Fe32::ZERO]);
         assert_eq!(Fe32::ZERO.powers().nth(0), Some(Fe32::ONE));
         assert_eq!(Fe32::ZERO.powers().nth(31), Some(Fe32::ONE));
+    }
+
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn multiplicative_order_supports_large_factors() {
+        assert_eq!(Fe::GENERATOR.multiplicative_order(), Fe::MULTIPLICATIVE_ORDER,);
+    }
+
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn powers_nth_preserves_large_unsigned_exponents() {
+        let exponent = 1usize << 63;
+        let expected = Fe::new(7_725_530_454_779_639_848); // checked with sage
+        assert_eq!(Fe::GENERATOR.powers().nth(exponent), Some(expected));
     }
 
     #[test]
@@ -579,6 +595,21 @@ mod tests {
     fn muli_i64_min() {
         assert_eq!(Fe::new(0).muli(i64::MIN), Fe::new(0));
         assert_eq!(Fe::new(1).muli(i64::MIN), Fe::new(2679));
+    }
+
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn powu_large_field() {
+        assert_eq!(Fe::new(1).powu(0), Fe::new(1));
+        assert_eq!(Fe::new(100).powu(0), Fe::new(1));
+        assert_eq!(Fe::new(Fe::MODULUS - 10_000).powu(0), Fe::new(1));
+
+        assert_eq!(Fe::new(1).powu(1), Fe::new(1));
+
+        assert_eq!(Fe::new(2).powu(5), Fe::new(32));
+
+        assert_eq!(Fe::new(1 << 9).powu(7), Fe::new(Fe::MODULUS - 2679));
+        assert_eq!(Fe::new(1 << 9).powu(14), Fe::new(2679 * 2679));
     }
 
     #[test]
