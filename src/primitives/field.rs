@@ -63,13 +63,9 @@ pub trait Field:
     fn multiplicative_inverse(self) -> Self;
 
     /// Takes the element times some integer.
-    fn muli(&self, mut n: i64) -> Self {
-        let mut base = if n >= 0 {
-            self.clone()
-        } else {
-            n *= -1;
-            -self.clone()
-        };
+    fn muli(&self, n: i64) -> Self {
+        let mut base = if n >= 0 { self.clone() } else { -self.clone() };
+        let mut n = n.unsigned_abs();
 
         let mut ret = Self::ZERO;
         // Special case some particular characteristics
@@ -87,8 +83,9 @@ pub trait Field:
             x => {
                 // This is identical to powi below, but with * replaced by +.
                 if x > 0 {
-                    // Just an optimization, fine if this doesn't run for large x.
-                    if let Ok(x) = i64::try_from(x) {
+                    // Just an optimization, fine if this doesn't run for large x on obscure
+                    // systems where usize won't cast to u64.
+                    if let Ok(x) = u64::try_from(x) {
                         n %= x;
                     }
                 }
@@ -106,15 +103,16 @@ pub trait Field:
     }
 
     /// Takes the element to the power of some integer.
-    fn powi(&self, mut n: i64) -> Self {
-        let mut base = if n >= 0 {
-            self.clone()
-        } else {
-            n *= -1;
-            self.clone().multiplicative_inverse()
-        };
-        // Just an optimization, fine if this doesn't run for large x.
-        if let Ok(x) = i64::try_from(Self::MULTIPLICATIVE_ORDER) {
+    ///
+    /// # Panics
+    ///
+    /// Panics if `self` is the zero element and `n` is less than 0.
+    fn powi(&self, n: i64) -> Self {
+        let mut base = if n >= 0 { self.clone() } else { self.clone().multiplicative_inverse() };
+        let mut n = n.unsigned_abs();
+        // Just an optimization, fine if this doesn't run for large x on obscure
+        // systems where usize won't cast to u64.
+        if let Ok(x) = u64::try_from(Self::MULTIPLICATIVE_ORDER) {
             n %= x;
         }
 
