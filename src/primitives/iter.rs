@@ -564,4 +564,74 @@ mod tests {
             assert_eq!(fes_iter.clone().fes_to_bytes().collect::<Vec<_>>(), DATA);
         }
     }
+
+    #[test]
+    fn fes_to_bytes_len_matches_remaining_output() {
+        for len in 0..=8 {
+            let mut iter = vec![Fe32::Q; len].into_iter().fes_to_bytes();
+            loop {
+                assert_eq!(iter.size_hint(), (iter.len(), Some(iter.len())));
+                assert_eq!(
+                    iter.len(),
+                    iter.clone().count(),
+                    "length computation matches actual remaining iterator count (fes_to_bytes)"
+                );
+                if iter.next().is_none() {
+                    break;
+                }
+            }
+            assert_eq!(iter.size_hint(), (0, Some(0)));
+            assert_eq!(iter.len(), 0);
+        }
+    }
+
+    #[test]
+    fn bytes_to_fes_len_matches_remaining_output() {
+        for len in 0..=5 {
+            let mut iter = vec![0u8; len].into_iter().bytes_to_fes();
+            loop {
+                assert_eq!(iter.size_hint(), (iter.exact_size().unwrap(), iter.exact_size()));
+                assert_eq!(
+                    iter.exact_size().unwrap(),
+                    iter.clone().count(),
+                    "length computation matches actual remaining iterator count (bytes_to_fes)"
+                );
+                if iter.next().is_none() {
+                    break;
+                }
+            }
+            assert_eq!(iter.size_hint(), (0, Some(0)));
+            assert_eq!(iter.exact_size(), Some(0));
+        }
+    }
+
+    #[test]
+    fn fes_to_bytes_len_does_not_overflow() {
+        // Smallest length that will overflow when multiplying by 5
+        let fe_len = usize::MAX / 5 + 1;
+        let iter = core::iter::repeat(Fe32::Q).take(fe_len).fes_to_bytes();
+        let expected = (fe_len / 8) * 5 + ((fe_len % 8) * 5) / 8;
+        assert_eq!(iter.size_hint(), (expected, Some(expected)));
+
+        // Largest length we can do period.
+        let fe_len = usize::MAX;
+        let iter = core::iter::repeat(Fe32::Q).take(fe_len).fes_to_bytes();
+        let expected = (fe_len / 8) * 5 + ((fe_len % 8) * 5) / 8;
+        assert_eq!(iter.size_hint(), (expected, Some(expected)));
+    }
+
+    #[test]
+    fn bytes_to_fes_len_does_not_overflow() {
+        // Smallest length that will overflow when multiplying by 8
+        let input_len = usize::MAX / 8 + 1;
+        let expected = input_len / 5 * 8 + (input_len % 5 * 8 + 4) / 5;
+        let iter = core::iter::repeat(0u8).take(input_len).bytes_to_fes();
+        assert_eq!(iter.size_hint(), (expected, Some(expected)));
+
+        // Largest length that can be divided by 5 then multiplied by 8.
+        let input_len = usize::MAX / 8 * 5 + 4;
+        let expected = input_len / 5 * 8 + (input_len % 5 * 8 + 4) / 5;
+        let iter = core::iter::repeat(0u8).take(input_len).bytes_to_fes();
+        assert_eq!(iter.size_hint(), (expected, Some(expected)));
+    }
 }
