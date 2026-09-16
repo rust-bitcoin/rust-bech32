@@ -102,14 +102,8 @@ pub trait Field:
         }
     }
 
-    /// Takes the element to the power of some integer.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `self` is the zero element and `n` is less than 0.
-    fn powi(&self, n: i64) -> Self {
-        let mut base = if n >= 0 { self.clone() } else { self.clone().multiplicative_inverse() };
-        let mut n = n.unsigned_abs();
+    /// Takes the element to the power of some unsigned integer.
+    fn powu(&self, mut n: u64) -> Self {
         // Just an optimization, fine if this doesn't run for large x on obscure
         // systems where usize won't cast to u64.
         if let Ok(x) = u64::try_from(Self::MULTIPLICATIVE_ORDER) {
@@ -117,6 +111,7 @@ pub trait Field:
         }
 
         let mut ret = Self::ONE;
+        let mut base = self.clone();
         while n > 0 {
             if n & 1 == 1 {
                 ret *= &base;
@@ -127,10 +122,23 @@ pub trait Field:
         ret
     }
 
+    /// Takes the element to the power of some signed integer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `self` is the zero element and `n` is less than 0.
+    fn powi(&self, n: i64) -> Self {
+        let base = if n >= 0 { self.clone() } else { self.clone().multiplicative_inverse() };
+        let n = n.unsigned_abs();
+        base.powu(n)
+    }
+
     /// The multiplicative order of an element.
     fn multiplicative_order(&self) -> usize {
         for &ord in Self::MULTIPLICATIVE_ORDER_FACTORS {
-            if self.powi(ord as i64) == Self::ONE {
+            // This `expect` cannot be hit on any real system.
+            let ord64 = u64::try_from(ord).expect("multiplicative order in excess of 2^64 - 1");
+            if self.powu(ord64) == Self::ONE {
                 return ord;
             }
         }
@@ -421,7 +429,7 @@ impl<F: Field> Iterator for Powers<F> {
         ret
     }
 
-    /// Compute next by calling `F::powi`.
+    /// Compute next by calling `F::powu`.
     ///
     /// The default implementation of `nth` will simply call the iterator `n`
     /// times, throwing away the result, which takes O(n) field multiplications.
@@ -429,8 +437,9 @@ impl<F: Field> Iterator for Powers<F> {
     ///
     /// This is important because this method is called internally by `Iterator::skip`.
     fn nth(&mut self, n: usize) -> Option<F> {
-        let ni64 = (n % F::MULTIPLICATIVE_ORDER) as i64; // cast ok since modulus should be small
-        self.next *= self.base.powi(ni64);
+        let n = u64::try_from(n % F::MULTIPLICATIVE_ORDER)
+            .expect("multiplicative order in excess of 2^64 - 1");
+        self.next *= self.base.powu(n);
         self.next()
     }
 }
@@ -456,19 +465,6 @@ pub(crate) mod large_odd_field {
         pub const fn new(n: u64) -> Self { Self(n % Self::MODULUS) }
 
         fn reduce(n: u128) -> Self { Self((n % Self::MODULUS as u128) as u64) }
-
-        // Deliberately independent of Field::powi.
-        pub fn pow_u64(mut self, mut n: u64) -> Self {
-            let mut result = Self::ONE;
-            while n != 0 {
-                if n & 1 != 0 {
-                    result *= self;
-                }
-                self *= self;
-                n >>= 1;
-            }
-            result
-        }
     }
 
     impl Field for LargeOddFe {
@@ -482,7 +478,7 @@ pub(crate) mod large_odd_field {
 
         fn multiplicative_inverse(self) -> Self {
             assert_ne!(self, Self::ZERO, "division by zero");
-            self.pow_u64(Self::MODULUS - 2)
+            self.powu(Self::MODULUS - 2)
         }
     }
 
