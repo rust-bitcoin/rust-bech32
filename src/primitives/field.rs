@@ -104,6 +104,15 @@ pub trait Field:
 
     /// Takes the element to the power of some unsigned integer.
     fn powu(&self, mut n: u64) -> Self {
+        if *self == Self::ZERO {
+            // Special-case 0^n and early-return before we manipulate `n` at all.
+            if n == 0 {
+                return Self::ONE;
+            } else {
+                return Self::ZERO;
+            }
+        }
+
         // Just an optimization, fine if this doesn't run for large x on obscure
         // systems where usize won't cast to u64.
         if let Ok(x) = u64::try_from(Self::MULTIPLICATIVE_ORDER) {
@@ -437,8 +446,7 @@ impl<F: Field> Iterator for Powers<F> {
     ///
     /// This is important because this method is called internally by `Iterator::skip`.
     fn nth(&mut self, n: usize) -> Option<F> {
-        let n = u64::try_from(n % F::MULTIPLICATIVE_ORDER)
-            .expect("multiplicative order in excess of 2^64 - 1");
+        let n = u64::try_from(n).expect("multiplicative order in excess of 2^64 - 1");
         self.next *= self.base.powu(n);
         self.next()
     }
@@ -560,12 +568,12 @@ mod tests {
     #[allow(clippy::iter_nth_zero)] // we are testing this
     fn zero_pow() {
         assert_eq!(Fe32::ZERO.powi(0), Fe32::ONE);
-        assert_eq!(Fe32::ZERO.powi(31), Fe32::ONE);
+        assert_eq!(Fe32::ZERO.powi(31), Fe32::ZERO);
         assert_eq!(Fe32::ZERO.powu(0), Fe32::ONE);
-        assert_eq!(Fe32::ZERO.powu(31), Fe32::ONE);
+        assert_eq!(Fe32::ZERO.powu(31), Fe32::ZERO);
         assert_eq!(Fe32::ZERO.powers().take(2).collect::<Vec<_>>(), vec![Fe32::ONE, Fe32::ZERO]);
         assert_eq!(Fe32::ZERO.powers().nth(0), Some(Fe32::ONE));
-        assert_eq!(Fe32::ZERO.powers().nth(31), Some(Fe32::ONE));
+        assert_eq!(Fe32::ZERO.powers().nth(31), Some(Fe32::ZERO));
     }
 
     #[test]
