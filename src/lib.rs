@@ -445,11 +445,21 @@ pub fn encode_upper_to_writer<Ck: Checksum, W: std::io::Write>(
 /// otherwise a [`CodeLengthError`] containing the encoded length and the maximum allowed.
 pub fn encoded_length<Ck: Checksum>(hrp: Hrp, data: &[u8]) -> Result<usize, CodeLengthError> {
     let iter = data.iter().copied().bytes_to_fes();
-    let len = hrp.len() + 1 + iter.len() + Ck::CHECKSUM_LENGTH; // +1 for separator
-    if len > Ck::CODE_LENGTH {
-        Err(CodeLengthError { encoded_length: len, code_length: Ck::CODE_LENGTH })
+    let len = hrp
+        .len()
+        .checked_add(1) // +1 for separator
+        .and_then(|n| n.checked_add(iter.len()))
+        .and_then(|n| n.checked_add(Ck::CHECKSUM_LENGTH));
+
+    if let Some(len) = len {
+        if len > Ck::CODE_LENGTH {
+            Err(CodeLengthError { encoded_length: len, code_length: Ck::CODE_LENGTH })
+        } else {
+            Ok(len)
+        }
     } else {
-        Ok(len)
+        // If the encoded length would exceed usize::MAX just saturate it for error reporting.
+        Err(CodeLengthError { encoded_length: usize::MAX, code_length: Ck::CODE_LENGTH })
     }
 }
 
