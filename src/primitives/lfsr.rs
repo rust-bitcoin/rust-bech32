@@ -261,4 +261,17 @@ mod tests {
                 .collect();
         assert_eq!(step5_sequence, [Fe32::A, Fe32::C, Fe32::A, Fe32::Y]);
     }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn lfsr_odd_field() {
+        use crate::primitives::field::large_odd_field::LargeOddFe as Fe;
+
+        // [1, 1] should obviously continue forever as 1, 1. But in an earlier version of the
+        // codebase it would produce 1, -1 due to a sign error.
+        let initial = [Fe::ONE, Fe::ONE];
+        for x in LfsrIter::berlekamp_massey(&initial).take(1000) {
+            assert_eq!(x, Fe::ONE);
+        }
+    }
 }

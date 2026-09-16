@@ -436,7 +436,127 @@ impl<F: Field> Iterator for Powers<F> {
 }
 
 #[cfg(test)]
+#[cfg(target_pointer_width = "64")]
+pub(crate) mod large_odd_field {
+    use core::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+
+    use super::*;
+
+    /// Integers mod 9223372036854778487 which is 2^63 + 2679.
+    ///
+    /// Unlike the fields actually used by this library, this (a) has odd characteristic so that
+    /// addition and negation are different, and (b) has characteristic > 2^63 so that any naive
+    /// generic operations will trigger overflows.
+    #[derive(Copy, Clone, PartialEq, Eq, Debug, Default, Hash)]
+    pub struct LargeOddFe(u64);
+
+    impl LargeOddFe {
+        pub const MODULUS: u64 = 9_223_372_036_854_778_487;
+
+        pub const fn new(n: u64) -> Self { Self(n % Self::MODULUS) }
+
+        fn reduce(n: u128) -> Self { Self((n % Self::MODULUS as u128) as u64) }
+
+        // Deliberately independent of Field::powi.
+        pub fn pow_u64(mut self, mut n: u64) -> Self {
+            let mut result = Self::ONE;
+            while n != 0 {
+                if n & 1 != 0 {
+                    result *= self;
+                }
+                self *= self;
+                n >>= 1;
+            }
+            result
+        }
+    }
+
+    impl Field for LargeOddFe {
+        const ZERO: Self = Self(0);
+        const ONE: Self = Self(1);
+        const GENERATOR: Self = Self(5); // checked with sage
+        const CHARACTERISTIC: usize = 9_223_372_036_854_778_487;
+        const MULTIPLICATIVE_ORDER: usize = 9_223_372_036_854_778_486;
+        const MULTIPLICATIVE_ORDER_FACTORS: &'static [usize] =
+            &[1, 2, 4_611_686_018_427_389_243, 9_223_372_036_854_778_486];
+
+        fn multiplicative_inverse(self) -> Self {
+            assert_ne!(self, Self::ZERO, "division by zero");
+            self.pow_u64(Self::MODULUS - 2)
+        }
+    }
+
+    impl fmt::Display for LargeOddFe {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { self.0.fmt(f) }
+    }
+
+    macro_rules! impl_op {
+        ($op:ident, $method:ident, $assign:ident, $assign_method:ident,
+         |$a:ident, $b:ident| $body:expr) => {
+            impl $op for LargeOddFe {
+                type Output = Self;
+
+                fn $method(self, rhs: Self) -> Self {
+                    let ($a, $b) = (self, rhs);
+                    $body
+                }
+            }
+
+            impl $op<&LargeOddFe> for LargeOddFe {
+                type Output = Self;
+
+                fn $method(self, rhs: &Self) -> Self { self.$method(*rhs) }
+            }
+
+            impl $assign for LargeOddFe {
+                fn $assign_method(&mut self, rhs: Self) { *self = (*self).$method(rhs); }
+            }
+
+            impl $assign<&LargeOddFe> for LargeOddFe {
+                fn $assign_method(&mut self, rhs: &Self) { *self = (*self).$method(*rhs); }
+            }
+        };
+    }
+
+    impl_op!(Add, add, AddAssign, add_assign, |a, b| {
+        LargeOddFe::reduce(a.0 as u128 + b.0 as u128)
+    });
+
+    impl_op!(Sub, sub, SubAssign, sub_assign, |a, b| {
+        LargeOddFe::reduce(a.0 as u128 + LargeOddFe::MODULUS as u128 - b.0 as u128)
+    });
+
+    impl_op!(Mul, mul, MulAssign, mul_assign, |a, b| {
+        LargeOddFe::reduce(a.0 as u128 * b.0 as u128)
+    });
+
+    impl_op!(Div, div, DivAssign, div_assign, |a, b| a * b.multiplicative_inverse());
+
+    impl Neg for LargeOddFe {
+        type Output = Self;
+
+        fn neg(self) -> Self {
+            if self.0 == 0 {
+                self
+            } else {
+                Self(Self::MODULUS - self.0)
+            }
+        }
+    }
+
+    impl iter::Sum for LargeOddFe {
+        fn sum<I: Iterator<Item = Self>>(iter: I) -> Self { iter.fold(Self::ZERO, |a, b| a + b) }
+    }
+
+    impl<'a> iter::Sum<&'a LargeOddFe> for LargeOddFe {
+        fn sum<I: Iterator<Item = &'a LargeOddFe>>(iter: I) -> Self { iter.copied().sum() }
+    }
+}
+
+#[cfg(test)]
 mod tests {
+    #[cfg(target_pointer_width = "64")]
+    use super::large_odd_field::LargeOddFe as Fe;
     use super::*;
     use crate::Fe32;
 
@@ -448,5 +568,43 @@ mod tests {
         assert_eq!(Fe32::ZERO.powers().take(2).collect::<Vec<_>>(), vec![Fe32::ONE, Fe32::ZERO]);
         assert_eq!(Fe32::ZERO.powers().nth(0), Some(Fe32::ONE));
         assert_eq!(Fe32::ZERO.powers().nth(31), Some(Fe32::ONE));
+    }
+
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn muli_large_field() {
+        assert_eq!(Fe::new(0).muli(-1), Fe::new(0));
+        assert_eq!(Fe::new(1).muli(-1), Fe::new(Fe::MODULUS - 1));
+        assert_eq!(Fe::new(1), Fe::new(Fe::MODULUS - 1).muli(-1));
+    }
+
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn muli_i64_min() {
+        assert_eq!(Fe::new(0).muli(i64::MIN), Fe::new(0));
+        assert_eq!(Fe::new(1).muli(i64::MIN), Fe::new(2679));
+    }
+
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn powi_large_field() {
+        assert_eq!(Fe::new(1).powi(0), Fe::new(1));
+        assert_eq!(Fe::new(100).powi(0), Fe::new(1));
+        assert_eq!(Fe::new(Fe::MODULUS - 10_000).powi(0), Fe::new(1));
+
+        assert_eq!(Fe::new(1).powi(-1), Fe::new(1));
+        assert_eq!(Fe::new(1).powi(1), Fe::new(1));
+
+        assert_eq!(Fe::new(2).powi(5), Fe::new(32));
+
+        assert_eq!(Fe::new(1 << 9).powi(7), Fe::new(Fe::MODULUS - 2679));
+        assert_eq!(Fe::new(1 << 9).powi(14), Fe::new(2679 * 2679));
+    }
+
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn powi_i64_min() {
+        assert_eq!(Fe::new(1).powi(i64::MIN), Fe::new(1));
+        assert_eq!(Fe::new(Fe::MODULUS - 1).powi(i64::MIN), Fe::new(1));
     }
 }
