@@ -448,7 +448,7 @@ pub fn encoded_length<Ck: Checksum>(hrp: Hrp, data: &[u8]) -> Result<usize, Code
     let len = hrp
         .len()
         .checked_add(1) // +1 for separator
-        .and_then(|n| n.checked_add(iter.len()))
+        .and_then(|n| n.checked_add(iter.exact_size()?))
         .and_then(|n| n.checked_add(Ck::CHECKSUM_LENGTH));
 
     if let Some(len) = len {

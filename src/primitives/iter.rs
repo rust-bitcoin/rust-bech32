@@ -92,6 +92,14 @@ pub trait Fe32IterExt: Sized + Iterator<Item = Fe32> {
 
 impl<I> Fe32IterExt for I where I: Iterator<Item = Fe32> {}
 
+/// The number of fes encoded by n bytes, rounded up because we pad the fes.
+fn bytes_len_to_fes_len(bytes: usize, extra_bits: usize) -> Option<usize> {
+    let q = bytes / 5;
+    let r = bytes % 5;
+
+    Some(q.checked_mul(8)? + (8 * r + extra_bits + 4) / 5)
+}
+
 /// Iterator adaptor that converts bytes to GF32 elements.
 ///
 /// If the total number of bits is not a multiple of 5, it right-pads with 0 bits.
@@ -100,6 +108,20 @@ pub struct BytesToFes<I: Iterator<Item = u8>> {
     last_byte: Option<u8>,
     bit_offset: usize,
     iter: I,
+}
+
+impl<I> BytesToFes<I>
+where
+    I: Iterator<Item = u8>,
+    I: ExactSizeIterator,
+{
+    /// Returns the number of remaining field elements in this iterator, unless that would
+    /// overflow the range of `usize`.
+    pub fn exact_size(&self) -> Option<usize> {
+        let len = self.iter.len();
+        let extra_bits = self.last_byte.map(|_| 8 - self.bit_offset).unwrap_or(0);
+        bytes_len_to_fes_len(len, extra_bits)
+    }
 }
 
 impl<I> Iterator for BytesToFes<I>
@@ -139,36 +161,11 @@ where
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let (min, max) = self.iter.size_hint();
-        let (min, max) = match self.last_byte {
-            // +1 because we set last_byte with call to `next`.
-            Some(_) => (min + 1, max.map(|max| max + 1)),
-            None => (min, max),
-        };
-
-        let min = bytes_len_to_fes_len(min);
-        let max = max.map(bytes_len_to_fes_len);
+        let extra_bits = self.last_byte.map(|_| 8 - self.bit_offset).unwrap_or(0);
+        let min = bytes_len_to_fes_len(min, extra_bits).unwrap_or(usize::MAX);
+        let max = max.and_then(|max| bytes_len_to_fes_len(max, extra_bits));
 
         (min, max)
-    }
-}
-
-/// The number of fes encoded by n bytes, rounded up because we pad the fes.
-fn bytes_len_to_fes_len(bytes: usize) -> usize {
-    let bits = bytes * 8;
-    (bits + 4) / 5
-}
-
-impl<I> ExactSizeIterator for BytesToFes<I>
-where
-    I: Iterator<Item = u8> + ExactSizeIterator,
-{
-    #[inline]
-    fn len(&self) -> usize {
-        let len = match self.last_byte {
-            Some(_) => self.iter.len() + 1,
-            None => self.iter.len(),
-        };
-        bytes_len_to_fes_len(len)
     }
 }
 
