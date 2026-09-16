@@ -2,7 +2,7 @@
 
 //! Generic Field Traits
 
-use core::convert::TryInto;
+use core::convert::{TryFrom as _, TryInto};
 use core::iter::{Skip, Take};
 use core::{fmt, hash, iter, ops};
 
@@ -64,7 +64,7 @@ pub trait Field:
 
     /// Takes the element times some integer.
     fn muli(&self, mut n: i64) -> Self {
-        let base = if n >= 0 {
+        let mut base = if n >= 0 {
             self.clone()
         } else {
             n *= -1;
@@ -87,16 +87,18 @@ pub trait Field:
             x => {
                 // This is identical to powi below, but with * replaced by +.
                 if x > 0 {
-                    n %= x as i64;
+                    // Just an optimization, fine if this doesn't run for large x.
+                    if let Ok(x) = i64::try_from(x) {
+                        n %= x;
+                    }
                 }
 
-                let mut mask = x.next_power_of_two() as i64;
-                while mask > 0 {
-                    ret += ret.clone();
-                    if n & mask != 0 {
+                while n > 0 {
+                    if n & 1 == 1 {
                         ret += &base;
                     }
-                    mask >>= 1;
+                    base += base.clone();
+                    n >>= 1;
                 }
                 ret
             }
@@ -105,22 +107,24 @@ pub trait Field:
 
     /// Takes the element to the power of some integer.
     fn powi(&self, mut n: i64) -> Self {
-        let base = if n >= 0 {
+        let mut base = if n >= 0 {
             self.clone()
         } else {
             n *= -1;
             self.clone().multiplicative_inverse()
         };
-        n %= Self::MULTIPLICATIVE_ORDER as i64;
+        // Just an optimization, fine if this doesn't run for large x.
+        if let Ok(x) = i64::try_from(Self::MULTIPLICATIVE_ORDER) {
+            n %= x;
+        }
 
-        let mut mask = Self::MULTIPLICATIVE_ORDER.next_power_of_two() as i64;
         let mut ret = Self::ONE;
-        while mask > 0 {
-            ret *= ret.clone();
-            if n & mask != 0 {
+        while n > 0 {
+            if n & 1 == 1 {
                 ret *= &base;
             }
-            mask >>= 1;
+            base *= base.clone();
+            n >>= 1;
         }
         ret
     }
