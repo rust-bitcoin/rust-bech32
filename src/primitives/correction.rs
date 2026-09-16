@@ -515,4 +515,33 @@ mod tests {
         ctx.add_erasures(&[21]);
         assert!(ctx.bch_errors().is_some(), "should be able to correct");
     }
+
+    #[test]
+    fn regression_vector_3() {
+        // Found by fuzzer. Two errors plus an erasure. Not correctable, but the error correction
+        // logic returns a "correction" that would lie outside of the string.
+        let e = UncheckedHrpstring::new(
+            "bc1wwzruyqr3ja8w7hnja2spmkgfdcgvqwp5swz4hf4ngsjecfz0w0pqud7k38",
+        )
+        .expect("well-formed string")
+        .validate_checksum::<crate::Bech32>()
+        .expect_err("invalid bech32m string");
+        let mut ctx = e.correction_context::<Bech32>(59).unwrap();
+        assert!(ctx.bch_errors().is_none(), "cannot correct");
+        ctx.add_erasures(&[21]);
+        assert!(ctx.bch_errors().is_none(), "cannot correct");
+    }
+
+    #[test]
+    fn regression_vector_4() {
+        // Found by ChatGPT 6 Astra (given a specific prompt). This has an uncorrectable pattern
+        // of errors that 'corrects' to a single error at exactly the index of the HRP separator.
+        // We should refuse to correct this.
+        let e = UncheckedHrpstring::new("a1h2d2fd")
+            .expect("well-formed string")
+            .validate_checksum::<crate::Bech32>()
+            .expect_err("invalid bech32 string");
+        let ctx = e.correction_context::<Bech32>(6).unwrap();
+        assert!(ctx.bch_errors().is_none(), "cannot correct");
+    }
 }
