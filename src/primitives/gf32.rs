@@ -531,6 +531,14 @@ mod tests {
     }
 
     #[test]
+    fn muli_zero_negative_multiplier() {
+        assert_eq!(Fe32::P.muli(-1), Fe32::P);
+        assert_eq!(Fe32::P.muli(-2), Fe32::Q);
+        assert_eq!(Fe32::Q.muli(-1), Fe32::Q);
+        assert_eq!(Fe32::Q.muli(-2), Fe32::Q);
+    }
+
+    #[test]
     #[cfg(feature = "std")]
     fn conversion_error_display_and_source() {
         let invalid = Fe32::from_char('b').unwrap_err();
