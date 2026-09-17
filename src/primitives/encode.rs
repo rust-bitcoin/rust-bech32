@@ -437,4 +437,23 @@ mod tests {
         let count = 1 + iter.by_ref().count();
         assert_eq!(count, expected_total);
     }
+
+    #[test]
+    fn encoder_size_hints_do_not_wrap() {
+        // These are valid, finite lazy iterators. Adding an adaptor's
+        // remaining prefix to their length cannot be represented in usize,
+        // so the lower bound must saturate and the upper bound must be None.
+        let data = core::iter::repeat(Fe32::Q).take(usize::MAX);
+        let with_version = WitnessVersionIter::new(Some(Fe32::Q), data);
+        assert_eq!(with_version.size_hint(), (usize::MAX, None));
+
+        let hrp = Hrp::parse_unchecked("a");
+        let data = WitnessVersionIter::new(None, core::iter::repeat(Fe32::Q).take(usize::MAX));
+        let chars = CharIter::<_, crate::primitives::NoChecksum>::new(&hrp, data);
+        assert_eq!(chars.size_hint(), (usize::MAX, None));
+
+        let data = WitnessVersionIter::new(None, core::iter::repeat(Fe32::Q).take(usize::MAX));
+        let fes = Fe32Iter::<_, crate::primitives::NoChecksum>::new(&hrp, data);
+        assert_eq!(fes.size_hint(), (usize::MAX, None));
+    }
 }

@@ -560,6 +560,13 @@ mod tests {
         }
         assert_eq!(RustCode(Fe32::A).to_string(), "Fe32::A");
     }
+
+    #[test]
+    #[should_panic]
+    fn zero_div_zero() {
+        // Every zero denominator must be rejected, including a zero numerator.
+        let _ = Fe32::Q / Fe32::Q;
+    }
 }
 
 #[cfg(kani)]

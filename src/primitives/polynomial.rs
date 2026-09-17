@@ -596,4 +596,14 @@ mod tests {
         r -= x;
         assert_eq!(r.as_inner()[1], Fe32::P);
     }
+
+    #[test]
+    fn bch_generator_handles_a_single_root() {
+        // p(x) = x + 1 has exactly one distinct root. A one-character
+        // generator is accepted by the public PrintImpl constructor.
+        let polynomial = Polynomial::with_monic_leading_term(&[Fe32::P]);
+        let (_, _, root_indices) = polynomial.bch_generator_primitive_element::<Fe1024>();
+
+        assert_eq!(root_indices.start(), root_indices.end());
+    }
 }

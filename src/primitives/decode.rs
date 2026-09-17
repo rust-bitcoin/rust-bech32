@@ -1319,6 +1319,12 @@ mod tests {
     }
 
     #[test]
+    fn checksum_only_segwit_address_is_rejected_without_panicking() {
+        // Valid Bech32m checksum for HRP "tb" with an empty data payload.
+        assert!(SegwitHrpstring::new("tb1dclvmr").is_err());
+    }
+
+    #[test]
     #[cfg(feature = "std")]
     fn error_display_and_sources() {
         let unchecked_err = UncheckedHrpstringError::Char(CharError::MissingSeparator);
