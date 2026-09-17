@@ -148,7 +148,16 @@ impl<F: Field> Polynomial<F> {
         res
     }
 
-    /// TODO
+    /// Given a polynomial `a_nx^n + ... + a_0` and a syndrome polynomial `s_mx^m + ... + s_0`
+    /// (where `a_n` is nonzero but `s_m` might be zero), computes a "skewed convolution".
+    ///
+    /// This convolution is `c_tx^t + ... + c_0` where
+    ///
+    /// * `t` is `m - n`, bounded below at 0
+    /// * `c_k` is computed as the sum of `a_i*s_j` where `i + j == n + k`
+    ///
+    /// Essentially we compute the product of the two polynomials but drop every term with
+    /// x-exponent less than `n`.
     pub fn convolution(&self, syndromes: &Self) -> Self {
         let mut ret = FieldVec::new();
         let terms = (1 + syndromes.inner.len()).saturating_sub(1 + self.degree());

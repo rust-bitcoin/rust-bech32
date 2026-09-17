@@ -154,17 +154,23 @@ impl<Ck: Checksum> Corrector<Ck> {
         Ck::ROOT_EXPONENTS.end() - Ck::ROOT_EXPONENTS.start() + 1
     }
 
-    /// TODO
+    /// Informs the correction context of the location of erasures (known errors).
+    ///
+    /// These erasures are indexed from the end of the string, so that the final character has
+    /// index 0, the one before that index 1, and so on.
     pub fn add_erasures(&mut self, locs: &[usize]) {
         for loc in locs {
             // If the user tries to add too many erasures, just ignore them. In
             // this case error correction is guaranteed to fail anyway, because
-            // they will have exceeded the singleton bound. (Otherwise, the
-            // singleton bound, which is always <= the checksum length, must be
-            // greater than NO_ALLOC_MAX_LENGTH. So the checksum length must be
-            // greater than NO_ALLOC_MAX_LENGTH. Then correction will still fail.)
+            // the user must have exceeded the singleton bound of the checksum
+            // before hitting this alloc limit. (Or they are using a large custom
+            // checksum that exceeds the alloc limit and which won't work without
+            // "alloc" anyway.)
+            //
+            // Each erasure contributes degree 1 to the "erasure locator" polynomial,
+            // whose maximum degree is `NO_ALLOC_MAX_LENGTH - 1`.
             #[cfg(not(feature = "alloc"))]
-            if self.erasures.len() == NO_ALLOC_MAX_LENGTH {
+            if self.erasures.len() + 1 == NO_ALLOC_MAX_LENGTH {
                 break;
             }
             self.erasures.push(*loc);
