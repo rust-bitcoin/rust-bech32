@@ -267,10 +267,10 @@ impl Bech32Field for Fe32 {
     }
 
     fn _div(&self, other: &Self) -> Self {
-        if self.0 == 0 {
-            Self(0)
-        } else if other.0 == 0 {
+        if other.0 == 0 {
             panic!("Attempt to divide {} by 0 in GF32", self);
+        } else if self.0 == 0 {
+            Self(0)
         } else {
             let log1 = LOG[usize::from(self.0)];
             let log2 = LOG[usize::from(other.0)];
