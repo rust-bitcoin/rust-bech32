@@ -541,7 +541,11 @@ impl<'s> SegwitHrpstring<'s> {
             (true, _) | (false, VERSION_0) => unchecked.validate_and_remove_checksum::<Bech32>()?,
             _ => unchecked.validate_and_remove_checksum::<Bech32m>()?,
         };
-        checked.ascii = &checked.ascii[1..]; // Remove the witness version byte.
+        // Remove the witness version byte (if there is one)
+        checked.ascii = match checked.ascii.get(1..) {
+            Some(remainder) => remainder,
+            None => return Err(SegwitHrpstringError::NoData),
+        };
 
         // Do additional segwit-specific checks.
         checked.validate_segwit_padding()?;
