@@ -65,12 +65,16 @@ pub trait CorrectableError {
 
     /// Wrapper around [`Self::residue_error`] that outputs a correction context.
     ///
-    /// Will return None if the error is not a correctable one, or if the **alloc**
-    /// feature is disabled and the checksum is too large. See the documentation
-    /// for [`NO_ALLOC_MAX_LENGTH`] for more information.
+    /// `non_hrp_len` is the length of the string to be corrected, including the checksum
+    /// but excluding the HRP and the `1` separator. For segwit addresses this is typically
+    /// 39 (for p2wpkh) or 59 (for p2wsh and Taproot).
+    ///
+    /// Will return None if the error is unrelated to checksum validation, or if the **alloc**
+    /// feature is disabled and the checksum is too large. See the documentation for
+    /// [`NO_ALLOC_MAX_LENGTH`] for more information.
     ///
     /// This is the function that users should call.
-    fn correction_context<Ck: Checksum>(&self) -> Option<Corrector<Ck>> {
+    fn correction_context<Ck: Checksum>(&self, non_hrp_len: usize) -> Option<Corrector<Ck>> {
         #[cfg(not(feature = "alloc"))]
         if Ck::CHECKSUM_LENGTH >= NO_ALLOC_MAX_LENGTH {
             return None;
@@ -79,6 +83,7 @@ pub trait CorrectableError {
         self.residue_error().map(|e| Corrector {
             erasures: FieldVec::new(),
             residue: e.residue(),
+            max_index: non_hrp_len,
             phantom: PhantomData,
         })
     }
@@ -134,6 +139,7 @@ impl CorrectableError for DecodeError {
 pub struct Corrector<Ck: Checksum> {
     erasures: FieldVec<usize>,
     residue: Polynomial<Fe32>,
+    max_index: usize,
     phantom: PhantomData<Ck>,
 }
 
@@ -210,14 +216,41 @@ impl<Ck: Checksum> Corrector<Ck> {
             //     when calling the BM algorithm, in all other cases we use the ordinary
             //     unmodified syndromes.
             let errata_locator = conn.mul_mod_x_d(&erasure_locator, usize::MAX);
-            Some(ErrorIterator {
-                evaluator: errata_locator.mul_mod_x_d(&syndromes, self.singleton_bound()),
-                locator_derivative: errata_locator.formal_derivative(),
-                erasures: &self.erasures[..],
-                errors: conn.find_nonzero_distinct_roots(Ck::ROOT_GENERATOR),
-                a: Ck::ROOT_GENERATOR,
-                c: *Ck::ROOT_EXPONENTS.start(),
-            })
+            let evaluator = errata_locator.mul_mod_x_d(&syndromes, self.singleton_bound());
+
+            // If we are within the correction radius, it can be shown that the evaluator degree
+            // is strictly less than the locator degree. This is a very cheap check, so do it here.
+            if evaluator.degree() < errata_locator.degree() {
+                let ret = ErrorIterator {
+                    evaluator,
+                    locator_derivative: errata_locator.formal_derivative(),
+                    erasures: &self.erasures[..],
+                    errors: conn.find_nonzero_distinct_roots(Ck::ROOT_GENERATOR),
+                    a: Ck::ROOT_GENERATOR,
+                    c: *Ck::ROOT_EXPONENTS.start(),
+                };
+
+                // ...however, if we are outside of the correction radius, several things may still
+                // go wrong. In particular, we may have fewer roots than we expect (the locator
+                // polynomial is not fully reducible) or we may have roots that lie outside of the
+                // base field (our syndromes are "best explained" by some weird object which is not
+                // an error pattern).
+                //
+                // In the latter case, because our iterator terminates early if it would return
+                // something not in the base field, our root count will fail. So we don't need to
+                // do a separate "not in the base field" check here.
+                //
+                // Alternately, we may obtain a "valid correction" whose error pattern goes outside
+                // the bounds of the string. This is also nonsensical, so we filter it out.
+                let n_roots = ret.clone().filter(|(idx, _)| *idx < self.max_index).count();
+                if n_roots == errata_locator.degree() {
+                    Some(ret)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -262,6 +295,19 @@ pub struct ErrorIterator<'c, Ck: Checksum> {
     c: usize,
 }
 
+impl<Ck: Checksum> Clone for ErrorIterator<'_, Ck> {
+    fn clone(&self) -> Self {
+        Self {
+            evaluator: self.evaluator.clone(),
+            locator_derivative: self.locator_derivative.clone(),
+            erasures: self.erasures,
+            errors: self.errors.clone(),
+            a: self.a.clone(),
+            c: self.c,
+        }
+    }
+}
+
 impl<Ck: Checksum> Iterator for ErrorIterator<'_, Ck> {
     type Item = (usize, Fe32);
 
@@ -290,17 +336,18 @@ impl<Ck: Checksum> Iterator for ErrorIterator<'_, Ck> {
         // where here a is `Ck::ROOT_GENERATOR`, c is the first element of the range
         // `Ck::ROOT_EXPONENTS`, and both evaluator and locator_derivative are polynomials
         // which are computed when constructing the ErrorIterator.
-
         let a_i = self.a.powi(neg_i as i64);
         let a_neg_i = a_i.clone().multiplicative_inverse();
+        let locator_eval = self.locator_derivative.evaluate(&a_neg_i);
+        if locator_eval == Ck::CorrectionField::ZERO {
+            return None;
+        }
 
         let num = self.evaluator.evaluate(&a_neg_i);
-        let den = a_i.powi(self.c as i64 - 1) * self.locator_derivative.evaluate(&a_neg_i);
+        let den = a_i.powi(self.c as i64 - 1) * locator_eval;
+
         let ret = -num / den;
-        match ret.try_into() {
-            Ok(ret) => Some((neg_i, ret)),
-            Err(_) => unreachable!("error guaranteed to lie in base field"),
-        }
+        ret.try_into().ok().map(|ret| (neg_i, ret))
     }
 }
 
@@ -319,7 +366,7 @@ mod tests {
         match SegwitHrpstring::new(s) {
             Ok(_) => panic!("{} successfully, and wrongly, parsed", s),
             Err(e) => {
-                let mut ctx = e.correction_context::<Bech32>().unwrap();
+                let mut ctx = e.correction_context::<Bech32>(39).unwrap();
                 let mut iter = ctx.bch_errors().unwrap();
                 assert_eq!(iter.next(), Some((0, Fe32::X)));
                 assert_eq!(iter.next(), None);
@@ -336,7 +383,7 @@ mod tests {
         match SegwitHrpstring::new(s) {
             Ok(_) => panic!("{} successfully, and wrongly, parsed", s),
             Err(e) => {
-                let mut ctx = e.correction_context::<Bech32>().unwrap();
+                let mut ctx = e.correction_context::<Bech32>(39).unwrap();
                 let mut iter = ctx.bch_errors().unwrap();
                 assert_eq!(iter.next(), Some((6, Fe32::T)));
                 assert_eq!(iter.next(), None);
@@ -353,7 +400,7 @@ mod tests {
         match SegwitHrpstring::new(s) {
             Ok(_) => panic!("{} successfully, and wrongly, parsed", s),
             Err(e) => {
-                let ctx = e.correction_context::<Bech32>().unwrap();
+                let ctx = e.correction_context::<Bech32>(39).unwrap();
                 let mut iter = ctx.bch_errors().unwrap();
 
                 assert_eq!(iter.next(), Some((20, Fe32::_3)));
@@ -366,7 +413,7 @@ mod tests {
         match SegwitHrpstring::new(s) {
             Ok(_) => panic!("{} successfully, and wrongly, parsed", s),
             Err(e) => {
-                let mut ctx = e.correction_context::<Bech32>().unwrap();
+                let mut ctx = e.correction_context::<Bech32>(39).unwrap();
                 assert!(ctx.bch_errors().is_none());
 
                 // But we can correct it if we inform where an error is.
@@ -389,7 +436,7 @@ mod tests {
         match SegwitHrpstring::new(s) {
             Ok(_) => panic!("{} successfully, and wrongly, parsed", s),
             Err(e) => {
-                let mut ctx = e.correction_context::<Bech32>().unwrap();
+                let mut ctx = e.correction_context::<Bech32>(39).unwrap();
                 ctx.add_erasures(&[37, 0, 20]);
                 let mut iter = ctx.bch_errors().unwrap();
 
@@ -435,5 +482,66 @@ mod tests {
                 "top-level decode checksum errors should expose invalid residue"
             );
         }
+    }
+
+    #[test]
+    fn regression_vector_1() {
+        // Found by fuzzer. Produces errors that don't live in the base field, causing a panic in
+        // ErrorIterator::next. (This happens despite passing the various degree checks, proving
+        // that these cheap checks are not sufficient.)
+        let e = UncheckedHrpstring::new(
+            "bc1awzrzyqr3ja8w7hnja2spmkgfdcgvqwp5sw94af4ngsjecfz0w0pqud7k38",
+        )
+        .expect("well-formed string")
+        .validate_checksum::<crate::Bech32>()
+        .expect_err("invalid bech32 string");
+        let mut ctx = e.correction_context::<Bech32>(59).unwrap();
+        assert!(ctx.bch_errors().is_none(), "cannot correct");
+        ctx.add_erasures(&[23]);
+        assert!(ctx.bch_errors().is_none(), "cannot correct");
+    }
+
+    #[test]
+    fn regression_vector_2() {
+        // Found by fuzzer. *Should* be correctable. Has one unknown error and one erasure.
+        let e = UncheckedHrpstring::new(
+            "bc1qwzrryqr3ja8w7hnda2spmkgfdcgvqwp5swz4pf4ngsjecfz0w0pqud7k38",
+        )
+        .expect("well-formed string")
+        .validate_checksum::<crate::Bech32>()
+        .expect_err("invalid bech32 string");
+        let mut ctx = e.correction_context::<Bech32>(59).unwrap();
+        assert!(ctx.bch_errors().is_none(), "cannot correct");
+        ctx.add_erasures(&[21]);
+        assert!(ctx.bch_errors().is_some(), "should be able to correct");
+    }
+
+    #[test]
+    fn regression_vector_3() {
+        // Found by fuzzer. Two errors plus an erasure. Not correctable, but the error correction
+        // logic returns a "correction" that would lie outside of the string.
+        let e = UncheckedHrpstring::new(
+            "bc1wwzruyqr3ja8w7hnja2spmkgfdcgvqwp5swz4hf4ngsjecfz0w0pqud7k38",
+        )
+        .expect("well-formed string")
+        .validate_checksum::<crate::Bech32>()
+        .expect_err("invalid bech32m string");
+        let mut ctx = e.correction_context::<Bech32>(59).unwrap();
+        assert!(ctx.bch_errors().is_none(), "cannot correct");
+        ctx.add_erasures(&[21]);
+        assert!(ctx.bch_errors().is_none(), "cannot correct");
+    }
+
+    #[test]
+    fn regression_vector_4() {
+        // Found by ChatGPT 6 Astra (given a specific prompt). This has an uncorrectable pattern
+        // of errors that 'corrects' to a single error at exactly the index of the HRP separator.
+        // We should refuse to correct this.
+        let e = UncheckedHrpstring::new("a1h2d2fd")
+            .expect("well-formed string")
+            .validate_checksum::<crate::Bech32>()
+            .expect_err("invalid bech32 string");
+        let ctx = e.correction_context::<Bech32>(6).unwrap();
+        assert!(ctx.bch_errors().is_none(), "cannot correct");
     }
 }
