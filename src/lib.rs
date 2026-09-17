@@ -445,11 +445,21 @@ pub fn encode_upper_to_writer<Ck: Checksum, W: std::io::Write>(
 /// otherwise a [`CodeLengthError`] containing the encoded length and the maximum allowed.
 pub fn encoded_length<Ck: Checksum>(hrp: Hrp, data: &[u8]) -> Result<usize, CodeLengthError> {
     let iter = data.iter().copied().bytes_to_fes();
-    let len = hrp.len() + 1 + iter.len() + Ck::CHECKSUM_LENGTH; // +1 for separator
-    if len > Ck::CODE_LENGTH {
-        Err(CodeLengthError { encoded_length: len, code_length: Ck::CODE_LENGTH })
+    let len = hrp
+        .len()
+        .checked_add(1) // +1 for separator
+        .and_then(|n| n.checked_add(iter.exact_size()?))
+        .and_then(|n| n.checked_add(Ck::CHECKSUM_LENGTH));
+
+    if let Some(len) = len {
+        if len > Ck::CODE_LENGTH {
+            Err(CodeLengthError { encoded_length: len, code_length: Ck::CODE_LENGTH })
+        } else {
+            Ok(len)
+        }
     } else {
-        Ok(len)
+        // If the encoded length would exceed usize::MAX just saturate it for error reporting.
+        Err(CodeLengthError { encoded_length: usize::MAX, code_length: Ck::CODE_LENGTH })
     }
 }
 
@@ -748,6 +758,26 @@ mod tests {
         // A 91 character long string, greater than the segwit enforced maximum of 90.
         let s = "abcd1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqrw9z3s";
         assert!(decode(s).is_ok());
+    }
+
+    #[test]
+    fn encoded_length_rejects_overflowing_checksum_length() {
+        // Define a checksum which is the same as bech32 except we claim that it has usize::MAX
+        // length.
+        enum OverflowChecksum {}
+        impl Checksum for OverflowChecksum {
+            type MidstateRepr = <Bech32 as Checksum>::MidstateRepr;
+            type CorrectionField = <Bech32 as Checksum>::CorrectionField;
+            const ROOT_GENERATOR: Self::CorrectionField = <Bech32 as Checksum>::ROOT_GENERATOR;
+            const ROOT_EXPONENTS: core::ops::RangeInclusive<usize> = 24..=26;
+            const CODE_LENGTH: usize = usize::MAX; // lmao
+            const CHECKSUM_LENGTH: usize = usize::MAX; // lmao
+            const GENERATOR_SH: [u32; 5] = <Bech32 as Checksum>::GENERATOR_SH;
+            const TARGET_RESIDUE: u32 = <Bech32 as Checksum>::TARGET_RESIDUE;
+        }
+
+        let hrp = Hrp::parse_unchecked("a");
+        encoded_length::<OverflowChecksum>(hrp, &[]).expect_err("length should overflow");
     }
 }
 #[cfg(bench)]
