@@ -222,7 +222,7 @@ impl<F: Field> Polynomial<F> {
     ) -> (E, usize, ops::RangeInclusive<usize>) {
         let roots: FieldVec<usize> = self.find_nonzero_distinct_roots(E::GENERATOR).collect();
         debug_assert!(roots.len() <= self.degree());
-        // debug_assert!(roots.is_sorted()); // nightly only API
+        // debug_assert!(roots.is_sorted()); // need Rust 1.82
         assert_eq!(
             self.degree() + usize::from(self.zero_is_root()),
             roots.len(),
@@ -231,6 +231,10 @@ impl<F: Field> Polynomial<F> {
             roots,
             self.degree(),
         );
+
+        if roots.len() == 1 {
+            return (E::GENERATOR, E::MULTIPLICATIVE_ORDER, roots[0]..=roots[0]);
+        }
 
         // Brute-force (worst case n^3*log(n) in the length of the polynomial) the longest
         // geometric series within the set of roots. The common ratio between these
