@@ -17,8 +17,12 @@ fn do_test(data: &[u8]) {
         iv.push(Fe32::try_from(*ch).unwrap());
     }
 
-    for (i, d) in LfsrIter::berlekamp_massey(&iv).take(data.len()).enumerate() {
-        assert_eq!(data[i], d.to_u8());
+    let mut lfsr = LfsrIter::berlekamp_massey(&iv);
+    for i in 0..3 * data.len() {
+        let d = lfsr.next().expect("LFSR should never run out");
+        if i < data.len() {
+            assert_eq!(data[i], d.to_u8());
+        }
     }
 }
 
@@ -52,7 +56,7 @@ mod tests {
     #[test]
     fn duplicate_crash() {
         let mut a = Vec::new();
-        extend_vec_from_hex("00", &mut a);
+        extend_vec_from_hex("00000000", &mut a);
         super::do_test(&a);
     }
 }
