@@ -286,4 +286,13 @@ mod tests {
             assert_eq!(x, Fe::ONE);
         }
     }
+
+    #[test]
+    fn berlekamp_massey_all_zero_sequence_does_not_run_dry() {
+        for i in 0..crate::primitives::correction::NO_ALLOC_MAX_LENGTH {
+            let mut lfsr = LfsrIter::berlekamp_massey(&vec![Fe32::ZERO; i]);
+            assert_eq!(lfsr.next(), Some(Fe32::ZERO));
+            assert_eq!(lfsr.next(), Some(Fe32::ZERO));
+        }
+    }
 }
