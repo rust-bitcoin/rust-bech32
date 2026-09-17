@@ -80,7 +80,7 @@ pub trait CorrectableError {
             return None;
         }
 
-        self.residue_error().map(|e| Corrector {
+        self.residue_error().filter(|e| e.residue_length_matches::<Ck>()).map(|e| Corrector {
             erasures: FieldVec::new(),
             residue: e.residue(),
             max_index: non_hrp_len,
