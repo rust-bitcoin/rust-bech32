@@ -163,7 +163,7 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         let (min, max) = self.iter.size_hint();
         match self.witness_version {
-            Some(_) => (min + 1, max.map(|max| max + 1)),
+            Some(_) => (min.saturating_add(1), max.and_then(|max| max.checked_add(1))),
             None => (min, max),
         }
     }
@@ -230,11 +230,14 @@ where
                 let (hrp_min, hrp_max) = hrp_iter.size_hint();
                 let (chk_min, chk_max) = self.checksummed.size_hint();
 
-                let min = hrp_min + 1 + chk_min; // +1 for the separator.
+                let min = hrp_min
+                    .saturating_add(1) // for the separator
+                    .saturating_add(chk_min);
 
-                // To provide a max boundary we need to have gotten a value from the hrp iter as well as the
-                // checksummed iter, otherwise we have to return None since we cannot know the maximum.
-                let max = hrp_max.zip(chk_max).map(|(hrp, chk)| hrp + 1 + chk);
+                let max = hrp_max
+                    .zip(chk_max)
+                    .and_then(|(hrp, chk)| hrp.checked_add(chk))
+                    .and_then(|sum| sum.checked_add(1)); // for the separator
 
                 (min, max)
             },
@@ -330,8 +333,8 @@ where
 
         let data = self.checksummed.size_hint();
 
-        let min = hrp.0 + data.0;
-        let max = hrp.1.zip(data.1).map(|(hrp, data)| hrp + data);
+        let min = hrp.0.saturating_add(data.0);
+        let max = hrp.1.zip(data.1).and_then(|(hrp, data)| hrp.checked_add(data));
 
         (min, max)
     }
