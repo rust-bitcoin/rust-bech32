@@ -47,7 +47,8 @@ impl<F: Field> LfsrIter<F> {
     ///
     /// # Panics
     ///
-    /// Panics if given an empty list of initial contents.
+    /// Panics if given an empty list of initial contents, or on non-`alloc` builds if
+    /// the list of initial contents is greater than or equal to `NO_ALLOC_MAX_LENGTH`.
     pub fn berlekamp_massey(initial_contents: &[F]) -> Self {
         assert_ne!(initial_contents.len(), 0, "cannot create a LFSR with no initial contents");
 
