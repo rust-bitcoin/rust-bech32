@@ -173,6 +173,11 @@ impl<Ck: Checksum> Corrector<Ck> {
             if self.erasures.len() + 1 == NO_ALLOC_MAX_LENGTH {
                 break;
             }
+            // Similarly, if the user exceeds the singleton bound, just drop any remaining
+            // erasures since we know correction will fail.
+            if self.erasures.len() > self.singleton_bound() {
+                break;
+            }
             self.erasures.push(*loc);
         }
     }
@@ -188,6 +193,11 @@ impl<Ck: Checksum> Corrector<Ck> {
     /// If the input string has sufficiently many errors, this unique closest correct
     /// string may not actually be the intended string.
     pub fn bch_errors(&self) -> Option<ErrorIterator<'_, Ck>> {
+        // Early fail if there are too many erasures.
+        if self.erasures.len() > self.singleton_bound() {
+            return None;
+        }
+
         // 1. Compute all syndromes by evaluating the residue at each power of the generator.
         let syndromes: Polynomial<_> = Ck::ROOT_GENERATOR
             .powers_range(Ck::ROOT_EXPONENTS)
