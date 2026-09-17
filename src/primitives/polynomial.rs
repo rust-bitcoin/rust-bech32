@@ -184,8 +184,8 @@ impl<F: Field> Polynomial<F> {
             (sidx..=eidx).map(|i| self.inner[exp - i].clone() * &other.inner[i]).sum()
         };
 
-        let max_n = cmp::min(sdeg + odeg + 1, d - 1);
-        (0..=max_n).map(convolution_product).collect()
+        let max_deg = cmp::min(sdeg + odeg, d - 1);
+        (0..=max_deg).map(convolution_product).collect()
     }
 
     /// Given a BCH generator polynomial, find an element alpha that maximizes the
