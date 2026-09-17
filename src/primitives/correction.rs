@@ -375,6 +375,26 @@ mod tests {
     };
     use crate::Bech32;
 
+    #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    enum Codex32 {}
+
+    impl Checksum for Codex32 {
+        type MidstateRepr = u128;
+        type CorrectionField = crate::Fe1024;
+        const ROOT_GENERATOR: Self::CorrectionField = crate::Fe1024::new([Fe32::_9, Fe32::_9]);
+        const ROOT_EXPONENTS: core::ops::RangeInclusive<usize> = 9..=16;
+        const CHECKSUM_LENGTH: usize = 13;
+        const CODE_LENGTH: usize = 93;
+        const GENERATOR_SH: [u128; 5] = [
+            0x19dc500ce73fde210,
+            0x1bfae00def77fe529,
+            0x1fbd920fffe7bee52,
+            0x1739640bdeee3fdad,
+            0x07729a039cfc75f5a,
+        ];
+        const TARGET_RESIDUE: u128 = 0x10ce0795c2fd1e62a;
+    }
+
     #[test]
     fn bech32() {
         // Last x should be q
@@ -559,5 +579,51 @@ mod tests {
             .expect_err("invalid bech32 string");
         let ctx = e.correction_context::<Bech32>(6).unwrap();
         assert!(ctx.bch_errors().is_none(), "cannot correct");
+    }
+
+    #[test]
+    fn too_many_erasures_do_not_panic_without_alloc() {
+        let checksum_error = UncheckedHrpstring::new("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdx")
+            .expect("vector should parse")
+            .validate_checksum::<Bech32>()
+            .expect_err("vector should have an invalid checksum residue");
+        let mut ctx = checksum_error
+            .correction_context::<Bech32>(39)
+            .expect("invalid checksum residue should be correctable");
+        let mut erasures = [0; NO_ALLOC_MAX_LENGTH];
+        for (idx, loc) in erasures.iter_mut().enumerate() {
+            *loc = idx;
+        }
+
+        ctx.add_erasures(&erasures);
+        let _ = ctx.bch_errors();
+    }
+
+    #[test]
+    fn wide_invalid_residue_comparison_does_not_panic() {
+        let checksum_error =
+            UncheckedHrpstring::new("ms10testsxxxxxxxxxxxxxxxxxxxxxxxxxx4nzvca9cmczlq")
+                .expect("vector should parse")
+                .validate_checksum::<Codex32>()
+                .expect_err("vector should have an invalid checksum residue");
+
+        assert!(!checksum_error
+            .residue_error()
+            .expect("is a residue error")
+            .matches_bech32_checksum());
+    }
+
+    #[test]
+    fn mismatched_checksum_context_does_not_panic_without_alloc() {
+        let checksum_error =
+            UncheckedHrpstring::new("ms10testsxxxxxxxxxxxxxxxxxxxxxxxxxx4nzvca9cmczlq")
+                .expect("vector should parse")
+                .validate_checksum::<Codex32>()
+                .expect_err("vector should have an invalid checksum residue");
+
+        assert!(
+            checksum_error.correction_context::<Bech32>(45).is_none(),
+            "a short mismatched checksum must not materialize an oversized residue"
+        );
     }
 }
