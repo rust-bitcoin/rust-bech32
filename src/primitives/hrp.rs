@@ -163,16 +163,21 @@ impl Hrp {
 
                 // However, an invalid length error will take priority over an
                 // invalid character error.
-                if self.index + s.len() > self.arr.len() {
-                    self.error = Some(Error::TooLong(self.index + s.len()));
+                //
+                // Because we keep counting even in the error case, it's possible (on 32-bit
+                // systems at least) to cause an arithmetic overflow here, e.g. by having an
+                // iterator that yields the same 1MB chunk 4096 times. So use saturating_add.
+                let end = self.index.saturating_add(s.len());
+                if end > self.arr.len() {
+                    self.error = Some(Error::TooLong(end));
                 } else {
                     // Only do the actual copy if we passed the index check.
-                    self.arr[self.index..self.index + s.len()].copy_from_slice(s.as_bytes());
+                    self.arr[self.index..end].copy_from_slice(s.as_bytes());
                 }
 
                 // Unconditionally update self.index so that in the case of a too-long
                 // string, our error return will reflect the full length.
-                self.index += s.len();
+                self.index = end;
                 Ok(())
             }
         }
