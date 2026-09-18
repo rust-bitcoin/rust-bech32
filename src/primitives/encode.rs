@@ -163,7 +163,7 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         let (min, max) = self.iter.size_hint();
         match self.witness_version {
-            Some(_) => (min + 1, max.map(|max| max + 1)),
+            Some(_) => (min.saturating_add(1), max.and_then(|max| max.checked_add(1))),
             None => (min, max),
         }
     }
@@ -230,11 +230,14 @@ where
                 let (hrp_min, hrp_max) = hrp_iter.size_hint();
                 let (chk_min, chk_max) = self.checksummed.size_hint();
 
-                let min = hrp_min + 1 + chk_min; // +1 for the separator.
+                let min = hrp_min
+                    .saturating_add(1) // for the separator
+                    .saturating_add(chk_min);
 
-                // To provide a max boundary we need to have gotten a value from the hrp iter as well as the
-                // checksummed iter, otherwise we have to return None since we cannot know the maximum.
-                let max = hrp_max.zip(chk_max).map(|(hrp, chk)| hrp + 1 + chk);
+                let max = hrp_max
+                    .zip(chk_max)
+                    .and_then(|(hrp, chk)| hrp.checked_add(chk))
+                    .and_then(|sum| sum.checked_add(1)); // for the separator
 
                 (min, max)
             },
@@ -330,8 +333,8 @@ where
 
         let data = self.checksummed.size_hint();
 
-        let min = hrp.0 + data.0;
-        let max = hrp.1.zip(data.1).map(|(hrp, data)| hrp + data);
+        let min = hrp.0.saturating_add(data.0);
+        let max = hrp.1.zip(data.1).and_then(|(hrp, data)| hrp.checked_add(data));
 
         (min, max)
     }
@@ -433,5 +436,24 @@ mod tests {
         iter.next();
         let count = 1 + iter.by_ref().count();
         assert_eq!(count, expected_total);
+    }
+
+    #[test]
+    fn encoder_size_hints_do_not_wrap() {
+        // These are valid, finite lazy iterators. Adding an adaptor's
+        // remaining prefix to their length cannot be represented in usize,
+        // so the lower bound must saturate and the upper bound must be None.
+        let data = core::iter::repeat(Fe32::Q).take(usize::MAX);
+        let with_version = WitnessVersionIter::new(Some(Fe32::Q), data);
+        assert_eq!(with_version.size_hint(), (usize::MAX, None));
+
+        let hrp = Hrp::parse_unchecked("a");
+        let data = WitnessVersionIter::new(None, core::iter::repeat(Fe32::Q).take(usize::MAX));
+        let chars = CharIter::<_, crate::primitives::NoChecksum>::new(&hrp, data);
+        assert_eq!(chars.size_hint(), (usize::MAX, None));
+
+        let data = WitnessVersionIter::new(None, core::iter::repeat(Fe32::Q).take(usize::MAX));
+        let fes = Fe32Iter::<_, crate::primitives::NoChecksum>::new(&hrp, data);
+        assert_eq!(fes.size_hint(), (usize::MAX, None));
     }
 }

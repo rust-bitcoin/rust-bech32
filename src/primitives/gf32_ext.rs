@@ -480,4 +480,12 @@ mod tests {
         let ratio = a / b;
         assert_eq!(ratio * b, a);
     }
+
+    #[test]
+    #[should_panic]
+    fn zero_div_zero_1() { let _ = Fe1024::ZERO / Fe1024::ZERO; }
+
+    #[test]
+    #[should_panic]
+    fn zero_div_zero_2() { let _ = Fe32768::ZERO / Fe32768::ZERO; }
 }

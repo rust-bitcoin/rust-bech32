@@ -541,7 +541,11 @@ impl<'s> SegwitHrpstring<'s> {
             (true, _) | (false, VERSION_0) => unchecked.validate_and_remove_checksum::<Bech32>()?,
             _ => unchecked.validate_and_remove_checksum::<Bech32m>()?,
         };
-        checked.ascii = &checked.ascii[1..]; // Remove the witness version byte.
+        // Remove the witness version byte (if there is one)
+        checked.ascii = match checked.ascii.get(1..) {
+            Some(remainder) => remainder,
+            None => return Err(SegwitHrpstringError::NoData),
+        };
 
         // Do additional segwit-specific checks.
         checked.validate_segwit_padding()?;
@@ -1312,6 +1316,12 @@ mod tests {
         assert_eq!(byte_iter.size_hint(), (5, Some(5)));
         assert_eq!(byte_iter.next(), Some(0));
         assert_eq!(byte_iter.size_hint(), (4, Some(4)));
+    }
+
+    #[test]
+    fn checksum_only_segwit_address_is_rejected_without_panicking() {
+        // Valid Bech32m checksum for HRP "tb" with an empty data payload.
+        assert!(SegwitHrpstring::new("tb1dclvmr").is_err());
     }
 
     #[test]
