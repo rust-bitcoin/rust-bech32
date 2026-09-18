@@ -330,7 +330,7 @@ where
         let add = self.checksum_remaining;
         let (min, max) = self.iter.size_hint();
 
-        (min + add, max.map(|max| max + add))
+        (min.saturating_add(add), max.and_then(|max| max.checked_add(add)))
     }
 }
 
