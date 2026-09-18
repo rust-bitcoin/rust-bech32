@@ -835,4 +835,30 @@ mod tests {
         lower.hash(&mut h2);
         assert_eq!(h1.finish(), h2.finish());
     }
+
+    #[cfg(target_pointer_width = "32")]
+    #[test]
+    fn parse_display_rejects_length_overflow() {
+        struct Repeated<'a> {
+            chunk: &'a str,
+            count: usize,
+        }
+
+        impl core::fmt::Display for Repeated<'_> {
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                for _ in 0..self.count {
+                    f.write_str(self.chunk)?;
+                }
+                Ok(())
+            }
+        }
+
+        // Each write fails character validation immediately, so only one
+        // byte per chunk is inspected. The chunks are never accumulated.
+        let chunk = vec![b' '; 1 << 20];
+        let chunk = core::str::from_utf8(&chunk).unwrap();
+        // 4096 writes of 1 MiB overflow a 32-bit usize using only 1 MiB.
+        let result = Hrp::parse_display(Repeated { chunk, count: 4096 });
+        assert!(result.is_err(), "oversized formatted input must be rejected without panicking");
+    }
 }
