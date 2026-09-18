@@ -336,7 +336,8 @@ pub fn encoded_length(
     witness_program: &[u8],
 ) -> Result<usize, SegwitCodeLengthError> {
     // Ck is only for length and since they are both the same we can use either here.
-    let len = crate::encoded_length::<Bech32>(hrp, witness_program).map(|len| len + 1)?; // +1 for witness version.
+    let len =
+        crate::encoded_length::<Bech32>(hrp, witness_program).map(|len| len.saturating_add(1))?; // +1 for witness version.
 
     if len > MAX_STRING_LENGTH {
         Err(SegwitCodeLengthError(len))

@@ -330,7 +330,7 @@ where
         let add = self.checksum_remaining;
         let (min, max) = self.iter.size_hint();
 
-        (min + add, max.map(|max| max + add))
+        (min.saturating_add(add), max.and_then(|max| max.checked_add(add)))
     }
 }
 
@@ -633,5 +633,28 @@ mod tests {
         let expected = input_len / 5 * 8 + (input_len % 5 * 8 + 4) / 5;
         let iter = core::iter::repeat(0u8).take(input_len).bytes_to_fes();
         assert_eq!(iter.size_hint(), (expected, Some(expected)));
+    }
+
+    #[test]
+    fn checksummed_size_hint_bounds_small_stream_with_large_take_limit() {
+        let payload = [Fe32::Q; 16];
+        let mut input = payload.iter().copied();
+        // A valid, small stream with an unknown length and a large read limit.
+        let data = core::iter::from_fn(|| input.next()).take(usize::MAX);
+        assert_eq!(data.size_hint(), (0, Some(usize::MAX)));
+
+        let encoded = Checksummed::<_, crate::Bech32>::new(data);
+        let (lower, upper) = encoded.size_hint();
+        let actual = encoded.count();
+        assert_eq!(actual, 22);
+        assert!(lower <= actual);
+        assert!(
+            upper.map_or(true, |bound| actual <= bound),
+            "an upper bound must not let oversized output pass a length check"
+        );
+
+        let data = core::iter::repeat(Fe32::Q).take(usize::MAX);
+        let encoded = Checksummed::<_, crate::Bech32>::new(data);
+        assert_eq!(encoded.size_hint(), (usize::MAX, None));
     }
 }
