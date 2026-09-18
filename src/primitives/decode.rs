@@ -962,7 +962,20 @@ impl InvalidResidueError {
     /// too large a checksum without an allocator. We would like to better understand
     /// the usecase for this before exposing such a footgun.
     pub fn matches_bech32_checksum(&self) -> bool {
-        self.actual == Polynomial::from_residue(Bech32::TARGET_RESIDUE)
+        self.residue_length_matches::<Bech32>()
+            && self.actual == Polynomial::from_residue(Bech32::TARGET_RESIDUE)
+    }
+
+    /// Whether or not the invalid residue has the correct length for the given checksum.
+    ///
+    /// As the residue error loses the checksum generic (to avoid polluting entire trees
+    /// of error types with the generic), this method is needed to check in no-alloc
+    /// contexts whether the residue is something we have enough space to handle.
+    ///
+    /// This is a very crude check as far as "checksum compatibility" goes but it's sufficient to
+    /// avoid out-of-bound panics.
+    pub(super) fn residue_length_matches<Ck: Checksum>(&self) -> bool {
+        self.actual.as_inner().len() == Ck::MidstateRepr::WIDTH
     }
 
     /// Accessor for the invalid residue, less the target residue.

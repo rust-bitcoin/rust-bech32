@@ -80,7 +80,7 @@ pub trait CorrectableError {
             return None;
         }
 
-        self.residue_error().map(|e| Corrector {
+        self.residue_error().filter(|e| e.residue_length_matches::<Ck>()).map(|e| Corrector {
             erasures: FieldVec::new(),
             residue: e.residue(),
             max_index: non_hrp_len,
@@ -154,17 +154,28 @@ impl<Ck: Checksum> Corrector<Ck> {
         Ck::ROOT_EXPONENTS.end() - Ck::ROOT_EXPONENTS.start() + 1
     }
 
-    /// TODO
+    /// Informs the correction context of the location of erasures (known errors).
+    ///
+    /// These erasures are indexed from the end of the string, so that the final character has
+    /// index 0, the one before that index 1, and so on.
     pub fn add_erasures(&mut self, locs: &[usize]) {
         for loc in locs {
             // If the user tries to add too many erasures, just ignore them. In
             // this case error correction is guaranteed to fail anyway, because
-            // they will have exceeded the singleton bound. (Otherwise, the
-            // singleton bound, which is always <= the checksum length, must be
-            // greater than NO_ALLOC_MAX_LENGTH. So the checksum length must be
-            // greater than NO_ALLOC_MAX_LENGTH. Then correction will still fail.)
+            // the user must have exceeded the singleton bound of the checksum
+            // before hitting this alloc limit. (Or they are using a large custom
+            // checksum that exceeds the alloc limit and which won't work without
+            // "alloc" anyway.)
+            //
+            // Each erasure contributes degree 1 to the "erasure locator" polynomial,
+            // whose maximum degree is `NO_ALLOC_MAX_LENGTH - 1`.
             #[cfg(not(feature = "alloc"))]
-            if self.erasures.len() == NO_ALLOC_MAX_LENGTH {
+            if self.erasures.len() + 1 == NO_ALLOC_MAX_LENGTH {
+                break;
+            }
+            // Similarly, if the user exceeds the singleton bound, just drop any remaining
+            // erasures since we know correction will fail.
+            if self.erasures.len() > self.singleton_bound() {
                 break;
             }
             self.erasures.push(*loc);
@@ -182,6 +193,11 @@ impl<Ck: Checksum> Corrector<Ck> {
     /// If the input string has sufficiently many errors, this unique closest correct
     /// string may not actually be the intended string.
     pub fn bch_errors(&self) -> Option<ErrorIterator<'_, Ck>> {
+        // Early fail if there are too many erasures.
+        if self.erasures.len() > self.singleton_bound() {
+            return None;
+        }
+
         // 1. Compute all syndromes by evaluating the residue at each power of the generator.
         let syndromes: Polynomial<_> = Ck::ROOT_GENERATOR
             .powers_range(Ck::ROOT_EXPONENTS)
@@ -358,6 +374,26 @@ mod tests {
         CheckedHrpstringError, SegwitHrpstring, SegwitHrpstringError, UncheckedHrpstring,
     };
     use crate::Bech32;
+
+    #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    enum Codex32 {}
+
+    impl Checksum for Codex32 {
+        type MidstateRepr = u128;
+        type CorrectionField = crate::Fe1024;
+        const ROOT_GENERATOR: Self::CorrectionField = crate::Fe1024::new([Fe32::_9, Fe32::_9]);
+        const ROOT_EXPONENTS: core::ops::RangeInclusive<usize> = 9..=16;
+        const CHECKSUM_LENGTH: usize = 13;
+        const CODE_LENGTH: usize = 93;
+        const GENERATOR_SH: [u128; 5] = [
+            0x19dc500ce73fde210,
+            0x1bfae00def77fe529,
+            0x1fbd920fffe7bee52,
+            0x1739640bdeee3fdad,
+            0x07729a039cfc75f5a,
+        ];
+        const TARGET_RESIDUE: u128 = 0x10ce0795c2fd1e62a;
+    }
 
     #[test]
     fn bech32() {
@@ -543,5 +579,51 @@ mod tests {
             .expect_err("invalid bech32 string");
         let ctx = e.correction_context::<Bech32>(6).unwrap();
         assert!(ctx.bch_errors().is_none(), "cannot correct");
+    }
+
+    #[test]
+    fn too_many_erasures_do_not_panic_without_alloc() {
+        let checksum_error = UncheckedHrpstring::new("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdx")
+            .expect("vector should parse")
+            .validate_checksum::<Bech32>()
+            .expect_err("vector should have an invalid checksum residue");
+        let mut ctx = checksum_error
+            .correction_context::<Bech32>(39)
+            .expect("invalid checksum residue should be correctable");
+        let mut erasures = [0; NO_ALLOC_MAX_LENGTH];
+        for (idx, loc) in erasures.iter_mut().enumerate() {
+            *loc = idx;
+        }
+
+        ctx.add_erasures(&erasures);
+        let _ = ctx.bch_errors();
+    }
+
+    #[test]
+    fn wide_invalid_residue_comparison_does_not_panic() {
+        let checksum_error =
+            UncheckedHrpstring::new("ms10testsxxxxxxxxxxxxxxxxxxxxxxxxxx4nzvca9cmczlq")
+                .expect("vector should parse")
+                .validate_checksum::<Codex32>()
+                .expect_err("vector should have an invalid checksum residue");
+
+        assert!(!checksum_error
+            .residue_error()
+            .expect("is a residue error")
+            .matches_bech32_checksum());
+    }
+
+    #[test]
+    fn mismatched_checksum_context_does_not_panic_without_alloc() {
+        let checksum_error =
+            UncheckedHrpstring::new("ms10testsxxxxxxxxxxxxxxxxxxxxxxxxxx4nzvca9cmczlq")
+                .expect("vector should parse")
+                .validate_checksum::<Codex32>()
+                .expect_err("vector should have an invalid checksum residue");
+
+        assert!(
+            checksum_error.correction_context::<Bech32>(45).is_none(),
+            "a short mismatched checksum must not materialize an oversized residue"
+        );
     }
 }
