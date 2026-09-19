@@ -13,7 +13,7 @@ edition = "2018"
 rust-version = "1.56.1"
 
 [package.metadata.rbmt.toolchains]
-nightly = "nightly-2026-09-04"
+nightly = "nightly-2026-09-18"
 stable = "1.98.1"
 
 [features]
