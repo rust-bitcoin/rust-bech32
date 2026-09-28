@@ -584,6 +584,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "long-hrp")]
     fn can_encode_maximum_length_address() {
         let program = [0_u8; 40]; // Maximum witness program length.
         let hrp = Hrp::parse_unchecked("anhrpthatis18chars");
@@ -592,6 +593,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "long-hrp")]
     fn can_not_encode_address_too_long() {
         let tcs = vec![
             ("anhrpthatis19charsx", 91),
@@ -607,6 +609,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "long-hrp")]
     fn can_decode_maximum_length_address() {
         let address = "anhrpthatisnineteen1pqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqghfyyfz";
         assert_eq!(address.len(), MAX_STRING_LENGTH);
@@ -615,6 +618,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "long-hrp")]
     fn can_not_decode_address_too_long() {
         let address = "anhrpthatistwentycha1pqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgqfrwjz";
         assert_eq!(address.len(), MAX_STRING_LENGTH + 1);
@@ -623,6 +627,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "long-hrp")]
     fn unchecked_encoders_must_not_silently_truncate() {
         // 22-char HRP + 1 separator + 1 witness version + 64 data + 6 checksum = 94 chars,
         // which exceeds the 90-byte (per spec) stack buffer used by the unchecked encoders.

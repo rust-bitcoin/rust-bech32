@@ -1,3 +1,7 @@
+# Unreleased
+
+* Add `long-hrp` feature (enabled by default); when this is disabled, the maximum length of HRPs is 11 characters [#313](https://github.com/rust-bitcoin/rust-bech32/pull/313)
+
 # 0.12.0 - 2024-10-27
 
 This release adds error correction.

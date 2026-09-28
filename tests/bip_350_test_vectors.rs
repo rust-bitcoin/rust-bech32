@@ -39,14 +39,19 @@ macro_rules! check_valid_bech32m {
         )*
     }
 }
+
 check_valid_bech32m! {
     valid_bech32m_hrp_string_0, "A1LQFN3A";
     valid_bech32m_hrp_string_1, "a1lqfn3a";
-    valid_bech32m_hrp_string_2, "an83characterlonghumanreadablepartthatcontainsthetheexcludedcharactersbioandnumber11sg7hg6";
     valid_bech32m_hrp_string_3, "abcdef1l7aum6echk45nj3s0wdvt2fg8x9yrzpqzd3ryx";
     valid_bech32m_hrp_string_4, "11llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllludsr8";
     valid_bech32m_hrp_string_5, "split1checkupstagehandshakeupstreamerranterredcaperredlc445v";
     valid_bech32m_hrp_string_6, "?1v759aa";
+}
+
+#[cfg(feature = "long-hrp")]
+check_valid_bech32m! {
+    valid_bech32m_hrp_string_2, "an83characterlonghumanreadablepartthatcontainsthetheexcludedcharactersbioandnumber11sg7hg6";
 }
 
 macro_rules! check_valid_address_roundtrip {

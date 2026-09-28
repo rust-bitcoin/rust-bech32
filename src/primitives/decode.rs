@@ -1203,8 +1203,11 @@ mod tests {
     #[test]
     #[cfg(feature = "alloc")]
     fn check_hrp_max_length() {
-        let hrps =
-            "an83characterlonghumanreadablepartthatcontainsthenumber1andtheexcludedcharactersbio";
+        let hrps = if cfg!(feature = "long-hrp") {
+            "an83characterlonghumanreadablepartthatcontainsthenumber1andtheexcludedcharactersbio"
+        } else {
+            "an11charact"
+        };
 
         let hrp = Hrp::parse_unchecked(hrps);
         let s = crate::encode::<Bech32>(hrp, &[]).expect("failed to encode empty buffer");

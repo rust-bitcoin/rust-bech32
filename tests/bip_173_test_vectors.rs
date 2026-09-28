@@ -43,11 +43,15 @@ macro_rules! check_valid_bech32 {
 check_valid_bech32! {
     valid_bech32_hrp_string_0, "A12UEL5L";
     valid_bech32_hrp_string_a, "a12uel5l";
-    valid_bech32_hrp_string_1, "an83characterlonghumanreadablepartthatcontainsthenumber1andtheexcludedcharactersbio1tt5tgs";
-    valid_bech32_hrp_string_2, "abcdef1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw";
     valid_bech32_hrp_string_3, "11qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqc8247j";
     valid_bech32_hrp_string_4, "split1checkupstagehandshakeupstreamerranterredcaperred2y9e3w";
     valid_bech32_hrp_string_b, "?1ezyfcl";
+}
+
+#[cfg(feature = "long-hrp")]
+check_valid_bech32! {
+    valid_bech32_hrp_string_1, "an83characterlonghumanreadablepartthatcontainsthenumber1andtheexcludedcharactersbio1tt5tgs";
+    valid_bech32_hrp_string_2, "abcdef1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw";
 }
 
 macro_rules! check_valid_address_roundtrip {

@@ -17,9 +17,11 @@ nightly = "nightly-2026-09-25"
 stable = "1.98.1"
 
 [features]
-default = ["std"]
+default = ["std", "long-hrp"]
 std = ["alloc"]
 alloc = []
+# Enable this to support HRP up to 83 characters, otherwise it is limited to just 11
+long-hrp = []
 
 [lints.rust]
 unexpected_cfgs = { level = "deny", check-cfg = [ 'cfg(bench)', 'cfg(kani)' ] }
