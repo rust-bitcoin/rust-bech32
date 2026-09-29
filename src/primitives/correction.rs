@@ -582,6 +582,92 @@ mod tests {
     }
 
     #[test]
+    fn regression_vector_5() {
+        // Found by fuzzer. This has a single (nontrivial) error, which is covered by an
+        // erasure, plus three further erasures, for a total of four -- one more than the
+        // singleton bound of 3. The erasure list is processed one at a time, and the
+        // decision point is when `erasures.len()` is exactly equal to the bound: we must
+        // push the fourth erasure (after which `bch_errors` correctly refuses, since four
+        // erasures can never be corrected). Mutants which tighten the break condition to
+        // `len == bound` or `len >= bound` stop at three erasures instead -- and since
+        // three erasures are within the bound, they would then happily return a
+        // "correction". See issue #312.
+        let e = UncheckedHrpstring::new(
+            "bc1qwzrryqr3ja8w7hnza2spmkgfdcgvqwp5swz4af4ngsjecfz0w0pqud7k38",
+        )
+        .expect("well-formed string")
+        .validate_checksum::<crate::Bech32>()
+        .expect_err("invalid bech32 string");
+
+        // With only the first three erasures we are exactly at the bound, and correction
+        // succeeds. This is what the mutants would end up doing if given all four.
+        let mut ctx = e.correction_context::<Bech32>(59).unwrap();
+        ctx.add_erasures(&[42, 23, 19]);
+        assert!(ctx.bch_errors().is_some(), "three erasures are exactly at the bound");
+
+        // With all four erasures, we must keep all four (not silently drop the last one)
+        // and refuse to correct.
+        let mut ctx = e.correction_context::<Bech32>(59).unwrap();
+        ctx.add_erasures(&[42, 23, 19, 58]);
+        assert!(ctx.bch_errors().is_none(), "four erasures exceed the bound");
+    }
+
+    #[test]
+    fn regression_vector_6() {
+        // Found by fuzzer. This has two unknown errors and no erasures: 2E + X = 4 exceeds
+        // the singleton bound of 3, so we refuse to correct. The `+` -> `*` mutant in
+        // `bch_errors` instead computes deg(erasure_locator) * 2 * deg(conn) = 0 * 4 = 0,
+        // which is trivially within the bound, and accepts -- the resulting "correction"
+        // passes all the subsequent degree and root-count checks. With no erasures the
+        // left side of the bound check degenerates, which is why this vector is needed.
+        // See issue #312.
+        let e = UncheckedHrpstring::new(
+            "bc1gwzrryqr3ja8w7hnja2spmkgfdcgvqwp5uwz4af4ngsjecfz0w0pqud7k38",
+        )
+        .expect("well-formed string")
+        .validate_checksum::<crate::Bech32>()
+        .expect_err("invalid bech32 string");
+        let ctx = e.correction_context::<Bech32>(59).unwrap();
+        assert!(ctx.bch_errors().is_none(), "two errors cannot be corrected");
+    }
+
+    #[test]
+    fn regression_vector_7() {
+        // Found by fuzzer. One (nontrivial) error marked as an erasure, in a pattern for
+        // which deg(evaluator) == deg(errata_locator) == 1. The real code requires the
+        // evaluator degree to be *strictly* less than the locator degree; the `<` -> `<=`
+        // mutant accepts equality, and this vector's bogus locator has a full set of
+        // in-bounds roots, so the mutant would return a correction where we (correctly)
+        // return None. See issue #312.
+        let e = UncheckedHrpstring::new(
+            "bc1s0z6ryqr3ja807hnja2s7mkgfdcgvqwp5swz4ff4ngsjecfz0w0pqud7k38",
+        )
+        .expect("well-formed string")
+        .validate_checksum::<crate::Bech32>()
+        .expect_err("invalid bech32 string");
+        let mut ctx = e.correction_context::<Bech32>(59).unwrap();
+        ctx.add_erasures(&[16]);
+        assert!(ctx.bch_errors().is_none(), "cannot correct");
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn regression_vector_8() {
+        // Found by fuzzer. Same as `regression_vector_6` but for Codex32, whose singleton
+        // bound is 8, and which sits right at the edge of the correction radius: four
+        // unknown errors plus one erasure gives 2E + X = 9, just one past the bound. The
+        // `+` -> `*` mutant computes 1 * 2 * 4 = 8 <= 8 and accepts; its "correction"
+        // passes all the subsequent checks. See issue #312.
+        let e = UncheckedHrpstring::new("ms10tes2sxxxxxxxxxxxxxxxxxxxxxwxfxx4nzvcx9kmczlw")
+            .expect("well-formed string")
+            .validate_checksum::<Codex32>()
+            .expect_err("invalid codex32 string");
+        let mut ctx = e.correction_context::<Codex32>(55).unwrap();
+        ctx.add_erasures(&[17]);
+        assert!(ctx.bch_errors().is_none(), "4 errors and 1 erasure exceed the bound of 8");
+    }
+
+    #[test]
     fn too_many_erasures_do_not_panic_without_alloc() {
         let checksum_error = UncheckedHrpstring::new("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdx")
             .expect("vector should parse")
