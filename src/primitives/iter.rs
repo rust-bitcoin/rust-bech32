@@ -633,6 +633,11 @@ mod tests {
         let expected = input_len / 5 * 8 + (input_len % 5 * 8 + 4) / 5;
         let iter = core::iter::repeat(0u8).take(input_len).bytes_to_fes();
         assert_eq!(iter.size_hint(), (expected, Some(expected)));
+
+        // This one will actually overflow, but barely.
+        let input_len = (usize::MAX / 8 + 1) * 5;
+        let iter = core::iter::repeat(0u8).take(input_len).bytes_to_fes();
+        assert_eq!(iter.size_hint(), (usize::MAX, None));
     }
 
     #[test]
