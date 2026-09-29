@@ -97,7 +97,7 @@ fn bytes_len_to_fes_len(bytes: usize, extra_bits: usize) -> Option<usize> {
     let q = bytes / 5;
     let r = bytes % 5;
 
-    Some(q.checked_mul(8)? + (8 * r + extra_bits + 4) / 5)
+    q.checked_mul(8)?.checked_add((8 * r + extra_bits + 4) / 5)
 }
 
 /// Iterator adaptor that converts bytes to GF32 elements.
