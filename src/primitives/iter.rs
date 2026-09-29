@@ -267,7 +267,7 @@ where
     I: Iterator<Item = Fe32>,
     Ck: Checksum,
 {
-    iter: I,
+    iter: Option<I>,
     checksum_remaining: usize,
     checksum_engine: checksum::Engine<Ck>,
 }
@@ -282,7 +282,7 @@ where
     #[inline]
     pub fn new(data: I) -> Self {
         Self {
-            iter: data,
+            iter: Some(data),
             checksum_remaining: Ck::CHECKSUM_LENGTH,
             checksum_engine: checksum::Engine::new(),
         }
@@ -307,12 +307,13 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Fe32> {
-        match self.iter.next() {
+        match self.iter.as_mut().and_then(Iterator::next) {
             Some(fe) => {
                 self.checksum_engine.input_fe(fe);
                 Some(fe)
             }
-            None =>
+            None => {
+                self.iter = None;
                 if self.checksum_remaining == 0 {
                     None
                 } else {
@@ -321,14 +322,18 @@ where
                     }
                     self.checksum_remaining -= 1;
                     Some(Fe32(self.checksum_engine.residue().unpack(self.checksum_remaining)))
-                },
+                }
+            }
         }
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let add = self.checksum_remaining;
-        let (min, max) = self.iter.size_hint();
+        let (min, max) = match self.iter {
+            Some(ref iter) => iter.size_hint(),
+            None => (0, Some(0)),
+        };
 
         (min.saturating_add(add), max.and_then(|max| max.checked_add(add)))
     }
