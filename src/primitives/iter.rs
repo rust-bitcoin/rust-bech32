@@ -667,4 +667,19 @@ mod tests {
         let encoded = Checksummed::<_, crate::Bech32>::new(data);
         assert_eq!(encoded.size_hint(), (usize::MAX, None));
     }
+
+    #[test]
+    fn checksummed_respects_unfused_iterator() {
+        struct PanicIter(bool);
+        impl Iterator for PanicIter {
+            type Item = Fe32;
+            fn next(&mut self) -> Option<Self::Item> {
+                assert!(!self.0); // panic after second call
+                self.0 = true;
+                None
+            }
+        }
+
+        let _ = Checksummed::<_, crate::Bech32>::new(PanicIter(false)).count();
+    }
 }
