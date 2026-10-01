@@ -97,7 +97,7 @@ fn bytes_len_to_fes_len(bytes: usize, extra_bits: usize) -> Option<usize> {
     let q = bytes / 5;
     let r = bytes % 5;
 
-    Some(q.checked_mul(8)? + (8 * r + extra_bits + 4) / 5)
+    q.checked_mul(8)?.checked_add((8 * r + extra_bits + 4) / 5)
 }
 
 /// Iterator adaptor that converts bytes to GF32 elements.
@@ -267,7 +267,7 @@ where
     I: Iterator<Item = Fe32>,
     Ck: Checksum,
 {
-    iter: I,
+    iter: Option<I>,
     checksum_remaining: usize,
     checksum_engine: checksum::Engine<Ck>,
 }
@@ -282,7 +282,7 @@ where
     #[inline]
     pub fn new(data: I) -> Self {
         Self {
-            iter: data,
+            iter: Some(data),
             checksum_remaining: Ck::CHECKSUM_LENGTH,
             checksum_engine: checksum::Engine::new(),
         }
@@ -307,12 +307,13 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Fe32> {
-        match self.iter.next() {
+        match self.iter.as_mut().and_then(Iterator::next) {
             Some(fe) => {
                 self.checksum_engine.input_fe(fe);
                 Some(fe)
             }
-            None =>
+            None => {
+                self.iter = None;
                 if self.checksum_remaining == 0 {
                     None
                 } else {
@@ -321,14 +322,18 @@ where
                     }
                     self.checksum_remaining -= 1;
                     Some(Fe32(self.checksum_engine.residue().unpack(self.checksum_remaining)))
-                },
+                }
+            }
         }
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let add = self.checksum_remaining;
-        let (min, max) = self.iter.size_hint();
+        let (min, max) = match self.iter {
+            Some(ref iter) => iter.size_hint(),
+            None => (0, Some(0)),
+        };
 
         (min.saturating_add(add), max.and_then(|max| max.checked_add(add)))
     }
@@ -633,6 +638,11 @@ mod tests {
         let expected = input_len / 5 * 8 + (input_len % 5 * 8 + 4) / 5;
         let iter = core::iter::repeat(0u8).take(input_len).bytes_to_fes();
         assert_eq!(iter.size_hint(), (expected, Some(expected)));
+
+        // This one will actually overflow, but barely.
+        let input_len = (usize::MAX / 8 + 1) * 5;
+        let iter = core::iter::repeat(0u8).take(input_len).bytes_to_fes();
+        assert_eq!(iter.size_hint(), (usize::MAX, None));
     }
 
     #[test]
@@ -656,5 +666,20 @@ mod tests {
         let data = core::iter::repeat(Fe32::Q).take(usize::MAX);
         let encoded = Checksummed::<_, crate::Bech32>::new(data);
         assert_eq!(encoded.size_hint(), (usize::MAX, None));
+    }
+
+    #[test]
+    fn checksummed_respects_unfused_iterator() {
+        struct PanicIter(bool);
+        impl Iterator for PanicIter {
+            type Item = Fe32;
+            fn next(&mut self) -> Option<Self::Item> {
+                assert!(!self.0); // panic after second call
+                self.0 = true;
+                None
+            }
+        }
+
+        let _ = Checksummed::<_, crate::Bech32>::new(PanicIter(false)).count();
     }
 }
