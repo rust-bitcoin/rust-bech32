@@ -582,6 +582,92 @@ mod tests {
     }
 
     #[test]
+    fn regression_vector_5() {
+        // Found by fuzzer. This has a single (nontrivial) error, which is covered by an
+        // erasure, plus three further erasures, for a total of four -- one more than the
+        // singleton bound of 3. The erasure list is processed one at a time, and the
+        // decision point is when `erasures.len()` is exactly equal to the bound: we must
+        // push the fourth erasure (after which `bch_errors` correctly refuses, since four
+        // erasures can never be corrected). Mutants which tighten the break condition to
+        // `len == bound` or `len >= bound` stop at three erasures instead -- and since
+        // three erasures are within the bound, they would then happily return a
+        // "correction". See issue #312.
+        let e = UncheckedHrpstring::new(
+            "bc1qwzrryqr3ja8w7hnza2spmkgfdcgvqwp5swz4af4ngsjecfz0w0pqud7k38",
+        )
+        .expect("well-formed string")
+        .validate_checksum::<crate::Bech32>()
+        .expect_err("invalid bech32 string");
+
+        // With only the first three erasures we are exactly at the bound, and correction
+        // succeeds. This is what the mutants would end up doing if given all four.
+        let mut ctx = e.correction_context::<Bech32>(59).unwrap();
+        ctx.add_erasures(&[42, 23, 19]);
+        assert!(ctx.bch_errors().is_some(), "three erasures are exactly at the bound");
+
+        // With all four erasures, we must keep all four (not silently drop the last one)
+        // and refuse to correct.
+        let mut ctx = e.correction_context::<Bech32>(59).unwrap();
+        ctx.add_erasures(&[42, 23, 19, 58]);
+        assert!(ctx.bch_errors().is_none(), "four erasures exceed the bound");
+    }
+
+    #[test]
+    fn regression_vector_6() {
+        // Found by fuzzer. This has two unknown errors and no erasures: 2E + X = 4 exceeds
+        // the singleton bound of 3, so we refuse to correct. The `+` -> `*` mutant in
+        // `bch_errors` instead computes deg(erasure_locator) * 2 * deg(conn) = 0 * 4 = 0,
+        // which is trivially within the bound, and accepts -- the resulting "correction"
+        // passes all the subsequent degree and root-count checks. With no erasures the
+        // left side of the bound check degenerates, which is why this vector is needed.
+        // See issue #312.
+        let e = UncheckedHrpstring::new(
+            "bc1gwzrryqr3ja8w7hnja2spmkgfdcgvqwp5uwz4af4ngsjecfz0w0pqud7k38",
+        )
+        .expect("well-formed string")
+        .validate_checksum::<crate::Bech32>()
+        .expect_err("invalid bech32 string");
+        let ctx = e.correction_context::<Bech32>(59).unwrap();
+        assert!(ctx.bch_errors().is_none(), "two errors cannot be corrected");
+    }
+
+    #[test]
+    fn regression_vector_7() {
+        // Found by fuzzer. One (nontrivial) error marked as an erasure, in a pattern for
+        // which deg(evaluator) == deg(errata_locator) == 1. The real code requires the
+        // evaluator degree to be *strictly* less than the locator degree; the `<` -> `<=`
+        // mutant accepts equality, and this vector's bogus locator has a full set of
+        // in-bounds roots, so the mutant would return a correction where we (correctly)
+        // return None. See issue #312.
+        let e = UncheckedHrpstring::new(
+            "bc1s0z6ryqr3ja807hnja2s7mkgfdcgvqwp5swz4ff4ngsjecfz0w0pqud7k38",
+        )
+        .expect("well-formed string")
+        .validate_checksum::<crate::Bech32>()
+        .expect_err("invalid bech32 string");
+        let mut ctx = e.correction_context::<Bech32>(59).unwrap();
+        ctx.add_erasures(&[16]);
+        assert!(ctx.bch_errors().is_none(), "cannot correct");
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn regression_vector_8() {
+        // Found by fuzzer. Same as `regression_vector_6` but for Codex32, whose singleton
+        // bound is 8, and which sits right at the edge of the correction radius: four
+        // unknown errors plus one erasure gives 2E + X = 9, just one past the bound. The
+        // `+` -> `*` mutant computes 1 * 2 * 4 = 8 <= 8 and accepts; its "correction"
+        // passes all the subsequent checks. See issue #312.
+        let e = UncheckedHrpstring::new("ms10tes2sxxxxxxxxxxxxxxxxxxxxxwxfxx4nzvcx9kmczlw")
+            .expect("well-formed string")
+            .validate_checksum::<Codex32>()
+            .expect_err("invalid codex32 string");
+        let mut ctx = e.correction_context::<Codex32>(55).unwrap();
+        ctx.add_erasures(&[17]);
+        assert!(ctx.bch_errors().is_none(), "4 errors and 1 erasure exceed the bound of 8");
+    }
+
+    #[test]
     fn too_many_erasures_do_not_panic_without_alloc() {
         let checksum_error = UncheckedHrpstring::new("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdx")
             .expect("vector should parse")
@@ -625,5 +711,138 @@ mod tests {
             checksum_error.correction_context::<Bech32>(45).is_none(),
             "a short mismatched checksum must not materialize an oversized residue"
         );
+    }
+
+    /// A checksum that can correct exactly NO_ALLOC_MAX_LENGTH erasures.
+    ///
+    /// Generated by the `generate_erasure_cap_checksum` test.
+    #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    enum RsMaxNoAlloc {}
+    // Code block generated by Checksum::print_impl polynomial h079f9p target qqqqqp)
+    impl Checksum for RsMaxNoAlloc {
+        type MidstateRepr = u32; // checksum packs into 30 bits
+
+        type CorrectionField = Fe32;
+        const ROOT_GENERATOR: Self::CorrectionField = Fe32::Z;
+        const ROOT_EXPONENTS: core::ops::RangeInclusive<usize> = 1..=6;
+
+        const CODE_LENGTH: usize = 31;
+        const CHECKSUM_LENGTH: usize = 6;
+        const GENERATOR_SH: [u32; 5] = [0x0a92f9f7, 0x152557c7, 0x28da0eae, 0x03a0987c, 0x05d130d1];
+        const TARGET_RESIDUE: u32 = 0x00000001;
+    }
+
+    #[test]
+    fn generate_erasure_cap_checksum() {
+        use core::convert::TryFrom as _;
+
+        use crate::primitives::checksum::{PackedFe32 as _, PrintImpl};
+
+        // Make a generator polynomial of the form product_i (x - Z^i) which will have
+        // correction field Fe32 (no/trivial extension) and be able to correct exactly
+        // n erasures for length n.
+        //
+        // The resulting code will be remarkably compact, for its correction properties,
+        // but have length 31 which is not super useful. But it will let us test edge
+        // cases for our NO_ALLOC_MAX_LENGTH logic.
+        let mut generator = Polynomial::with_monic_leading_term(&[]);
+        for i in 1..=u64::try_from(NO_ALLOC_MAX_LENGTH - 1).expect("lol") {
+            let factor = Polynomial::with_monic_leading_term(&[Fe32::Z.powu(i)]);
+            generator = generator.mul_mod_x_d(&factor, usize::MAX);
+        }
+        assert_eq!(generator.degree(), NO_ALLOC_MAX_LENGTH - 1);
+
+        // Sanity check that the existing RsMaxNoAlloc appears to be this.
+        // Weirdly annoying to get the generator from PrintImpl into a Polynomial...
+        let actual_generator = (0..NO_ALLOC_MAX_LENGTH - 1)
+            .map(|i| Fe32(RsMaxNoAlloc::GENERATOR_SH[0].unpack(i)))
+            .chain(core::iter::once(Fe32::P))
+            .collect();
+        if generator != actual_generator {
+            // ...and the reverse direction.
+            let mut gen_coeffs = generator.clone().into_inner();
+            gen_coeffs.reverse();
+            let mut residue = [Fe32::Q; NO_ALLOC_MAX_LENGTH - 1];
+            residue[NO_ALLOC_MAX_LENGTH - 2] = Fe32::P;
+
+            println!("{}", PrintImpl::<Fe32>::new("RsMaxNoAlloc", &gen_coeffs[1..], &residue));
+
+            panic!(
+                "Mismatch between `RsMaxNoAlloc` checksum and the formula that computes it. \
+                 If you changed NO_ALLOC_MAX_LENGTH then you must also update the checksum in \
+                 corrections.rs.
+
+                 Generator polynomial: {}\n
+                 Computed generator: {}\n",
+                actual_generator, generator,
+            );
+        }
+    }
+
+    #[test]
+    fn erasure_cap_without_alloc() {
+        let bad_string = "rs1ry9x8gqqqq0l7ptm";
+
+        #[cfg(feature = "alloc")]
+        {
+            let correct = crate::encode::<RsMaxNoAlloc>(
+                crate::Hrp::parse_unchecked("rs"),
+                &[0; NO_ALLOC_MAX_LENGTH - 1],
+            )
+            .unwrap();
+
+            // Corrupt the string by changing every character
+            let mut correct_b = correct.as_bytes().to_owned();
+            for (i, byte) in correct_b.iter_mut().enumerate().skip(3).take(NO_ALLOC_MAX_LENGTH - 1)
+            {
+                *byte = Fe32(i as u8).to_char() as u8;
+            }
+            let incorrect = core::str::from_utf8(&correct_b).unwrap();
+
+            if incorrect != bad_string {
+                panic!("Please update 'bad_string' to \"{}\"", incorrect);
+            }
+        }
+
+        let checksum_error = UncheckedHrpstring::new(bad_string)
+            .expect("vector should parse")
+            .validate_checksum::<RsMaxNoAlloc>()
+            .expect_err("vector should have an invalid checksum residue");
+        let mut ctx = checksum_error
+            .correction_context::<RsMaxNoAlloc>(bad_string.len() - 3)
+            .expect("residue should fit the correction context");
+
+        let mut erasures = [0; NO_ALLOC_MAX_LENGTH - 1];
+        for (i, erasure) in erasures.iter_mut().enumerate() {
+            *erasure = bad_string.len() - 4 - i;
+        }
+        ctx.add_erasures(&erasures);
+        let mut iter = ctx.bch_errors().expect("# of erasures exactly at the bound, correctable");
+        for i in 0..erasures.len() {
+            assert_eq!(
+                iter.next(),
+                Some((bad_string.len() - 4 - i, Fe32(3 + i as u8))),
+                "error at {}",
+                i
+            );
+        }
+        assert_eq!(iter.next(), None, "exactly six errors");
+
+        // Asking for `NO_ALLOC_MAX_LENGTH + 1` erasures must not panic. In no-alloc builds
+        // the only thing stopping us from writing past the end of the fixed-size array is
+        // the `len() + 1 == NO_ALLOC_MAX_LENGTH` break in `add_erasures`: the singleton
+        // bound of 6 lets 7 erasures through, which is exactly the array's capacity, so the
+        // 8th is the first one the cap check must stop. With the cap in place only 6
+        // erasures are retained -- exactly at the singleton bound, so correction proceeds;
+        // mutating the cap to `len() - 1 == ...` or `len() * 1 == ...` lets the 7th and 8th
+        // pushes through, which trips `FieldVec`'s capacity assertion. With `alloc` the cap
+        // is compiled out, all 8 erasures are retained, and the singleton bound rejects.
+        let mut ctx = checksum_error.correction_context::<RsMaxNoAlloc>(15).unwrap();
+        ctx.add_erasures(&[0, 1, 2, 3, 4, 5, 6, 7]);
+        if cfg!(feature = "alloc") {
+            assert!(ctx.bch_errors().is_none(), "8 erasures exceed the singleton bound of 6");
+        } else {
+            assert!(ctx.bch_errors().is_some(), "the cap retains 6 erasures, exactly correctable");
+        }
     }
 }

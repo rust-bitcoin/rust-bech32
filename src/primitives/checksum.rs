@@ -177,6 +177,7 @@ impl<'a, ExtField> PrintImpl<'a, ExtField> {
     /// # Panics
     ///
     /// Panics if any of the input values fail various sanity checks.
+    #[track_caller]
     pub fn new(name: &'a str, generator: &'a [Fe32], target: &'a [Fe32]) -> Self {
         // Sanity checks.
         assert_ne!(name.len(), 0, "type name cannot be the empty string");
@@ -241,7 +242,7 @@ where
         for fe in self.target {
             write!(f, "{}", fe)?;
         }
-        f.write_str("\n")?;
+        f.write_str(")\n")?;
         writeln!(f, "impl Checksum for {} {{", self.name)?;
         writeln!(
             f,
@@ -265,7 +266,7 @@ where
         writeln!(f, "    const GENERATOR_SH: [{}; 5] = [", self.midstate_repr)?;
         let mut gen5 = self.generator.clone().into_inner();
         for _ in 0..5 {
-            let gen_packed = u128::pack(gen5.iter().copied().map(From::from));
+            let gen_packed = u128::pack(gen5.iter().rev().skip(1).copied().map(From::from));
             writeln!(f, "        0x{:0width$x},", gen_packed, width = self.hex_width)?;
             gen5.iter_mut().for_each(|x| *x *= Fe32::Z);
         }
@@ -619,13 +620,14 @@ mod tests {
         )
         .to_string();
 
-        let generator_shift = "0x4eb8406b0"; // generator << 2^3
-        assert!(
-            rendered.contains(generator_shift),
-            "generated impl missing expected fragment: {}\n\n{}",
-            generator_shift,
-            rendered
-        );
+        for generator_shift in crate::Bech32::GENERATOR_SH {
+            assert!(
+                rendered.contains(&format!("{:08x}", generator_shift)),
+                "generated impl missing expected fragment: {:08x}\n\n{}",
+                generator_shift,
+                rendered
+            );
+        }
     }
 
     #[test]
