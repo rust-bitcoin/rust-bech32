@@ -898,4 +898,16 @@ mod tests {
         let result = Hrp::parse_display(Repeated { chunk, count: 4096 });
         assert!(result.is_err(), "oversized formatted input must be rejected without panicking");
     }
+
+    #[test]
+    #[allow(deprecated)] // SipHasher deprecated with no replacement
+    fn hrp_hash_includes_actual_length() {
+        use core::hash::SipHasher;
+
+        let mut hasher_1 = SipHasher::new();
+        let mut hasher_2 = SipHasher::new();
+        Hrp::parse_unchecked("aa").hash(&mut hasher_2);
+        (Hrp::parse_unchecked("a"), b'a').hash(&mut hasher_1);
+        assert_ne!(hasher_1.finish(), hasher_2.finish());
+    }
 }
