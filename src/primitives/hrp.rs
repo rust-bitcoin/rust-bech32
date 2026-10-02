@@ -361,7 +361,7 @@ impl Eq for Hrp {}
 impl core::hash::Hash for Hrp {
     #[inline]
     fn hash<H: core::hash::Hasher>(&self, h: &mut H) {
-        self.buf.len().hash(h);
+        self.len().hash(h);
         self.lowercase_byte_iter().for_each(|ch| ch.hash(h))
     }
 }
@@ -897,5 +897,17 @@ mod tests {
         // 4096 writes of 1 MiB overflow a 32-bit usize using only 1 MiB.
         let result = Hrp::parse_display(Repeated { chunk, count: 4096 });
         assert!(result.is_err(), "oversized formatted input must be rejected without panicking");
+    }
+
+    #[test]
+    #[allow(deprecated)] // SipHasher deprecated with no replacement
+    fn hrp_hash_includes_actual_length() {
+        use core::hash::SipHasher;
+
+        let mut hasher_1 = SipHasher::new();
+        let mut hasher_2 = SipHasher::new();
+        Hrp::parse_unchecked("aa").hash(&mut hasher_2);
+        (Hrp::parse_unchecked("a"), b'a').hash(&mut hasher_1);
+        assert_ne!(hasher_1.finish(), hasher_2.finish());
     }
 }
