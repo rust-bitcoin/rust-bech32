@@ -170,7 +170,7 @@ impl<Ck: Checksum> Corrector<Ck> {
             // Each erasure contributes degree 1 to the "erasure locator" polynomial,
             // whose maximum degree is `NO_ALLOC_MAX_LENGTH - 1`.
             #[cfg(not(feature = "alloc"))]
-            if self.erasures.len() + 1 == NO_ALLOC_MAX_LENGTH {
+            if self.erasures.len() == NO_ALLOC_MAX_LENGTH {
                 break;
             }
             // Similarly, if the user exceeds the singleton bound, just drop any remaining
@@ -828,21 +828,57 @@ mod tests {
         }
         assert_eq!(iter.next(), None, "exactly six errors");
 
-        // Asking for `NO_ALLOC_MAX_LENGTH + 1` erasures must not panic. In no-alloc builds
-        // the only thing stopping us from writing past the end of the fixed-size array is
-        // the `len() + 1 == NO_ALLOC_MAX_LENGTH` break in `add_erasures`: the singleton
-        // bound of 6 lets 7 erasures through, which is exactly the array's capacity, so the
-        // 8th is the first one the cap check must stop. With the cap in place only 6
-        // erasures are retained -- exactly at the singleton bound, so correction proceeds;
-        // mutating the cap to `len() - 1 == ...` or `len() * 1 == ...` lets the 7th and 8th
-        // pushes through, which trips `FieldVec`'s capacity assertion. With `alloc` the cap
-        // is compiled out, all 8 erasures are retained, and the singleton bound rejects.
+        // Asking for `NO_ALLOC_MAX_LENGTH` erasures must not panic, but nor should it work.
         let mut ctx = checksum_error.correction_context::<RsMaxNoAlloc>(15).unwrap();
-        ctx.add_erasures(&[0, 1, 2, 3, 4, 5, 6, 7]);
-        if cfg!(feature = "alloc") {
-            assert!(ctx.bch_errors().is_none(), "8 erasures exceed the singleton bound of 6");
-        } else {
-            assert!(ctx.bch_errors().is_some(), "the cap retains 6 erasures, exactly correctable");
+        ctx.add_erasures(&[0, 1, 2, 3, 4, 5, 6]);
+        assert!(ctx.bch_errors().is_none(), "7 erasures exceed the singleton bound of 6");
+    }
+
+    #[test]
+    fn excess_erasures_must_not_select_an_ambiguous_codeword() {
+        assert_eq!(NO_ALLOC_MAX_LENGTH, 7, "update this test if NO_ALLOC_MAX_LENGTH changes");
+
+        // Input string which has a bad checksum. If the last six characters are erased, it
+        // can be uniquely corrected (to `snd`), but if the last seven are erased, then
+        // correction is impossible (cannot distinguish between `fst` and `snd`).
+        let inp = "rs1qqqqqqqqqpqqqqqq";
+        let fst = "rs1qqqqqqqqqq0l7ptm";
+        let snd = "rs1qqqqqqqqqp2kmlyv";
+        let erasures = [0, 1, 2, 3, 4, 5, 6];
+
+        // Sanity check the test data.
+        for candidate in [fst, snd].iter() {
+            assert!(UncheckedHrpstring::new(candidate)
+                .unwrap()
+                .has_valid_checksum::<RsMaxNoAlloc>());
+            assert_eq!(
+                &candidate.as_bytes()[..candidate.len() - erasures.len()],
+                &inp.as_bytes()[..inp.len() - erasures.len()]
+            );
         }
+        assert_ne!(fst, snd);
+
+        let error =
+            UncheckedHrpstring::new(inp).unwrap().validate_checksum::<RsMaxNoAlloc>().unwrap_err();
+        let mut context = error.correction_context::<RsMaxNoAlloc>(inp.len() - 3).unwrap();
+        assert_eq!(context.singleton_bound(), 6);
+
+        // With only the checksum erased, the remaining payload selects second.
+        context.add_erasures(&erasures[..6]);
+        let mut repaired = *b"rs1qqqqqqqqqpqqqqqq";
+        for (index, value) in context.bch_errors().unwrap() {
+            let position = repaired.len() - 1 - index;
+            repaired[position] =
+                (Fe32::from_char(repaired[position] as char).unwrap() + value).to_char() as u8;
+        }
+        assert_eq!(core::str::from_utf8(&repaired).unwrap(), snd);
+
+        // The seventh erasure removes that distinguishing payload symbol.
+        // HEAD silently drops it and returns the previous correction again.
+        context.add_erasures(&erasures[6..]);
+        assert!(
+            context.bch_errors().is_none(),
+            "seven erasures exceed the bound and admit multiple valid completions"
+        );
     }
 }
