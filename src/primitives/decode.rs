@@ -452,7 +452,7 @@ impl<'s> CheckedHrpstring<'s> {
         }
 
         let fe_iter = AsciiToFe32Iter { iter: self.ascii.iter().copied() };
-        let padding_len = fe_iter.len() * 5 % 8;
+        let padding_len = (fe_iter.len() % 8) * 5 % 8;
 
         if padding_len > 4 {
             return Err(PaddingError::TooMuch);
