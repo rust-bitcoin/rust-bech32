@@ -69,7 +69,7 @@ exclude_re = [
     "replace % with \\+ in Polynomial<F>::bch_generator_primitive_element", # The ratio is used modulo the multiplicative order later, so this changes only its representative.
     "replace > with >= in Polynomial<F>::bch_generator_primitive_element",  # This only changes tie-breaking between equally long root runs; all accepted ties are algebraically valid.
 
-    "replace % with + in CheckedHrpstring<'s>::validate_segwit_padding", # Both "% 8" and "+ 8" are no-ops here except + can overflow, but this would require 800MM memory to test
+    "replace % with \\+ in CheckedHrpstring<'s>::validate_segwit_padding", # Both "% 8" and "+ 8" are no-ops here except + can overflow, but this would require 800MM memory to test
 
     # ----------------------------------Timeout mutations----------------------------------
 
