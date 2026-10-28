@@ -151,6 +151,16 @@ impl<F> FieldVec<F> {
         }
         self.inner_a[..self.len].iter_mut()
     }
+
+    /// Sorts the elements of the [`FieldVec`] in place, using the provided sort-key function.
+    pub fn sort_by_key<V: Ord>(&mut self, keyfn: impl FnMut(&F) -> V) {
+        #[cfg(feature = "alloc")]
+        if self.len > NO_ALLOC_MAX_LENGTH {
+            self.inner_v.sort_unstable_by_key(keyfn);
+            return;
+        }
+        self.inner_a.sort_unstable_by_key(keyfn);
+    }
 }
 
 impl<F: Field> FieldVec<F> {

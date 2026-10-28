@@ -237,6 +237,9 @@ impl<Ck: Checksum> Corrector<Ck> {
             // If we are within the correction radius, it can be shown that the evaluator degree
             // is strictly less than the locator degree. This is a very cheap check, so do it here.
             if evaluator.degree() < errata_locator.degree() {
+                // ...however, if we are outside of the correction radius, this check might pass
+                // but several other things may be wrong (and lead to faulty corrections).
+
                 let ret = ErrorIterator {
                     evaluator,
                     locator_derivative: errata_locator.formal_derivative(),
@@ -246,20 +249,58 @@ impl<Ck: Checksum> Corrector<Ck> {
                     c: *Ck::ROOT_EXPONENTS.start(),
                 };
 
-                // ...however, if we are outside of the correction radius, several things may still
-                // go wrong. In particular, we may have fewer roots than we expect (the locator
-                // polynomial is not fully reducible) or we may have roots that lie outside of the
-                // base field (our syndromes are "best explained" by some weird object which is not
-                // an error pattern).
+                // If we obtain a "valid correction" whose error pattern goes outside the bounds
+                // of the string, filter those errors out.
+                let mut idx_err: FieldVec<(_, _)> =
+                    ret.clone().filter(|(idx, _)| *idx < self.max_index).collect();
+
+                // If we have fewer roots than we expect, we may have rejected out-of-range ones,
+                // or our locator polynomial is not fully reducible, or it has roots that lie
+                // outside of the base field. In all cases, our syndromes are "best explained" by
+                // some weird object which is not an error pattern, so we reject it.
                 //
-                // In the latter case, because our iterator terminates early if it would return
+                // (In the latter case, because our iterator terminates early if it would return
                 // something not in the base field, our root count will fail. So we don't need to
-                // do a separate "not in the base field" check here.
+                // do an explicit "not in the base field" check here.)
+                if idx_err.len() != errata_locator.degree() {
+                    return None;
+                }
+
+                // Alternately, if our *generator polynomial* has extra roots outside of the
+                // `Ck::ROOT_EXPONENTS` range, the "syndromes" we get by evaluating our residue
+                // at these extra roots might fail to satisfy the key equation. Since we only
+                // checked the roots in `Ck::ROOT_EXPONENTS` (and we can't check the other roots
+                // using LFSR tricks, since they're not consecutive with the ones we did check),
+                // to detect this situation we just need to test whether our error correction
+                // actually cancels the residue.
                 //
-                // Alternately, we may obtain a "valid correction" whose error pattern goes outside
-                // the bounds of the string. This is also nonsensical, so we filter it out.
-                let n_roots = ret.clone().filter(|(idx, _)| *idx < self.max_index).count();
-                if n_roots == errata_locator.degree() {
+                // (I tried prompting multiple LLMs to find a "more algebraic" solution here, but
+                // the best I got was GPT 6 using the recurrence relation on the syndromes
+                //
+                //     sum_{k=0}^t Lambda_k S_{j-k} = 0
+                //
+                // to rachet the initial syndromes forward to get new ones at every point of the
+                // extension field. Then at each root, you can evaluate the residue and compare
+                // its value to the racheted syndrome. I guess that'd work (assuming that the
+                // recurrence relation holds only for valid error patterns, which I don't know),
+                // but it's way slower than just checking our proposed pattern.
+                idx_err.sort_by_key(|(idx, _)| core::cmp::Reverse(*idx));
+
+                let mut engine = crate::primitives::checksum::Engine::<Ck>::new_zeroed();
+                let mut last_idx = idx_err[0].0;
+                engine.input_fe(idx_err[0].1);
+                for (idx, err) in idx_err.iter().skip(1) {
+                    for _ in 0..last_idx - idx - 1 {
+                        engine.input_fe(Fe32::Q);
+                    }
+                    engine.input_fe(*err);
+                    last_idx = *idx;
+                }
+                for _ in 0..last_idx {
+                    engine.input_fe(Fe32::Q);
+                }
+
+                if Polynomial::from_residue(*engine.residue()) == self.residue {
                     Some(ret)
                 } else {
                     None
