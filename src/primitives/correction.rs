@@ -266,6 +266,14 @@ impl<Ck: Checksum> Corrector<Ck> {
                     return None;
                 }
 
+                // No valid error pattern will lead to double roots.
+                idx_err.sort_by_key(|(idx, _)| core::cmp::Reverse(*idx));
+                for window in idx_err.as_slice().windows(2) {
+                    if window[0].0 == window[1].0 {
+                        return None;
+                    }
+                }
+
                 // Alternately, if our *generator polynomial* has extra roots outside of the
                 // `Ck::ROOT_EXPONENTS` range, the "syndromes" we get by evaluating our residue
                 // at these extra roots might fail to satisfy the key equation. Since we only
@@ -284,7 +292,6 @@ impl<Ck: Checksum> Corrector<Ck> {
                 // its value to the racheted syndrome. I guess that'd work (assuming that the
                 // recurrence relation holds only for valid error patterns, which I don't know),
                 // but it's way slower than just checking our proposed pattern.
-                idx_err.sort_by_key(|(idx, _)| core::cmp::Reverse(*idx));
 
                 let mut engine = crate::primitives::checksum::Engine::<Ck>::new_zeroed();
                 let mut last_idx = idx_err[0].0;

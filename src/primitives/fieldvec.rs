@@ -124,19 +124,26 @@ impl<F> FieldVec<F> {
         }
     }
 
+    /// Returns the [`FieldVec`] as a Rust slice of field elements.
+    ///
+    /// # Panics
+    ///
+    /// Panics if [`Self::has_data`] is false.
+    pub fn as_slice(&self) -> &[F] {
+        if self.len > NO_ALLOC_MAX_LENGTH {
+            self.assert_has_data();
+            #[cfg(feature = "alloc")]
+            return &self.inner_v[..self.len];
+        }
+        &self.inner_a[..self.len]
+    }
+
     /// Returns an immutable iterator over the elements in the vector.
     ///
     /// # Panics
     ///
     /// Panics if [`Self::has_data`] is false.
-    pub fn iter(&self) -> slice::Iter<'_, F> {
-        if self.len > NO_ALLOC_MAX_LENGTH {
-            self.assert_has_data();
-            #[cfg(feature = "alloc")]
-            return self.inner_v[..self.len].iter();
-        }
-        self.inner_a[..self.len].iter()
-    }
+    pub fn iter(&self) -> slice::Iter<'_, F> { self.as_slice().iter() }
 
     /// Returns a mutable iterator over the elements in the vector.
     ///
