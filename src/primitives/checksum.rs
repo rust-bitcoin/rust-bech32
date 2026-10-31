@@ -300,6 +300,14 @@ impl<Ck: Checksum> Engine<Ck> {
     #[inline]
     pub fn new() -> Self { Self { residue: Ck::MidstateRepr::ONE } }
 
+    /// Constructs a new checksum engine with no data input whose initial residue is set to zero
+    /// rather than one.
+    ///
+    /// This function should only be used in specialized scenarios, such as error correction,
+    /// when one needs to compute the checksum of a difference of strings.
+    #[inline]
+    pub fn new_zeroed() -> Self { Self { residue: Ck::MidstateRepr::pack(core::iter::once(0)) } }
+
     /// Feeds `hrp` into the checksum engine.
     #[inline]
     pub fn input_hrp(&mut self, hrp: Hrp) {
