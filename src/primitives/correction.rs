@@ -237,6 +237,9 @@ impl<Ck: Checksum> Corrector<Ck> {
             // If we are within the correction radius, it can be shown that the evaluator degree
             // is strictly less than the locator degree. This is a very cheap check, so do it here.
             if evaluator.degree() < errata_locator.degree() {
+                // ...however, if we are outside of the correction radius, this check might pass
+                // but several other things may be wrong (and lead to faulty corrections).
+
                 let ret = ErrorIterator {
                     evaluator,
                     locator_derivative: errata_locator.formal_derivative(),
@@ -246,20 +249,65 @@ impl<Ck: Checksum> Corrector<Ck> {
                     c: *Ck::ROOT_EXPONENTS.start(),
                 };
 
-                // ...however, if we are outside of the correction radius, several things may still
-                // go wrong. In particular, we may have fewer roots than we expect (the locator
-                // polynomial is not fully reducible) or we may have roots that lie outside of the
-                // base field (our syndromes are "best explained" by some weird object which is not
-                // an error pattern).
+                // If we obtain a "valid correction" whose error pattern goes outside the bounds
+                // of the string, filter those errors out.
+                let mut idx_err: FieldVec<(_, _)> =
+                    ret.clone().filter(|(idx, _)| *idx < self.max_index).collect();
+
+                // If we have fewer roots than we expect, we may have rejected out-of-range ones,
+                // or our locator polynomial is not fully reducible, or it has roots that lie
+                // outside of the base field. In all cases, our syndromes are "best explained" by
+                // some weird object which is not an error pattern, so we reject it.
                 //
-                // In the latter case, because our iterator terminates early if it would return
+                // (In the latter case, because our iterator terminates early if it would return
                 // something not in the base field, our root count will fail. So we don't need to
-                // do a separate "not in the base field" check here.
+                // do an explicit "not in the base field" check here.)
+                if idx_err.len() != errata_locator.degree() {
+                    return None;
+                }
+
+                // No valid error pattern will lead to double roots.
+                idx_err.sort_by_key(|(idx, _)| core::cmp::Reverse(*idx));
+                for window in idx_err.as_slice().windows(2) {
+                    if window[0].0 == window[1].0 {
+                        return None;
+                    }
+                }
+
+                // Alternately, if our *generator polynomial* has extra roots outside of the
+                // `Ck::ROOT_EXPONENTS` range, the "syndromes" we get by evaluating our residue
+                // at these extra roots might fail to satisfy the key equation. Since we only
+                // checked the roots in `Ck::ROOT_EXPONENTS` (and we can't check the other roots
+                // using LFSR tricks, since they're not consecutive with the ones we did check),
+                // to detect this situation we just need to test whether our error correction
+                // actually cancels the residue.
                 //
-                // Alternately, we may obtain a "valid correction" whose error pattern goes outside
-                // the bounds of the string. This is also nonsensical, so we filter it out.
-                let n_roots = ret.clone().filter(|(idx, _)| *idx < self.max_index).count();
-                if n_roots == errata_locator.degree() {
+                // (I tried prompting multiple LLMs to find a "more algebraic" solution here, but
+                // the best I got was GPT 6 using the recurrence relation on the syndromes
+                //
+                //     sum_{k=0}^t Lambda_k S_{j-k} = 0
+                //
+                // to rachet the initial syndromes forward to get new ones at every point of the
+                // extension field. Then at each root, you can evaluate the residue and compare
+                // its value to the racheted syndrome. I guess that'd work (assuming that the
+                // recurrence relation holds only for valid error patterns, which I don't know),
+                // but it's way slower than just checking our proposed pattern.
+
+                let mut engine = crate::primitives::checksum::Engine::<Ck>::new_zeroed();
+                let mut last_idx = idx_err[0].0;
+                engine.input_fe(idx_err[0].1);
+                for (idx, err) in idx_err.iter().skip(1) {
+                    for _ in 0..last_idx - idx - 1 {
+                        engine.input_fe(Fe32::Q);
+                    }
+                    engine.input_fe(*err);
+                    last_idx = *idx;
+                }
+                for _ in 0..last_idx {
+                    engine.input_fe(Fe32::Q);
+                }
+
+                if Polynomial::from_residue(*engine.residue()) == self.residue {
                     Some(ret)
                 } else {
                     None
@@ -484,6 +532,224 @@ mod tests {
         }
     }
 
+    // Construct the discrepancy using the checksum engine, independently of
+    // the syndrome computations used by the corrector.
+    fn corrector_for_pattern<Ck: Checksum>(pattern: &[(usize, Fe32)]) -> Corrector<Ck> {
+        use crate::primitives::checksum::PackedFe32 as _;
+
+        let mut engine = crate::primitives::checksum::Engine::<Ck>::new();
+        let mut zeros = crate::primitives::checksum::Engine::<Ck>::new();
+        for index in (0..Ck::CODE_LENGTH).rev() {
+            let value = pattern.iter().find(|&&(i, _)| i == index).map_or(Fe32::Q, |p| p.1);
+            engine.input_fe(value);
+            zeros.input_fe(Fe32::Q);
+        }
+        let residue = *engine.residue() ^ *zeros.residue();
+        Corrector {
+            erasures: FieldVec::new(),
+            residue: (0..Ck::CHECKSUM_LENGTH).map(|i| Fe32(residue.unpack(i))).collect(),
+            max_index: Ck::CODE_LENGTH,
+            phantom: PhantomData,
+        }
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn correction_checks_roots_outside_the_bch_range() {
+        enum DescriptorChecksum {}
+
+        impl Checksum for DescriptorChecksum {
+            type MidstateRepr = u64;
+            type CorrectionField = crate::Fe32768;
+            const ROOT_GENERATOR: Self::CorrectionField =
+                crate::Fe32768::new([Fe32::T, Fe32::G, Fe32::_0]);
+            const ROOT_EXPONENTS: core::ops::RangeInclusive<usize> = 1056..=1058;
+            const CODE_LENGTH: usize = 32767;
+            const CHECKSUM_LENGTH: usize = 8;
+            const GENERATOR_SH: [u64; 5] =
+                [0xf5dee51989, 0xa9fdca3312, 0x1bab10e32d, 0x3706b1677a, 0x644d626ffd];
+            const TARGET_RESIDUE: u64 = 1;
+        }
+
+        DescriptorChecksum::sanity_check();
+        assert!(UncheckedHrpstring::new("a1qqqqqqqqz4w8qtd6")
+            .unwrap()
+            .has_valid_checksum::<DescriptorChecksum>());
+
+        let one_error = UncheckedHrpstring::new("a1qqqqqqqqz4w8qtdm")
+            .unwrap()
+            .validate_checksum::<DescriptorChecksum>()
+            .unwrap_err();
+        let context = one_error.correction_context::<DescriptorChecksum>(16).unwrap();
+        let mut errors = context.bch_errors().expect("one error is correctable");
+        assert_eq!(errors.next(), Some((0, Fe32::P)));
+        assert_eq!(errors.next(), None);
+
+        // Issue #311: g(x)/(x + 1) + 1 has the same sampled syndromes as a
+        // single error at position zero, but differs at the unchecked root 1.
+        let error = UncheckedHrpstring::new("a1qqqqqqqqr2xqfggj")
+            .unwrap()
+            .validate_checksum::<DescriptorChecksum>()
+            .unwrap_err();
+        let context = error.correction_context::<DescriptorChecksum>(16).unwrap();
+        assert!(context.bch_errors().is_none(), "not correctable modulo the full generator");
+    }
+
+    #[test]
+    fn additional_roots_with_errors_and_erasures() {
+        // A small code with two independent roots outside the BCH range.
+        // All roots are in GF(32), so this also exercises the fallback without
+        // an allocator and without assuming a primitive extension-field root.
+        enum ExtraRoots {}
+        impl Checksum for ExtraRoots {
+            type MidstateRepr = u32;
+            type CorrectionField = crate::Fe1024;
+            const ROOT_GENERATOR: Self::CorrectionField = crate::Fe1024::new([Fe32::Z, Fe32::Q]);
+            const ROOT_EXPONENTS: core::ops::RangeInclusive<usize> = 1..=3;
+            const CODE_LENGTH: usize = 31;
+            const CHECKSUM_LENGTH: usize = 5;
+            // product (x - Z^i) for i in {1, 2, 3, 9, 17}.
+            const GENERATOR_SH: [u32; 5] = [0xb2b2e2, 0x16560e4, 0x5a65c8, 0xa0ef90, 0x1417e29];
+            const TARGET_RESIDUE: u32 = 1;
+        }
+        ExtraRoots::sanity_check();
+
+        type TestCase = (&'static [(usize, Fe32)], &'static [usize]);
+        let patterns: &[TestCase] = &[
+            (&[(0, Fe32::P)], &[]),
+            (&[(14, Fe32::L)], &[]),
+            (&[(30, Fe32::Z)], &[]),
+            (&[(0, Fe32::Q)], &[0]),
+            (&[(0, Fe32::Y), (30, Fe32::G)], &[30]),
+            (&[(0, Fe32::Y), (14, Fe32::S), (30, Fe32::G)], &[30, 0, 14]),
+            (&[(0, Fe32::Q), (14, Fe32::Q), (30, Fe32::G)], &[30, 0, 14]),
+        ];
+        for &(pattern, erasures) in patterns {
+            let mut corrector = corrector_for_pattern::<ExtraRoots>(pattern);
+            corrector.add_erasures(erasures);
+            let residue = corrector.residue.clone();
+            let mut expected = pattern.to_vec();
+            expected.sort_by_key(|&(i, _)| i);
+            let mut actual: Vec<_> = corrector.bch_errors().expect("correctable pattern").collect();
+            actual.sort_by_key(|&(i, _)| i);
+            assert_eq!(actual, expected);
+
+            let hidden_factors: &[&[Fe32]] = &[
+                // product (x - Z^i), i in {1, 2, 3}: neither extra root agrees.
+                &[Fe32::J, Fe32::_3, Fe32::W, Fe32::P],
+                // Also include i = 9: only the second extra root disagrees.
+                &[Fe32::X, Fe32::_6, Fe32::N, Fe32::N, Fe32::P],
+            ];
+            for factor in hidden_factors {
+                for value in 1..32 {
+                    // These change the full residue but none of the sampled
+                    // syndromes, so the formerly accepted correction must fail.
+                    let hidden: Polynomial<_> =
+                        factor.iter().map(|coefficient| *coefficient * Fe32(value)).collect();
+                    corrector.residue = residue.clone() + hidden;
+                    assert!(corrector.bch_errors().is_none(), "hidden residue {}", value);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn correction_rejects_repeated_generator_roots() {
+        enum RepeatedRoot {}
+        impl Checksum for RepeatedRoot {
+            type MidstateRepr = u32;
+            type CorrectionField = crate::Fe1024;
+            const ROOT_GENERATOR: Self::CorrectionField = crate::Fe1024::new([Fe32::Z, Fe32::Q]);
+            const ROOT_EXPONENTS: core::ops::RangeInclusive<usize> = 1..=3;
+            const CODE_LENGTH: usize = 31;
+            const CHECKSUM_LENGTH: usize = 4;
+            // g(x) = (x - Z)^2 (x - Z^2) (x - Z^3).
+            const GENERATOR_SH: [u32; 5] = [0x6372d, 0xc6b7a, 0xcf7fd, 0xdcef3, 0xfbcef];
+            const TARGET_RESIDUE: u32 = 1;
+        }
+        RepeatedRoot::sanity_check();
+
+        // g(x)/(x - Z) vanishes at every distinct root of g, but is not a
+        // multiple of g. Adding it hides a discrepancy from the syndromes.
+        let hidden: Polynomial<_> = [Fe32::J, Fe32::_3, Fe32::W, Fe32::P].iter().copied().collect();
+        let mut corrector = corrector_for_pattern::<RepeatedRoot>(&[(0, Fe32::P)]);
+        corrector.residue += &hidden;
+        assert_eq!(corrector.bch_errors().map(|errors| errors.collect::<Vec<_>>()), None);
+    }
+
+    #[test]
+    fn additional_roots_in_extension_field() {
+        // Use only two of Bech32's consecutive roots. The remaining quadratic
+        // factor has roots alpha^26 and alpha^(26*32), both outside GF(32).
+        enum ShortBchRange {}
+        impl Checksum for ShortBchRange {
+            type MidstateRepr = u32;
+            type CorrectionField = crate::Fe1024;
+            const ROOT_GENERATOR: Self::CorrectionField = Bech32::ROOT_GENERATOR;
+            const ROOT_EXPONENTS: core::ops::RangeInclusive<usize> = 24..=25;
+            const CODE_LENGTH: usize = Bech32::CODE_LENGTH;
+            const CHECKSUM_LENGTH: usize = Bech32::CHECKSUM_LENGTH;
+            const GENERATOR_SH: [u32; 5] = Bech32::GENERATOR_SH;
+            const TARGET_RESIDUE: u32 = Bech32::TARGET_RESIDUE;
+        }
+        ShortBchRange::sanity_check();
+
+        let mut hidden = Polynomial::with_monic_leading_term(&[]);
+        for root in ShortBchRange::ROOT_GENERATOR.powers_range(ShortBchRange::ROOT_EXPONENTS) {
+            for conjugate in &[root, root.powu(32)] {
+                let factor: Polynomial<_> =
+                    [*conjugate, crate::Fe1024::ONE].iter().copied().collect();
+                hidden = hidden.mul_mod_x_d(&factor, usize::MAX);
+            }
+        }
+        let hidden: Polynomial<Fe32> = hidden.iter().map(|r| (*r).try_into().unwrap()).collect();
+
+        for &(index, value) in &[(0, Fe32::P), (6, Fe32::T), (1022, Fe32::L)] {
+            let mut corrector = corrector_for_pattern::<ShortBchRange>(&[(index, value)]);
+            let mut errors = corrector.bch_errors().expect("one error is correctable");
+            assert_eq!(errors.next(), Some((index, value)));
+            assert_eq!(errors.next(), None);
+            // This leaves the sampled syndromes unchanged, but changes both
+            // additional syndromes, so the same candidate must now be rejected.
+            corrector.residue += &hidden;
+            assert!(corrector.bch_errors().is_none());
+        }
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn codex32_errors_and_erasures() {
+        let pattern = [
+            (0, Fe32::P),
+            (9, Fe32::Z),
+            (17, Fe32::R),
+            (42, Fe32::Y),
+            (63, Fe32::_9),
+            (75, Fe32::X),
+            (88, Fe32::_8),
+            (92, Fe32::G),
+        ];
+        // Exercise every combination of errors and erasures at the bound,
+        // including zero-valued erasures. Codex32's sampled roots and their
+        // conjugates cover the whole generator, so no extra checks are needed.
+        for n_errors in 0..=4 {
+            let n_errata = 8 - n_errors;
+            for n_dummy in 0..=n_errata - n_errors {
+                let mut expected = pattern[..n_errata].to_vec();
+                for (_, value) in expected.iter_mut().skip(n_errata - n_dummy) {
+                    *value = Fe32::Q;
+                }
+                let mut corrector = corrector_for_pattern::<Codex32>(&expected);
+                let erasures: Vec<_> = expected[n_errors..].iter().map(|&(i, _)| i).collect();
+                corrector.add_erasures(&erasures);
+                let mut actual: Vec<_> =
+                    corrector.bch_errors().expect("correctable pattern").collect();
+                actual.sort_by_key(|&(i, _)| i);
+                assert_eq!(actual, expected);
+            }
+        }
+    }
+
     #[test]
     fn residue_error() {
         let checksum_error = UncheckedHrpstring::new("A1G7SGD8")
@@ -665,6 +931,22 @@ mod tests {
         let mut ctx = e.correction_context::<Codex32>(55).unwrap();
         ctx.add_erasures(&[17]);
         assert!(ctx.bch_errors().is_none(), "4 errors and 1 erasure exceed the bound of 8");
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn regression_vector_9() {
+        // Found by fuzzer. This one leads to an "error locator" polynomial with double roots.
+        // Interestingly, this is sensitive to the order of the erasures. If you delete the
+        // double-root check in `bch_errors` this will fail, but after swapping any of the
+        // erasures with each other, it'll pass.
+        let e = UncheckedHrpstring::new("ms10tesqsxx8xxxxpxxxxxxxxx7xxxxxxax4npgca9smczlw")
+            .expect("well-formed string")
+            .validate_checksum::<Codex32>()
+            .expect_err("invalid codex32 string");
+        let mut ctx = e.correction_context::<Codex32>(55).unwrap();
+        ctx.add_erasures(&[43, 31, 21, 36, 34, 14, 9, 5]);
+        assert!(ctx.bch_errors().is_none(), "8 erasures and more errors exceed the bound of 8");
     }
 
     #[test]
