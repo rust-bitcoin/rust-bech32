@@ -704,6 +704,12 @@ mod tests {
         }
         let hidden: Polynomial<Fe32> = hidden.iter().map(|r| (*r).try_into().unwrap()).collect();
 
+        // The corrector sees no errors in this residue, so it must return None.
+        // See the note on roots outside `Ck::ROOT_EXPONENTS` in `bch_errors`.
+        let mut corrector = corrector_for_pattern::<ShortBchRange>(&[]);
+        corrector.residue = hidden.clone();
+        assert!(corrector.bch_errors().is_none());
+
         for &(index, value) in &[(0, Fe32::P), (6, Fe32::T), (1022, Fe32::L)] {
             let mut corrector = corrector_for_pattern::<ShortBchRange>(&[(index, value)]);
             let mut errors = corrector.bch_errors().expect("one error is correctable");
